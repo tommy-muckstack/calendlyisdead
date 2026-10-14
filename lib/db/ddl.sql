@@ -17,3 +17,22 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalEventId" text;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "meetingUrl" text;
 CREATE TABLE IF NOT EXISTS calendar_connections (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, provider text NOT NULL, "accountEmail" text NOT NULL DEFAULT '', secret text NOT NULL, status text NOT NULL DEFAULT 'ok', "createdAt" timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS user_calendars (id text PRIMARY KEY, "connectionId" text NOT NULL REFERENCES calendar_connections(id) ON DELETE CASCADE, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "externalId" text NOT NULL, name text NOT NULL, "isPrimary" boolean NOT NULL DEFAULT false, "canWrite" boolean NOT NULL DEFAULT true, "checkConflicts" boolean NOT NULL DEFAULT false, UNIQUE ("connectionId", "externalId"));
+-- M4
+CREATE TABLE IF NOT EXISTS teams (id text PRIMARY KEY, slug text UNIQUE NOT NULL, name text NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS team_members ("teamId" text NOT NULL REFERENCES teams(id) ON DELETE CASCADE, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, role text NOT NULL DEFAULT 'member', PRIMARY KEY ("teamId", "userId"));
+CREATE TABLE IF NOT EXISTS team_invites (token text PRIMARY KEY, "teamId" text NOT NULL REFERENCES teams(id) ON DELETE CASCADE, email text NOT NULL, role text NOT NULL DEFAULT 'member', "invitedBy" text NOT NULL, expires timestamptz NOT NULL, "acceptedAt" timestamptz);
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "teamId" text REFERENCES teams(id) ON DELETE CASCADE;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS seats integer NOT NULL DEFAULT 1;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "rrMode" text NOT NULL DEFAULT 'even';
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "managedParentId" text;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "lockedFields" jsonb NOT NULL DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS event_type_hosts ("eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, priority integer NOT NULL DEFAULT 2, PRIMARY KEY ("eventTypeId", "userId"));
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS seat integer NOT NULL DEFAULT 0;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "groupUid" text;
+DROP INDEX IF EXISTS bookings_no_double;
+CREATE UNIQUE INDEX IF NOT EXISTS bookings_no_double2 ON bookings ("hostId", start, seat) WHERE status = 'confirmed';
+-- M5
+CREATE TABLE IF NOT EXISTS workflows (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, trigger text NOT NULL, "offsetMin" integer NOT NULL DEFAULT 0, channel text NOT NULL DEFAULT 'email', recipient text NOT NULL DEFAULT 'invitee', subject text NOT NULL DEFAULT '', body text NOT NULL DEFAULT '', "eventTypeIds" jsonb NOT NULL DEFAULT '[]', active boolean NOT NULL DEFAULT true);
+CREATE TABLE IF NOT EXISTS scheduled_messages (id text PRIMARY KEY, "workflowId" text NOT NULL REFERENCES workflows(id) ON DELETE CASCADE, "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE, "sendAt" timestamptz NOT NULL, status text NOT NULL DEFAULT 'pending', error text, "sentAt" timestamptz, UNIQUE ("workflowId", "bookingUid"));
+CREATE TABLE IF NOT EXISTS routing_forms (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, fields jsonb NOT NULL DEFAULT '[]', rules jsonb NOT NULL DEFAULT '[]', fallback jsonb NOT NULL DEFAULT '{"type":"message","value":"Thanks! We will be in touch."}');
+CREATE TABLE IF NOT EXISTS form_responses (id text PRIMARY KEY, "formId" text NOT NULL REFERENCES routing_forms(id) ON DELETE CASCADE, answers jsonb NOT NULL, "routedTo" jsonb NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now());

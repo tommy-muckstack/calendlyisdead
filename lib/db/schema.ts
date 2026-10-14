@@ -56,6 +56,11 @@ export const eventTypes = pgTable("event_types", {
   questions: jsonb("questions").$type<Question[]>().notNull().default([]),
   maxPerDay: integer("maxPerDay"),
   maxPerWeek: integer("maxPerWeek"),
+  teamId: text("teamId"),
+  seats: integer("seats").notNull().default(1),
+  rrMode: text("rrMode").notNull().default("even"), // even | priority
+  managedParentId: text("managedParentId"),
+  lockedFields: jsonb("lockedFields").$type<string[]>().notNull().default([]),
 });
 export const bookings = pgTable("bookings", {
   uid: text("uid").primaryKey(),
@@ -76,7 +81,31 @@ export const bookings = pgTable("bookings", {
   externalCalendarId: text("externalCalendarId"),
   externalEventId: text("externalEventId"),
   meetingUrl: text("meetingUrl"),
+  seat: integer("seat").notNull().default(0),
+  groupUid: text("groupUid"),
 });
+export const teams = pgTable("teams", { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
+export const teamMembers = pgTable("team_members", { teamId: text("teamId").notNull(), userId: text("userId").notNull(), role: text("role").notNull().default("member") },
+  t => [primaryKey({ columns: [t.teamId, t.userId] })]);
+export const teamInvites = pgTable("team_invites", { token: text("token").primaryKey(), teamId: text("teamId").notNull(), email: text("email").notNull(), role: text("role").notNull().default("member"),
+  invitedBy: text("invitedBy").notNull(), expires: timestamp("expires", { mode: "date", withTimezone: true }).notNull(), acceptedAt: timestamp("acceptedAt", { mode: "date", withTimezone: true }) });
+export const eventTypeHosts = pgTable("event_type_hosts", { eventTypeId: text("eventTypeId").notNull(), userId: text("userId").notNull(), priority: integer("priority").notNull().default(2) },
+  t => [primaryKey({ columns: [t.eventTypeId, t.userId] })]);
+export type WorkflowTrigger = "on_booked" | "before_start" | "after_end" | "on_cancelled";
+export const workflows = pgTable("workflows", { id: text("id").primaryKey(), userId: text("userId").notNull(), name: text("name").notNull(), trigger: text("trigger").$type<WorkflowTrigger>().notNull(),
+  offsetMin: integer("offsetMin").notNull().default(0), channel: text("channel").$type<"email" | "sms">().notNull().default("email"), recipient: text("recipient").$type<"invitee" | "host">().notNull().default("invitee"),
+  subject: text("subject").notNull().default(""), body: text("body").notNull().default(""), eventTypeIds: jsonb("eventTypeIds").$type<string[]>().notNull().default([]), active: boolean("active").notNull().default(true) });
+export const scheduledMessages = pgTable("scheduled_messages", { id: text("id").primaryKey(), workflowId: text("workflowId").notNull(), bookingUid: text("bookingUid").notNull(),
+  sendAt: timestamp("sendAt", { mode: "date", withTimezone: true }).notNull(), status: text("status").notNull().default("pending"), error: text("error"), sentAt: timestamp("sentAt", { mode: "date", withTimezone: true }) });
+export type FormField = { id: string; label: string; type: "text" | "email" | "select"; required: boolean; options?: string[] };
+export type Condition = { fieldId: string; op: "equals" | "not_equals" | "contains" | "in" | "gte" | "lte"; value: string };
+export type RouteAction = { type: "event" | "url" | "message"; value: string };
+export type Rule = { match: "all" | "any"; conditions: Condition[]; action: RouteAction };
+export const routingForms = pgTable("routing_forms", { id: text("id").primaryKey(), userId: text("userId").notNull(), name: text("name").notNull(),
+  fields: jsonb("fields").$type<FormField[]>().notNull().default([]), rules: jsonb("rules").$type<Rule[]>().notNull().default([]), fallback: jsonb("fallback").$type<RouteAction>().notNull() });
+export const formResponses = pgTable("form_responses", { id: text("id").primaryKey(), formId: text("formId").notNull(), answers: jsonb("answers").notNull(), routedTo: jsonb("routedTo").notNull(),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const calendarConnections = pgTable("calendar_connections", {
   id: text("id").primaryKey(),
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),

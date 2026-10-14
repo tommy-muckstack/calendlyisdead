@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
-  scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[] };
+  scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[];
+  kind: string; seats: number; managedParentId: string | null; lockedFields: string[] };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
@@ -24,7 +25,7 @@ export function EventTypesBoard({ initial, username, schedules }: { initial: ET[
     {items.map(et => <div key={et.id} className="card et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: 17 }}>{et.title}</div>
-        <div className="muted" style={{ fontSize: 14 }}>{et.durationMin} min · {et.location || "No location"} · One-on-one</div>
+        <div className="muted" style={{ fontSize: 14 }}>{et.durationMin} min · {et.location || "No location"} · {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-one"}{et.managedParentId ? " · Managed by your team" : ""}</div>
       </div>
       <button className="btn" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}/${username}/${et.slug}`); flash("Link copied"); }}>Copy link</button>
       <a className="btn" href={`/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>View</a>
@@ -45,14 +46,17 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
     if (first.current) { first.current = false; return; }
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      const { id: _id, ...body } = d as any; delete body.userId; delete body.kind; if (!body.scheduleId) delete body.scheduleId;
-      body.questions = (body.questions ?? []).filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
+      const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats"];
+      const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.lockedFields ?? []).includes(k)).map(k => [k, (d as any)[k]]));
+      if (d.managedParentId) delete body.kind; if (!body.scheduleId) delete body.scheduleId;
+      if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
       const r = await fetch(`/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (r.ok) { setErr(""); onChange(await r.json()); onSaved(); } else { const j = await r.json(); setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values"); }
     }, 600);
     return () => clearTimeout(timer.current);
   }, [d]);
   useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, []);
+  const L = (k: string) => (d.lockedFields ?? []).includes(k) && !!d.managedParentId;
   const set = (k: keyof ET) => (e: any) => setD({ ...d, [k]: e.target.type === "number" ? Number(e.target.value) : e.target.type === "checkbox" ? e.target.checked : e.target.value });
   const S = ({ id, title, summary, children }: any) => <div className="sect">
     <button onClick={() => setSect(sect === id ? "" : id)} aria-expanded={sect === id}><span><b>{title}</b><small>{summary}</small></span><span>{sect === id ? "–" : "+"}</span></button>
@@ -64,30 +68,34 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
       <header><b>Edit event type</b><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
       <div className="body">
         {err && <p style={{ color: "var(--warn)" }}>{err}</p>}
+        {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
-          <label className="f" htmlFor="et-title">Name</label><input id="et-title" className="input" value={d.title} onChange={set("title")} />
-          <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
-          <label className="f" htmlFor="et-color">Color</label><input id="et-color" type="color" value={d.color} onChange={set("color")} />
+          <label className="f" htmlFor="et-title">Name</label><input id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
+          <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
+          <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
+          {!d.managedParentId && <><label className="f" htmlFor="et-kind">Type</label>
+          <select id="et-kind" className="input" value={d.kind} onChange={e => setD({ ...d, kind: e.target.value })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
+          {d.kind === "group" && <><label className="f" htmlFor="et-seats">Seats per time</label><input id="et-seats" className="input" type="number" min={1} value={d.seats} onChange={set("seats")} /></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
-          <input className="input" list="locs" value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
+          <input className="input" list="locs" aria-label="Location" disabled={L("location")} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
           <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
         {S({ id: "link", title: "Link and description", summary: `/${username}/${d.slug}`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />
-          <label className="f" htmlFor="et-desc">Description</label><textarea id="et-desc" className="input" rows={4} value={d.description} onChange={set("description")} /></> })}
+          <label className="f" htmlFor="et-desc">Description</label><textarea id="et-desc" disabled={L("description")} className="input" rows={4} value={d.description} onChange={set("description")} /></> })}
         {S({ id: "limits", title: "Limits and buffers", summary: `${d.minNoticeMin / 60}h notice · ${d.rangeDays} days ahead · buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min`, children: <>
-          <label className="f" htmlFor="et-bb">Buffer before (min)</label><input id="et-bb" className="input" type="number" min={0} value={d.bufferBeforeMin} onChange={set("bufferBeforeMin")} />
-          <label className="f" htmlFor="et-ba">Buffer after (min)</label><input id="et-ba" className="input" type="number" min={0} value={d.bufferAfterMin} onChange={set("bufferAfterMin")} />
-          <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
-          <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} /></> })}
+          <label className="f" htmlFor="et-bb">Buffer before (min)</label><input id="et-bb" disabled={L("bufferBeforeMin")} className="input" type="number" min={0} value={d.bufferBeforeMin} onChange={set("bufferBeforeMin")} />
+          <label className="f" htmlFor="et-ba">Buffer after (min)</label><input id="et-ba" disabled={L("bufferAfterMin")} className="input" type="number" min={0} value={d.bufferAfterMin} onChange={set("bufferAfterMin")} />
+          <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
+          <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" disabled={L("rangeDays")} className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} /></> })}
         {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"}${d.maxPerDay ? ` · max ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · max ${d.maxPerWeek}/week` : ""}`, children: <>
           <label className="f" htmlFor="et-sched">Schedule</label>
           <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
             <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
           <label className="f" htmlFor="et-mpd">Max bookings per day (blank = no limit)</label>
-          <input id="et-mpd" className="input" type="number" min={1} value={d.maxPerDay ?? ""} onChange={e => setD({ ...d, maxPerDay: e.target.value ? Number(e.target.value) : null })} />
+          <input id="et-mpd" disabled={L("maxPerDay")} className="input" type="number" min={1} value={d.maxPerDay ?? ""} onChange={e => setD({ ...d, maxPerDay: e.target.value ? Number(e.target.value) : null })} />
           <label className="f" htmlFor="et-mpw">Max bookings per week (blank = no limit)</label>
-          <input id="et-mpw" className="input" type="number" min={1} value={d.maxPerWeek ?? ""} onChange={e => setD({ ...d, maxPerWeek: e.target.value ? Number(e.target.value) : null })} /></> })}
+          <input id="et-mpw" disabled={L("maxPerWeek")} className="input" type="number" min={1} value={d.maxPerWeek ?? ""} onChange={e => setD({ ...d, maxPerWeek: e.target.value ? Number(e.target.value) : null })} /></> })}
         {S({ id: "questions", title: "Invitee questions", summary: `Name, email${(d.questions ?? []).length ? ` + ${(d.questions ?? []).length} more` : ""}`, children: <>
           {(d.questions ?? []).map((q, i) => { const up = (n: Partial<Q>) => setD({ ...d, questions: d.questions.map((x, j) => j === i ? { ...x, ...n } : x) });
             return <div key={q.id} className="card" style={{ padding: 12, marginBottom: 10 }} data-testid="question">
@@ -103,7 +111,7 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
         <p className="muted" style={{ fontSize: 13 }}>Changes save automatically.</p>
-        <button className="btn danger" onClick={() => confirm("Delete this event type?") && onDelete()}>Delete event type</button>
+        {!d.managedParentId && <button className="btn danger" onClick={() => confirm("Delete this event type?") && onDelete()}>Delete event type</button>}
       </div>
     </aside>
   </>;

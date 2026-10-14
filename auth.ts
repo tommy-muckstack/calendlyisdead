@@ -3,7 +3,7 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
-import { getDb, schema, DEMO_USER_ID } from "@/lib/db";
+import { getDb, schema, DEMO_USER_ID, DEMO_MATE_ID } from "@/lib/db";
 import { sendMail } from "@/lib/email";
 import { defaultWeekly } from "@/lib/slots";
 
@@ -20,8 +20,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     } as any,
   ];
   if (process.env.AUTH_GOOGLE_ID) providers.push(Google({ allowDangerousEmailAccountLinking: true }));
-  if (demoEnabled()) providers.push(Credentials({ id: "demo", name: "Demo", credentials: {}, authorize: async () => {
-    const [u] = await db.select().from(schema.users).where(eq(schema.users.id, DEMO_USER_ID)); return u ?? null; } }));
+  if (demoEnabled()) providers.push(Credentials({ id: "demo", name: "Demo", credentials: { who: {} }, authorize: async (c: any) => {
+    const id = c?.who === "mate" ? DEMO_MATE_ID : DEMO_USER_ID;
+    const [u] = await db.select().from(schema.users).where(eq(schema.users.id, id)); return u ?? null; } }));
   return {
     secret: process.env.AUTH_SECRET ?? "dev-only-secret-change-me-in-production",
     trustHost: true,

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-type Props = { username: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
+type Props = { username: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
   reschedule?: { uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
@@ -24,7 +24,7 @@ export function BookingWidget(p: Props) {
   useEffect(() => {
     setSlots(null);
     const from = m.startOf("month").toISODate(), to = m.endOf("month").toISODate();
-    fetch(`/api/slots?user=${p.username}&slug=${p.slug}&from=${from}&to=${to}&tz=${encodeURIComponent(tz)}${p.reschedule ? `&exclude=${p.reschedule.uid}` : ""}`)
+    fetch(`/api/slots?user=${encodeURIComponent(p.username)}&slug=${p.slug}&from=${from}&to=${to}&tz=${encodeURIComponent(tz)}${p.reschedule ? `&exclude=${p.reschedule.uid}` : ""}`)
       .then(r => r.json()).then(j => setSlots(j.slots ?? {}));
   }, [month, tz]);
   const cells = useMemo(() => { const first = m.startOf("month"); const pad = first.weekday % 7; return [...Array(pad).fill(null), ...Array.from({ length: first.daysInMonth! }, (_, i) => first.plus({ days: i }))]; }, [month, tz]);
@@ -46,7 +46,7 @@ export function BookingWidget(p: Props) {
     <section className="info">
       <div className="muted" style={{ fontWeight: 600 }}>{p.host}</div>
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
-      <div className="muted">◷ {p.durationMin} min</div>
+      <div className="muted">◷ {p.durationMin} min{p.kindLabel ? ` · ${p.kindLabel}` : ""}</div>
       {p.location && <div className="muted" style={{ marginTop: 6 }}>📍 {p.location}</div>}
       {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {fmt(slot, "h:mm a")} – {DateTime.fromISO(slot).plus({ minutes: p.durationMin }).setZone(tz).toFormat("h:mm a, cccc, LLLL d")}</div>}
       {p.reschedule && <div className="card" style={{ padding: 12, marginTop: 16, background: "var(--brand-soft)" }}>Moving your booking from <b>{fmt(p.reschedule.start, "ccc LLL d, h:mm a")}</b></div>}
@@ -81,8 +81,8 @@ export function BookingWidget(p: Props) {
       <button className="btn" onClick={() => nav({ slot: null })}>← Back</button>
       <h2 style={{ fontSize: 20 }}>Your details</h2>
       <form onSubmit={submit}>
-        <label className="f" htmlFor="name">Name</label><input className="input" id="name" name="name" required defaultValue={p.reschedule?.name} />
-        <label className="f" htmlFor="email">Email</label><input className="input" id="email" name="email" type="email" required defaultValue={p.reschedule?.email} />
+        <label className="f" htmlFor="name">Name</label><input className="input" id="name" name="name" required defaultValue={p.reschedule?.name ?? q.get("name") ?? undefined} />
+        <label className="f" htmlFor="email">Email</label><input className="input" id="email" name="email" type="email" required defaultValue={p.reschedule?.email ?? q.get("email") ?? undefined} />
         <label className="f" htmlFor="guests">Guest emails (optional)</label><input className="input" id="guests" name="guests" placeholder="comma separated" />
         {p.questions.map(q => <div key={q.id}>
           <label className="f" htmlFor={`q_${q.id}`}>{q.label}{q.required ? " *" : ""}</label>

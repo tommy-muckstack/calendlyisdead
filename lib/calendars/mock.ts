@@ -5,7 +5,7 @@ import { CalendarProvider } from "./types";
 /** Keyless stand-in used in dev, demo and tests. Persists to .data/mock-calendar.json so tests can inspect writes.
  *  "Work" calendar: busy 12:00-13:00 America/New_York every weekday. "Personal": busy nothing, writable. */
 type Store = { events: { calendarId: string; id: string; title: string; start: string; end: string }[] };
-const file = () => path.join(process.cwd(), process.env.PGLITE_DIR ? path.dirname(process.env.PGLITE_DIR) : ".data", "mock-calendar.json");
+const file = () => path.resolve(process.cwd(), process.env.PGLITE_DIR ? path.dirname(process.env.PGLITE_DIR) : ".data", "mock-calendar.json");
 export const readMock = (): Store => { try { return JSON.parse(fs.readFileSync(file(), "utf8")); } catch { return { events: [] }; } };
 const write = (s: Store) => { fs.mkdirSync(path.dirname(file()), { recursive: true }); fs.writeFileSync(file(), JSON.stringify(s, null, 2)); };
 export const mockEnabled = () => process.env.NODE_ENV !== "production" || process.env.DEMO_MODE === "1" || process.env.CALENDAR_MOCK === "1";

@@ -11,6 +11,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Link className="nav" href="/app">◷ Event types</Link>
       <Link className="nav" href="/app/availability">▦ Availability</Link>
       <Link className="nav" href="/app/calendars">⇄ Calendars</Link>
+      <Link className="nav" href="/app/teams">◎ Teams</Link>
+      <Link className="nav" href="/app/workflows">✉ Workflows</Link>
+      <Link className="nav" href="/app/routing">⇢ Routing forms</Link>
       <a className="nav" href={`/${u.username}`} target="_blank">↗ My booking page</a>
       <div style={{ flex: 1 }} />
       <div className="muted" style={{ fontSize: 13, padding: "0 12px" }}>{u.email}</div>

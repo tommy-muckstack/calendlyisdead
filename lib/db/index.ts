@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
 import { defaultWeekly } from "../slots";
+import { eq } from "drizzle-orm";
 
 type DB = any;
 const g = globalThis as unknown as { __db?: Promise<DB> };
@@ -33,9 +34,13 @@ export function getDb(): Promise<DB> {
 }
 
 export const DEMO_USER_ID = "demo-user";
+export const DEMO_MATE_ID = "demo-mate";
 async function seed(db: DB) {
   const { users, schedules, eventTypes } = schema;
-  const existing = await db.select().from(users).limit(1);
+  // second demo account (a teammate), idempotent so older dev databases get it too
+  await db.insert(users).values({ id: DEMO_MATE_ID, name: "Sam Rivera", email: "sam@calendlyisdead.local", username: "sam", timezone: "America/Chicago" }).onConflictDoNothing();
+  await db.insert(schedules).values({ id: "sam-schedule", userId: DEMO_MATE_ID, timezone: "America/Chicago", weekly: defaultWeekly(), overrides: {} }).onConflictDoNothing();
+  const existing = await db.select().from(users).where(eq(users.id, DEMO_USER_ID));
   if (existing.length) return;
   await db.insert(users).values({ id: DEMO_USER_ID, name: "Demo Host", email: "demo@calendlyisdead.local", username: "demo", timezone: "America/New_York" });
   await db.insert(schedules).values({ id: "demo-schedule", userId: DEMO_USER_ID, timezone: "America/New_York", weekly: defaultWeekly(), overrides: {} });
