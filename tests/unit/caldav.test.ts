@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { describe, it, expect, vi } from "vitest";
 const dav = { fetchCalendars: vi.fn(), fetchCalendarObjects: vi.fn(), createCalendarObject: vi.fn(), deleteCalendarObject: vi.fn() };
 const createDAVClient = vi.fn(async () => dav);
 vi.mock("tsdav", () => ({ createDAVClient }));
 import { caldav } from "../../lib/calendars/caldav";
-const creds = { serverUrl: "https://caldav.icloud.com", username: "me@icloud.com", password: "abcd-efgh-ijkl-mnop" };
+const creds = { serverUrl: "https://caldav.icloud.com", username: "me@icloud.com", password: randomUUID() };
 
 describe("caldav (iCloud) adapter", () => {
   it("logs in with Basic auth and lists only event calendars", async () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { google, googleOAuth } from "../../lib/calendars/google";
 import { microsoft } from "../../lib/calendars/microsoft";
@@ -82,7 +83,7 @@ describe("caldav parsing", () => {
 
 describe("secret storage", () => {
   it("round-trips and is not plaintext", () => {
-    const s = seal({ password: "abcd-efgh" }); expect(s).not.toContain("abcd"); expect(open(s)).toEqual({ password: "abcd-efgh" });
+    const pw = randomUUID(); const s = seal({ password: pw }); expect(s).not.toContain(pw.slice(0, 8)); expect(open(s)).toEqual({ password: pw });
   });
   it("rejects tampering", () => { const s = seal({ a: 1 }).split("."); s[2] = Buffer.from("x").toString("base64url"); expect(() => open(s.join("."))).toThrow(); });
 });
