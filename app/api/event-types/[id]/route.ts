@@ -13,7 +13,9 @@ const Patch = z.object({ title: z.string().min(1).max(120), slug: z.string().reg
   questions: z.array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/), label: z.string().min(1).max(200), type: z.enum(["text", "textarea", "phone", "select"]),
     required: z.boolean(), options: z.array(z.string().min(1).max(100)).max(30).optional() })).max(20),
   kind: z.enum(["one_on_one", "group"]), seats: z.number().int().min(1).max(1000), rrMode: z.enum(["even", "priority"]),
-  lockedFields: z.array(z.enum(LOCKABLE)) }).partial();
+  lockedFields: z.array(z.enum(LOCKABLE)),
+  priceCents: z.number().int().min(0).max(10_000_000), currency: z.enum(["usd", "eur", "gbp", "cad", "aud"]),
+  redirectUrl: z.string().url().regex(/^https?:\/\//).max(500).nullable() }).partial();
 
 /** Who may edit: the owner of a personal type, or a team owner/admin for team types. */
 async function load(id: string, userId: string) {

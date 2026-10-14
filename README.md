@@ -29,8 +29,20 @@ Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET` (also e
 - Routing forms at `/f/<id>`: questions plus first-match rules (is, is not, contains, is one of, ≥, ≤) that send people to an event type (prefilled), a URL, or a message.
 - Demo mode has a second account (Sam, Chicago) so team features work with no keys.
 
+## Conferencing, payments, embeds, branding, analytics
+- **Zoom / Google Meet**: set an event type's location to "Zoom" or "Google Meet". Meet links come from Google Calendar write-back; Zoom uses a server-to-server OAuth app (`ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`, optional `ZOOM_USER`). With no keys, bookings get a labelled demo room at `/meet/<id>`.
+- **Paid bookings (Stripe)**: set a price under "Payment and confirmation". The slot is held for 30 minutes while the invitee pays; emails, calendar events and workflows only fire once paid. Set `STRIPE_SECRET_KEY` (use a `sk_test_` key for test mode) and `STRIPE_WEBHOOK_SECRET`, and point a Stripe webhook at `/api/stripe/webhook` (`checkout.session.completed`, `checkout.session.expired`). Without keys a demo checkout at `/pay/<uid>` simulates payment. Rescheduling keeps the payment.
+- **Redirect after booking**: optional URL per event type; gets `invitee_name`, `invitee_email`, `event_start`.
+- **Embeds** (`/app/embed` builds the snippet; live demo at `/embed-demo.html`): `<script src="/embed.js">` then an inline `<div class="cid-inline" data-url=…>`, a popup widget (`CalendlyIsDead.initPopupWidget({url,text,color})`) or a popup text link (`data-cid-popup`). Frames auto-resize and post `{source:"calendlyisdead",type:"booked"}` to the parent page.
+- **Branding** (`/app/branding`): brand color, logo, hide "Powered by". Embeds can override color with `?primary=RRGGBB`.
+- **Analytics** (`/app/analytics`): new/cancelled/rescheduled/completed, page views and conversion per event type, revenue, popular-times heatmap.
+- **Meeting polls** (`/app/polls`, public `/poll/<id>`) and **one-off links** (`/app/one-off`, single-use).
+
+## Email assistant (AI email-thread booker)
+`/app/assistant`: paste a thread; it extracts people, length, days/parts of day, explicit times and time zone, intersects that with your real availability, and drafts a reply with one-click booking links (prefilled name/email). It never sends mail. Works keyless with a built-in parser; set `LLM_API_KEY` (+ optional `LLM_BASE_URL`, `LLM_MODEL`, any OpenAI-compatible API) to use an LLM. Inbound mail: POST `{to, from, subject, text}` to `/api/inbound/email` with `Authorization: Bearer $INBOUND_SECRET`, addressed to `<username>+<event-slug>@your-domain`; it returns the proposal and draft.
+
 ## Tests
-`npm test` (slot generation and time-zone/DST unit tests), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
+`npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
 
 ## Status
-M0-M5 done except meeting polls. Includes M1 calendar sync, M2 extras (multiple schedules, holidays, daily/weekly limits, invitee questions), M4 teams and M5 automations: auth (email magic link, Google), Drizzle schema, availability (weekly hours, date overrides, buffers, notice, date range, time zones), one-on-one event types with an auto-saving slide-in editor, booking page, confirmation, email + .ics, reschedule/cancel.
+M0-M9 built (see docs/PLAN.md), including meeting polls and one-off links. Launch thread draft: `docs/launch/X_THREAD_DRAFT.md` (not posted). Not deployed.

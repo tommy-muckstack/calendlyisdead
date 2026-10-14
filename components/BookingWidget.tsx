@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-type Props = { username: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
+type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
   reschedule?: { uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
@@ -35,10 +35,14 @@ export function BookingWidget(p: Props) {
     const fd = new FormData(e.currentTarget);
     const guests = String(fd.get("guests") ?? "").split(/[,\s]+/).filter(Boolean);
     const r = await fetch("/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-      username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid,
+      username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid, embed: !!p.embed,
       answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
     const j = await r.json(); setBusy(false);
-    if (r.ok) router.push(`/booking/${j.uid}?new=1`);
+    if (r.ok) {
+      if (j.checkoutUrl) { location.href = j.checkoutUrl; return; }
+      if (j.redirectUrl && !p.embed) { location.href = j.redirectUrl; return; }
+      router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);
+    }
     else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
   }
 
@@ -48,6 +52,7 @@ export function BookingWidget(p: Props) {
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
       <div className="muted">◷ {p.durationMin} min{p.kindLabel ? ` · ${p.kindLabel}` : ""}</div>
       {p.location && <div className="muted" style={{ marginTop: 6 }}>📍 {p.location}</div>}
+      {p.price && <div className="muted" style={{ marginTop: 6 }} data-testid="price">💳 {p.price}, paid when you book</div>}
       {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {fmt(slot, "h:mm a")} – {DateTime.fromISO(slot).plus({ minutes: p.durationMin }).setZone(tz).toFormat("h:mm a, cccc, LLLL d")}</div>}
       {p.reschedule && <div className="card" style={{ padding: 12, marginTop: 16, background: "var(--brand-soft)" }}>Moving your booking from <b>{fmt(p.reschedule.start, "ccc LLL d, h:mm a")}</b></div>}
       {p.description && <p style={{ whiteSpace: "pre-wrap" }}>{p.description}</p>}
@@ -92,7 +97,7 @@ export function BookingWidget(p: Props) {
         </div>)}
         <label className="f" htmlFor="notes">Anything to prepare?</label><textarea className="input" id="notes" name="notes" rows={4} />
         {err && <p style={{ color: "var(--warn)" }}>{err}</p>}
-        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy}>{p.reschedule ? "Confirm new time" : "Book it"}</button>
+        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy}>{p.reschedule ? "Confirm new time" : p.price ? `Continue to payment (${p.price})` : "Book it"}</button>
       </form>
     </section>}
   </div>;

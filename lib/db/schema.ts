@@ -11,6 +11,9 @@ export const users = pgTable("users", {
   username: text("username").unique(),
   timezone: text("timezone").notNull().default("America/New_York"),
   addToCalendarId: text("addToCalendarId"),
+  brandColor: text("brandColor"),
+  logoUrl: text("logoUrl"),
+  hideBranding: boolean("hideBranding").notNull().default(false),
 });
 export const accounts = pgTable("accounts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -61,6 +64,10 @@ export const eventTypes = pgTable("event_types", {
   rrMode: text("rrMode").notNull().default("even"), // even | priority
   managedParentId: text("managedParentId"),
   lockedFields: jsonb("lockedFields").$type<string[]>().notNull().default([]),
+  priceCents: integer("priceCents").notNull().default(0),
+  currency: text("currency").notNull().default("usd"),
+  redirectUrl: text("redirectUrl"),
+  usedAt: timestamp("usedAt", { mode: "date", withTimezone: true }),
 });
 export const bookings = pgTable("bookings", {
   uid: text("uid").primaryKey(),
@@ -83,6 +90,9 @@ export const bookings = pgTable("bookings", {
   meetingUrl: text("meetingUrl"),
   seat: integer("seat").notNull().default(0),
   groupUid: text("groupUid"),
+  paymentStatus: text("paymentStatus").notNull().default("none"), // none | pending | paid
+  paymentRef: text("paymentRef"),
+  amountCents: integer("amountCents").notNull().default(0),
 });
 export const teams = pgTable("teams", { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
@@ -125,3 +135,11 @@ export const userCalendars = pgTable("user_calendars", {
   canWrite: boolean("canWrite").notNull().default(true),
   checkConflicts: boolean("checkConflicts").notNull().default(false),
 });
+
+export const pageViews = pgTable("page_views", { eventTypeId: text("eventTypeId").notNull(), day: text("day").notNull(), count: integer("count").notNull().default(0) },
+  t => [primaryKey({ columns: [t.eventTypeId, t.day] })]);
+export const polls = pgTable("polls", { id: text("id").primaryKey(), userId: text("userId").notNull(), title: text("title").notNull(), durationMin: integer("durationMin").notNull().default(30),
+  location: text("location").notNull().default(""), options: jsonb("options").$type<string[]>().notNull().default([]), status: text("status").notNull().default("open"),
+  chosen: text("chosen"), bookingUid: text("bookingUid"), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
+export const pollVotes = pgTable("poll_votes", { id: text("id").primaryKey(), pollId: text("pollId").notNull(), name: text("name").notNull(), email: text("email").notNull(),
+  picks: jsonb("picks").$type<string[]>().notNull().default([]), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });

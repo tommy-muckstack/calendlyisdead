@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[];
-  kind: string; seats: number; managedParentId: string | null; lockedFields: string[] };
+  kind: string; seats: number; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
@@ -46,7 +46,7 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
     if (first.current) { first.current = false; return; }
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats"];
+      const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"];
       const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.lockedFields ?? []).includes(k)).map(k => [k, (d as any)[k]]));
       if (d.managedParentId) delete body.kind; if (!body.scheduleId) delete body.scheduleId;
       if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
@@ -110,6 +110,14 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
                 value={(q.options ?? []).join(", ")} onChange={e => up({ options: e.target.value.split(",").map(x => x.trim()) })} />}
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
+        {S({ id: "pay", title: "Payment and confirmation", summary: `${d.priceCents ? `${(d.priceCents / 100).toFixed(2)} ${d.currency.toUpperCase()}` : "Free"}${d.redirectUrl ? " · redirects after booking" : ""}`, children: <>
+          <label className="f" htmlFor="et-price">Price (0 = free)</label>
+          <input id="et-price" className="input" type="number" min={0} step="0.01" value={(d.priceCents ?? 0) / 100} onChange={e => setD({ ...d, priceCents: Math.round(Number(e.target.value || 0) * 100) })} />
+          <label className="f" htmlFor="et-cur">Currency</label>
+          <select id="et-cur" className="input" value={d.currency ?? "usd"} onChange={e => setD({ ...d, currency: e.target.value })}>{["usd", "eur", "gbp", "cad", "aud"].map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}</select>
+          <p className="muted" style={{ fontSize: 13 }}>Payments go through Stripe Checkout when STRIPE_SECRET_KEY is set; otherwise a demo checkout is shown.</p>
+          <label className="f" htmlFor="et-redirect">Redirect after booking (optional)</label>
+          <input id="et-redirect" className="input" placeholder="https://example.com/thanks" value={d.redirectUrl ?? ""} onChange={e => setD({ ...d, redirectUrl: e.target.value.trim() || null })} /></> })}
         <p className="muted" style={{ fontSize: 13 }}>Changes save automatically.</p>
         {!d.managedParentId && <button className="btn danger" onClick={() => confirm("Delete this event type?") && onDelete()}>Delete event type</button>}
       </div>

@@ -8,6 +8,8 @@ import { buildIcs } from "./ics";
 import { sendMail } from "./email";
 import { onBooked, onCancelled } from "./workflows";
 import type { Question } from "./db/schema";
+import { confFor, meetingUrlFor } from "./conferencing";
+import { HOLD_MIN } from "./payments";
 const { users, eventTypes, schedules, bookings, teams, eventTypeHosts } = schema;
 
 export type Host = { user: any; schedule: any; priority: number };
@@ -27,7 +29,7 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
     [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.userId, ownerUser.id), eq(eventTypes.slug, slug)));
     if (et?.teamId) et = null; // team types are only bookable under the team URL
   }
-  if (!et || !et.active || et.kind === "managed") return null;
+  if (!et || !et.active || et.kind === "managed" || et.kind === "poll" || (et.kind === "one_off" && et.usedAt)) return null;
   const defaultSchedule = async (uid: string) => (await db.select().from(schedules).where(and(eq(schedules.userId, uid), eq(schedules.isDefault, true))))[0];
   let hosts: Host[];
   if (team) {
@@ -78,6 +80,7 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
 
 /** Open slots for an event type plus, per slot, which hosts are free (needed for round robin). */
 export async function availability(owner: string, slug: string, from: string, to: string, tz: string, now = DateTime.utc(), excludeUids: string[] = []) {
+  await expireUnpaid();
   const ev = await loadEvent(owner, slug);
   if (!ev) return null;
   const et = ev.eventType, exclude = new Set(excludeUids);
@@ -112,7 +115,7 @@ export async function pickHost(et: any, hosts: Host[], candidates: string[]) {
 
 export const baseUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
 
-async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
+export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
   const when = DateTime.fromJSDate(b.start).setZone(b.inviteeTz).toFormat("cccc, LLLL d, yyyy 'at' h:mm a ZZZZ");
   const hostNames = hostUsers.map(h => h.name).join(", ");
   const ics = buildIcs({ uid: `${b.uid}@calendlyisdead`, start: b.start, end: b.end, title: `${et.title} with ${hostNames}`,
@@ -169,22 +172,71 @@ export async function createBooking(input: BookingInput) {
   } catch { await restore(); throw new Error("slot_unavailable"); }
 
   for (const o of oldGroup) await removeEvent(o.externalCalendarId, o.externalEventId);
-  // calendar write-back per host; a group session is written once (first seat)
+  const paidBefore = oldGroup.find(o => o.paymentStatus === "paid");
+  const price = et.priceCents ?? 0;
+  if (et.kind === "one_off") await db.update(eventTypes).set({ usedAt: new Date() }).where(eq(eventTypes.id, et.id));
+  if (paidBefore) { // a paid booking keeps its payment when rescheduled
+    const pay = { paymentStatus: "paid", paymentRef: paidBefore.paymentRef, amountCents: paidBefore.amountCents };
+    await db.update(bookings).set(pay).where(inArray(bookings.uid, rows.map(r => r.uid))); rows.forEach(r => Object.assign(r, pay));
+  } else if (price > 0) {
+    // hold the slot until paid; calendar write-back, emails and workflows wait for confirmPayment()
+    const pay = { paymentStatus: "pending", amountCents: price };
+    await db.update(bookings).set(pay).where(inArray(bookings.uid, rows.map(r => r.uid))); rows.forEach(r => Object.assign(r, pay));
+    if (old) await onCancelled(old.uid, { rescheduled: true });
+    return rows[0];
+  }
+  const main = await finalize(rows, et, hostUsers, !!input.rescheduleUid);
+  if (old) await onCancelled(old.uid, { rescheduled: true });
+  return main;
+}
+
+/** Calendar write-back, conferencing link, notifications and workflows for freshly confirmed rows. */
+export async function finalize(rows: any[], et: any, hostUsers: any[], rescheduled: boolean) {
+  const db = await getDb();
+  // a group session is written once (first seat)
   for (const row of rows) {
     if (et.kind === "group" && row.seat > 0) continue;
     const host = hostUsers.find(u => u.id === row.hostId);
     const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: et.location, start: row.start, end: row.end,
       organizer: { name: host.name ?? "", email: host.email ?? "" }, attendees: [{ name: row.inviteeName, email: row.inviteeEmail }, ...row.guests.map((g: string) => ({ name: g, email: g }))],
-      wantsMeet: /google meet/i.test(et.location) });
+      wantsMeet: confFor(et.location) === "meet" });
     if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null });
-      await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null }).where(eq(bookings.uid, row.uid)); }
+      await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId }).where(eq(bookings.uid, row.uid)); }
   }
   const main = rows[0];
-  if (!main.meetingUrl) main.meetingUrl = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
-  await notify(input.rescheduleUid ? "rescheduled" : "confirmed", main, et, hostUsers);
-  if (old) await onCancelled(old.uid, { rescheduled: true });
+  const fromCal = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
+  // a group seat reuses the session's existing link
+  const [sibling] = et.kind === "group" ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.start, main.start), eq(bookings.status, "confirmed")))).filter((b: any) => b.meetingUrl && b.uid !== main.uid) : [];
+  main.meetingUrl = sibling?.meetingUrl ?? await meetingUrlFor(et.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal);
+  if (main.meetingUrl) await db.update(bookings).set({ meetingUrl: main.meetingUrl }).where(inArray(bookings.uid, rows.map(r => r.uid)));
+  await notify(rescheduled ? "rescheduled" : "confirmed", main, et, hostUsers);
   await onBooked(main.uid);
   return main;
+}
+
+/** Release slots held by bookings that were never paid. */
+export async function expireUnpaid(now = new Date()) {
+  const db = await getDb();
+  const cutoff = new Date(now.getTime() - HOLD_MIN * 60_000);
+  const r = await db.update(bookings).set({ status: "cancelled", cancelReason: "payment_expired" })
+    .where(and(eq(bookings.paymentStatus, "pending"), eq(bookings.status, "confirmed"), lte(bookings.createdAt, cutoff))).returning();
+  return r.length;
+}
+
+/** Called from the Stripe webhook (or the demo checkout). Idempotent. */
+export async function confirmPayment(uid: string, ref: string) {
+  const db = await getDb();
+  const [b] = await db.select().from(bookings).where(eq(bookings.uid, uid));
+  if (!b) return { error: "not_found" as const };
+  if (b.paymentStatus === "paid") return { ok: true, already: true };
+  if (b.status !== "confirmed") { console.warn(`[payments] ${uid} paid after its hold expired; refund ${ref} manually`); return { error: "expired" as const }; }
+  const rows = b.groupUid ? await db.select().from(bookings).where(eq(bookings.groupUid, b.groupUid)) : [b];
+  await db.update(bookings).set({ paymentStatus: "paid", paymentRef: ref }).where(inArray(bookings.uid, rows.map((r: any) => r.uid)));
+  const [et] = await db.select().from(eventTypes).where(eq(eventTypes.id, b.eventTypeId));
+  const hostUsers = await db.select().from(users).where(inArray(users.id, rows.map((r: any) => r.hostId)));
+  rows.sort((x: any, y: any) => (x.uid === uid ? -1 : y.uid === uid ? 1 : 0));
+  await finalize(rows.map((r: any) => ({ ...r, paymentStatus: "paid", paymentRef: ref })), et, hostUsers, !!b.rescheduledFrom);
+  return { ok: true };
 }
 
 export async function getBooking(uid: string) {
@@ -212,7 +264,7 @@ export async function cancelBooking(uid: string, reason: string) {
     }
     await removeEvent(row.externalCalendarId, row.externalEventId);
   }
-  await notify("cancelled", g.booking, g.eventType, g.hosts);
+  if (g.booking.paymentStatus !== "pending") await notify("cancelled", g.booking, g.eventType, g.hosts);
   await onCancelled(uid, { rescheduled: false });
   return g;
 }

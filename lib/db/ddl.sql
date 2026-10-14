@@ -36,3 +36,17 @@ CREATE TABLE IF NOT EXISTS workflows (id text PRIMARY KEY, "userId" text NOT NUL
 CREATE TABLE IF NOT EXISTS scheduled_messages (id text PRIMARY KEY, "workflowId" text NOT NULL REFERENCES workflows(id) ON DELETE CASCADE, "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE, "sendAt" timestamptz NOT NULL, status text NOT NULL DEFAULT 'pending', error text, "sentAt" timestamptz, UNIQUE ("workflowId", "bookingUid"));
 CREATE TABLE IF NOT EXISTS routing_forms (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, fields jsonb NOT NULL DEFAULT '[]', rules jsonb NOT NULL DEFAULT '[]', fallback jsonb NOT NULL DEFAULT '{"type":"message","value":"Thanks! We will be in touch."}');
 CREATE TABLE IF NOT EXISTS form_responses (id text PRIMARY KEY, "formId" text NOT NULL REFERENCES routing_forms(id) ON DELETE CASCADE, answers jsonb NOT NULL, "routedTo" jsonb NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now());
+-- M6-M9
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "brandColor" text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "logoUrl" text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "hideBranding" boolean NOT NULL DEFAULT false;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "priceCents" integer NOT NULL DEFAULT 0;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'usd';
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "redirectUrl" text;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "usedAt" timestamptz;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentStatus" text NOT NULL DEFAULT 'none';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentRef" text;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "amountCents" integer NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS page_views ("eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE, day text NOT NULL, count integer NOT NULL DEFAULT 0, PRIMARY KEY ("eventTypeId", day));
+CREATE TABLE IF NOT EXISTS polls (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, title text NOT NULL, "durationMin" integer NOT NULL DEFAULT 30, location text NOT NULL DEFAULT '', options jsonb NOT NULL DEFAULT '[]', status text NOT NULL DEFAULT 'open', chosen text, "bookingUid" text, "createdAt" timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS poll_votes (id text PRIMARY KEY, "pollId" text NOT NULL REFERENCES polls(id) ON DELETE CASCADE, name text NOT NULL, email text NOT NULL, picks jsonb NOT NULL DEFAULT '[]', "createdAt" timestamptz NOT NULL DEFAULT now());
