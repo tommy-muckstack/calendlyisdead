@@ -13,10 +13,17 @@ npm run dev        # http://localhost:3000, embedded Postgres (PGlite) in .data/
 - Host dashboard: /login, then "Use the demo account" (dev only, or `DEMO_MODE=1`)
 - Magic-link email and booking emails print to the server log (and `.data/outbox/`) unless `RESEND_API_KEY` is set.
 
-Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET`, `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`.
+Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET` (also encrypts stored calendar tokens), `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `AUTH_MICROSOFT_ID`/`AUTH_MICROSOFT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`.
+
+## Calendar sync
+- **Google**: same OAuth client as sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
+- **Outlook / Microsoft 365**: Entra app (multi-tenant + personal accounts), redirect `{APP_URL}/api/integrations/microsoft/callback`, delegated `Calendars.ReadWrite offline_access User.Read`.
+- **iCloud**: CalDAV at caldav.icloud.com with the Apple ID and an app-specific password.
+- **Demo calendar**: keyless mock (dev or `DEMO_MODE=1`), busy 12-1pm ET on weekdays.
+- Each user can connect several accounts, choose which calendars are checked for conflicts, and one calendar new bookings are added to. If a provider fails, its busy times are skipped and the connection is flagged.
 
 ## Tests
 `npm test` (slot generation and time-zone/DST unit tests), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
 
 ## Status
-M0-M3 done: auth (email magic link, Google), Drizzle schema, availability (weekly hours, date overrides, buffers, notice, date range, time zones), one-on-one event types with an auto-saving slide-in editor, booking page, confirmation, email + .ics, reschedule/cancel.
+M0-M3 done, plus M1 calendar sync and M2 extras (multiple schedules, holidays, daily/weekly limits, invitee questions): auth (email magic link, Google), Drizzle schema, availability (weekly hours, date overrides, buffers, notice, date range, time zones), one-on-one event types with an auto-saving slide-in editor, booking page, confirmation, email + .ics, reschedule/cancel.

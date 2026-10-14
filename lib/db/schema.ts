@@ -1,5 +1,6 @@
 import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean } from "drizzle-orm/pg-core";
 import type { Weekly } from "../slots";
+export type Question = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -9,6 +10,7 @@ export const users = pgTable("users", {
   image: text("image"),
   username: text("username").unique(),
   timezone: text("timezone").notNull().default("America/New_York"),
+  addToCalendarId: text("addToCalendarId"),
 });
 export const accounts = pgTable("accounts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -33,6 +35,7 @@ export const schedules = pgTable("schedules", {
   weekly: jsonb("weekly").$type<Weekly>().notNull(),
   overrides: jsonb("overrides").$type<Record<string, { start: string; end: string }[]>>().notNull().default({}),
   isDefault: boolean("isDefault").notNull().default(true),
+  holidayCountry: text("holidayCountry"),
 });
 export const eventTypes = pgTable("event_types", {
   id: text("id").primaryKey(),
@@ -50,6 +53,9 @@ export const eventTypes = pgTable("event_types", {
   rangeDays: integer("rangeDays").notNull().default(60),
   active: boolean("active").notNull().default(true),
   kind: text("kind").notNull().default("one_on_one"),
+  questions: jsonb("questions").$type<Question[]>().notNull().default([]),
+  maxPerDay: integer("maxPerDay"),
+  maxPerWeek: integer("maxPerWeek"),
 });
 export const bookings = pgTable("bookings", {
   uid: text("uid").primaryKey(),
@@ -66,4 +72,27 @@ export const bookings = pgTable("bookings", {
   cancelReason: text("cancelReason"),
   rescheduledFrom: text("rescheduledFrom"),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  answers: jsonb("answers").$type<Record<string, string>>().notNull().default({}),
+  externalCalendarId: text("externalCalendarId"),
+  externalEventId: text("externalEventId"),
+  meetingUrl: text("meetingUrl"),
+});
+export const calendarConnections = pgTable("calendar_connections", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // google | microsoft | caldav | mock
+  accountEmail: text("accountEmail").notNull().default(""),
+  secret: text("secret").notNull(), // AES-GCM encrypted JSON (tokens or CalDAV creds)
+  status: text("status").notNull().default("ok"),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+});
+export const userCalendars = pgTable("user_calendars", {
+  id: text("id").primaryKey(),
+  connectionId: text("connectionId").notNull().references(() => calendarConnections.id, { onDelete: "cascade" }),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  externalId: text("externalId").notNull(),
+  name: text("name").notNull(),
+  isPrimary: boolean("isPrimary").notNull().default(false),
+  canWrite: boolean("canWrite").notNull().default(true),
+  checkConflicts: boolean("checkConflicts").notNull().default(false),
 });

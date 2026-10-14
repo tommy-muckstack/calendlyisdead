@@ -58,3 +58,31 @@ describe("generateSlots", () => {
     expect(s["2026-03-09"][0]).toBe("2026-03-09T13:00:00.000Z");
   });
 });
+
+import { holidayDates } from "../../lib/slots";
+describe("holidays and limits", () => {
+  it("US holidays block the day unless an override re-opens it", () => {
+    const hol = holidayDates("US", 2026, 2026);
+    expect(hol).toContain("2026-11-26");
+    const s = generateSlots({ ...base, blockedDates: hol, from: "2026-11-25", to: "2026-11-27" });
+    expect(s["2026-11-26"]).toBeUndefined(); expect(s["2026-11-25"]).toHaveLength(16);
+    const s2 = generateSlots({ ...base, blockedDates: hol, schedule: { ...ny, overrides: { "2026-11-26": [{ start: "10:00", end: "11:00" }] } }, from: "2026-11-26", to: "2026-11-26" });
+    expect(s2["2026-11-26"]).toHaveLength(2);
+  });
+  it("max per day closes a day once reached (counted in host tz)", () => {
+    const existing = ["2026-10-13T13:00:00Z", "2026-10-13T15:00:00Z"];
+    const s = generateSlots({ ...base, existing, limits: { perDay: 2 }, from: "2026-10-12", to: "2026-10-14" });
+    expect(s["2026-10-13"]).toBeUndefined(); expect(s["2026-10-12"]).toBeDefined(); expect(s["2026-10-14"]).toBeDefined();
+  });
+  it("max per week closes the rest of that ISO week only", () => {
+    const existing = ["2026-10-12T13:00:00Z", "2026-10-13T13:00:00Z", "2026-10-14T13:00:00Z"];
+    const s = generateSlots({ ...base, existing, limits: { perWeek: 3 }, from: "2026-10-12", to: "2026-10-20" });
+    expect(s["2026-10-15"]).toBeUndefined(); expect(s["2026-10-16"]).toBeUndefined(); expect(s["2026-10-19"]).toHaveLength(16);
+  });
+  it("a booking at 11pm host time counts toward the host's day, not the invitee's", () => {
+    const sched = { ...ny, weekly: { ...ny.weekly, 2: [{ start: "09:00", end: "23:30" }] } };
+    const existing = ["2026-10-14T03:00:00Z"]; // Tue 13 Oct 23:00 NY = Wed in UTC
+    const s = generateSlots({ ...base, schedule: sched, existing, limits: { perDay: 1 }, from: "2026-10-13", to: "2026-10-14" });
+    expect(s["2026-10-13"]).toBeUndefined(); expect(s["2026-10-14"]).toHaveLength(16);
+  });
+});

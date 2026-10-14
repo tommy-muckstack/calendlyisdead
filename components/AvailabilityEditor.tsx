@@ -1,11 +1,26 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 type R = { start: string; end: string };
-type S = { timezone: string; weekly: Record<string, R[]>; overrides: Record<string, R[]> };
+type S = { id: string; name: string; isDefault: boolean; timezone: string; weekly: Record<string, R[]>; overrides: Record<string, R[]>; holidayCountry: string | null };
 const DAYS = [[7, "Sun"], [1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"]] as const;
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London"];
 
-export function AvailabilityEditor({ initial }: { initial: S }) {
+export function AvailabilityEditor({ schedules, countries }: { schedules: S[]; countries: [string, string][] }) {
+  const [list, setList] = useState(schedules);
+  const [curId, setCurId] = useState((schedules.find(x => x.isDefault) ?? schedules[0]).id);
+  return <>
+    <div className="row" style={{ flexWrap: "wrap", marginBottom: 12 }} role="tablist">
+      {list.map(x => <button key={x.id} role="tab" aria-selected={x.id === curId} className={`btn ${x.id === curId ? "primary" : ""}`} onClick={() => setCurId(x.id)}>{x.name}{x.isDefault ? " · default" : ""}</button>)}
+      <button className="btn" onClick={async () => { const r = await fetch("/api/schedules", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "New schedule" }) });
+        const n = await r.json(); setList([...list, { ...n, overrides: n.overrides ?? {}, holidayCountry: null }]); setCurId(n.id); }}>+ New schedule</button>
+    </div>
+    <ScheduleEditor key={curId} initial={list.find(x => x.id === curId)!} countries={countries} canDelete={list.length > 1}
+      onSaved={n => setList(l => l.map(x => x.id === n.id ? n : n.isDefault ? { ...x, isDefault: false } : x))}
+      onDeleted={() => { const rest = list.filter(x => x.id !== curId); setList(rest.some(x => x.isDefault) ? rest : rest.map((x, i) => i === 0 ? { ...x, isDefault: true } : x)); setCurId(rest[0].id); }} />
+  </>;
+}
+
+function ScheduleEditor({ initial, countries, canDelete, onSaved, onDeleted }: { initial: S; countries: [string, string][]; canDelete: boolean; onSaved(s: S): void; onDeleted(): void }) {
   const [s, setS] = useState<S>(initial);
   const [status, setStatus] = useState("");
   const [ovDate, setOvDate] = useState("");
@@ -14,8 +29,9 @@ export function AvailabilityEditor({ initial }: { initial: S }) {
     if (first.current) { first.current = false; return; }
     clearTimeout(t.current); setStatus("Saving…");
     t.current = setTimeout(async () => {
-      const r = await fetch("/api/availability", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(s) });
-      setStatus(r.ok ? "Saved" : "Couldn't save. Check that each start is before its end.");
+      const { id, ...body } = s;
+      const r = await fetch(`/api/schedules/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      setStatus(r.ok ? "Saved" : "Couldn't save. Check that each start is before its end."); if (r.ok) onSaved(s);
     }, 600);
   }, [s]);
   const setDay = (k: string, v: R[]) => setS({ ...s, weekly: { ...s.weekly, [k]: v } });
@@ -30,6 +46,12 @@ export function AvailabilityEditor({ initial }: { initial: S }) {
   return <>
     <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Availability</h1><span className="muted" role="status">{status}</span></div>
     <div className="card" style={{ padding: 24, marginTop: 20 }}>
+      <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 220 }}><label className="f" htmlFor="sname">Schedule name</label><input id="sname" className="input" value={s.name} onChange={e => setS({ ...s, name: e.target.value })} /></div>
+        {!s.isDefault && <button className="btn" onClick={() => setS({ ...s, isDefault: true })}>Make default</button>}
+        {canDelete && <button className="btn danger" onClick={async () => { if (!confirm("Delete this schedule? Event types using it move to another schedule.")) return;
+          const r = await fetch(`/api/schedules/${s.id}`, { method: "DELETE" }); if (r.ok) onDeleted(); }}>Delete</button>}
+      </div>
       <label className="f" htmlFor="tz">Time zone</label>
       <select id="tz" className="input" style={{ maxWidth: 360 }} value={s.timezone} onChange={e => setS({ ...s, timezone: e.target.value })}>{ZONES.map(z => <option key={z}>{z}</option>)}</select>
       <h3>Weekly hours</h3>
@@ -37,6 +59,10 @@ export function AvailabilityEditor({ initial }: { initial: S }) {
         <label style={{ width: 90, paddingTop: 10, fontWeight: 600 }}><input type="checkbox" checked={rs.length > 0} onChange={e => setDay(String(k), e.target.checked ? [{ start: "09:00", end: "17:00" }] : [])} /> {n}</label>
         {rs.length ? Ranges({ rs: rs, onSet: v => setDay(String(k), v) }) : <span className="muted" style={{ paddingTop: 10 }}>Unavailable</span>}
       </div>; })}
+      <h3 style={{ marginTop: 28 }}>Holidays</h3>
+      <p className="muted">Close on public holidays automatically. Date-specific hours below still win.</p>
+      <select aria-label="Holiday calendar" className="input" style={{ maxWidth: 360 }} value={s.holidayCountry ?? ""} onChange={e => setS({ ...s, holidayCountry: e.target.value || null })}>
+        <option value="">Don't block holidays</option>{countries.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
       <h3 style={{ marginTop: 28 }}>Date-specific hours</h3>
       <p className="muted">Override your weekly hours on particular dates, or mark a day off.</p>
       <div className="row"><input className="input" type="date" style={{ width: 200 }} value={ovDate} onChange={e => setOvDate(e.target.value)} />

@@ -4,7 +4,8 @@ import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 type Props = { username: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
-  reschedule?: { uid: string; name: string; email: string; start: string } };
+  reschedule?: { uid: string; name: string; email: string; start: string };
+  questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
 
 export function BookingWidget(p: Props) {
@@ -34,10 +35,11 @@ export function BookingWidget(p: Props) {
     const fd = new FormData(e.currentTarget);
     const guests = String(fd.get("guests") ?? "").split(/[,\s]+/).filter(Boolean);
     const r = await fetch("/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-      username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid }) });
+      username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid,
+      answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
     const j = await r.json(); setBusy(false);
     if (r.ok) router.push(`/booking/${j.uid}?new=1`);
-    else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : "Please check your details and try again.");
+    else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
   }
 
   return <div className="card bk">
@@ -82,6 +84,12 @@ export function BookingWidget(p: Props) {
         <label className="f" htmlFor="name">Name</label><input className="input" id="name" name="name" required defaultValue={p.reschedule?.name} />
         <label className="f" htmlFor="email">Email</label><input className="input" id="email" name="email" type="email" required defaultValue={p.reschedule?.email} />
         <label className="f" htmlFor="guests">Guest emails (optional)</label><input className="input" id="guests" name="guests" placeholder="comma separated" />
+        {p.questions.map(q => <div key={q.id}>
+          <label className="f" htmlFor={`q_${q.id}`}>{q.label}{q.required ? " *" : ""}</label>
+          {q.type === "textarea" ? <textarea className="input" id={`q_${q.id}`} name={`q_${q.id}`} rows={3} required={q.required} />
+            : q.type === "select" ? <select className="input" id={`q_${q.id}`} name={`q_${q.id}`} required={q.required} defaultValue=""><option value="" disabled>Choose one</option>{(q.options ?? []).map(o => <option key={o}>{o}</option>)}</select>
+            : <input className="input" id={`q_${q.id}`} name={`q_${q.id}`} type={q.type === "phone" ? "tel" : "text"} required={q.required} />}
+        </div>)}
         <label className="f" htmlFor="notes">Anything to prepare?</label><textarea className="input" id="notes" name="notes" rows={4} />
         {err && <p style={{ color: "var(--warn)" }}>{err}</p>}
         <button className="btn primary" style={{ marginTop: 16 }} disabled={busy}>{p.reschedule ? "Confirm new time" : "Book it"}</button>

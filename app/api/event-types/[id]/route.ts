@@ -7,12 +7,16 @@ export const runtime = "nodejs";
 const Patch = z.object({ title: z.string().min(1).max(120), slug: z.string().regex(/^[a-z0-9-]{1,60}$/), description: z.string().max(5000),
   durationMin: z.number().int().min(5).max(720), location: z.string().max(300), color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   bufferBeforeMin: z.number().int().min(0).max(240), bufferAfterMin: z.number().int().min(0).max(240), minNoticeMin: z.number().int().min(0).max(43200),
-  rangeDays: z.number().int().min(1).max(730), active: z.boolean() }).partial();
+  rangeDays: z.number().int().min(1).max(730), active: z.boolean(),
+  scheduleId: z.string(), maxPerDay: z.number().int().min(1).max(100).nullable(), maxPerWeek: z.number().int().min(1).max(500).nullable(),
+  questions: z.array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/), label: z.string().min(1).max(200), type: z.enum(["text", "textarea", "phone", "select"]),
+    required: z.boolean(), options: z.array(z.string().min(1).max(100)).max(30).optional() })).max(20) }).partial();
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const u = await requireUser(); if (!u) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params; const p = Patch.safeParse(await req.json());
   if (!p.success) return NextResponse.json({ error: "invalid", issues: p.error.issues }, { status: 400 });
   const db = await getDb();
+  if (p.data.scheduleId) { const [sc] = await db.select().from(schema.schedules).where(and(eq(schema.schedules.id, p.data.scheduleId), eq(schema.schedules.userId, u.id))); if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 }); }
   try {
     const r = await db.update(schema.eventTypes).set(p.data).where(and(eq(schema.eventTypes.id, id), eq(schema.eventTypes.userId, u.id))).returning();
     return r.length ? NextResponse.json(r[0]) : NextResponse.json({ error: "not_found" }, { status: 404 });

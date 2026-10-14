@@ -6,3 +6,14 @@ CREATE TABLE IF NOT EXISTS schedules (id text PRIMARY KEY, "userId" text NOT NUL
 CREATE TABLE IF NOT EXISTS event_types (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "scheduleId" text REFERENCES schedules(id), slug text NOT NULL, title text NOT NULL, description text NOT NULL DEFAULT '', "durationMin" integer NOT NULL DEFAULT 30, location text NOT NULL DEFAULT '', color text NOT NULL DEFAULT '#0E7C66', "bufferBeforeMin" integer NOT NULL DEFAULT 0, "bufferAfterMin" integer NOT NULL DEFAULT 0, "minNoticeMin" integer NOT NULL DEFAULT 240, "rangeDays" integer NOT NULL DEFAULT 60, active boolean NOT NULL DEFAULT true, kind text NOT NULL DEFAULT 'one_on_one', UNIQUE ("userId", slug));
 CREATE TABLE IF NOT EXISTS bookings (uid text PRIMARY KEY, "eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE, "hostId" text NOT NULL REFERENCES users(id), start timestamptz NOT NULL, "end" timestamptz NOT NULL, "inviteeName" text NOT NULL, "inviteeEmail" text NOT NULL, "inviteeTz" text NOT NULL, notes text NOT NULL DEFAULT '', guests jsonb NOT NULL DEFAULT '[]', status text NOT NULL DEFAULT 'confirmed', "cancelReason" text, "rescheduledFrom" text, "createdAt" timestamptz NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_no_double ON bookings ("hostId", start) WHERE status = 'confirmed';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "addToCalendarId" text;
+ALTER TABLE schedules ADD COLUMN IF NOT EXISTS "holidayCountry" text;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS questions jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerDay" integer;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerWeek" integer;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS answers jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalCalendarId" text;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalEventId" text;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "meetingUrl" text;
+CREATE TABLE IF NOT EXISTS calendar_connections (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, provider text NOT NULL, "accountEmail" text NOT NULL DEFAULT '', secret text NOT NULL, status text NOT NULL DEFAULT 'ok', "createdAt" timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS user_calendars (id text PRIMARY KEY, "connectionId" text NOT NULL REFERENCES calendar_connections(id) ON DELETE CASCADE, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "externalId" text NOT NULL, name text NOT NULL, "isPrimary" boolean NOT NULL DEFAULT false, "canWrite" boolean NOT NULL DEFAULT true, "checkConflicts" boolean NOT NULL DEFAULT false, UNIQUE ("connectionId", "externalId"));
