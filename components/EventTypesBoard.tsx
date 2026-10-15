@@ -54,7 +54,7 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
     timer.current = setTimeout(async () => {
       const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"];
       const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.lockedFields ?? []).includes(k)).map(k => [k, (d as any)[k]]));
-      if (d.managedParentId) delete body.kind; if (!body.scheduleId) delete body.scheduleId;
+      if (d.managedParentId) delete body.kind;
       if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
       const r = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (r.ok) { setErr(""); onChange(await r.json()); onSaved(); } else { const j = await r.json(); setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values"); }
