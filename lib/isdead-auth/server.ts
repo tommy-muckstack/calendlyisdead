@@ -46,3 +46,17 @@ export function verifyDemo(v: string | undefined): string | null {
   const id = v.slice(0, i), want = signDemo(id);
   return want.length === v.length && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(v)) ? id : null;
 }
+
+// ---- guest sessions: per-visitor HMAC-signed id, no account needed ----
+// Guests are first-class: the app works immediately; sign-in is an upgrade for sync/email features.
+// Requires AUTH_SECRET in production so ids can't be forged (dev falls back to the demo key).
+const guestKey = () => process.env.AUTH_SECRET ?? (process.env.NODE_ENV === "production" ? null : "dev-only-secret-change-me-in-production");
+export const guestEnabled = () => !!guestKey() && process.env.GUESTS !== "0";
+export const newGuestId = () => "g_" + crypto.randomBytes(15).toString("base64url");
+export function signGuest(id: string) { const k = guestKey(); if (!k) throw new Error("AUTH_SECRET is not set"); return `${id}.${crypto.createHmac("sha256", k).update(`guest:${id}`).digest("base64url")}`; }
+export function verifyGuest(v: string | undefined): string | null {
+  if (!v || !guestKey()) return null; const i = v.lastIndexOf("."); if (i < 1) return null;
+  const id = v.slice(0, i); if (!/^g_[A-Za-z0-9_-]{10,40}$/.test(id)) return null;
+  const want = signGuest(id);
+  return want.length === v.length && crypto.timingSafeEqual(Buffer.from(want), Buffer.from(v)) ? id : null;
+}
