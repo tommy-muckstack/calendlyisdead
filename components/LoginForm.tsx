@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { FirebaseClientConfig } from "@/lib/isdead-auth/config";
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, authErrorMessage } from "@/lib/isdead-auth/client";
 import { BP } from "@/lib/basepath";
+import { GoogleButton } from "@/vendor/isdead-design/src/google";
 type Props = { config: FirebaseClientConfig | null; demo: boolean; demoAs?: "mate"; to: string };
 const full = { width: "100%", justifyContent: "center" } as const;
 export function LoginForm({ config, demo, demoAs, to }: Props) {
@@ -31,7 +32,7 @@ export function LoginForm({ config, demo, demoAs, to }: Props) {
         <button className="btn primary" style={{ ...full, marginTop: 12 }} disabled={busy}>{mode === "signup" ? "Create account" : mode === "reset" ? "Email me a reset link" : "Sign in"}</button>
       </form>
       {mode !== "reset" && <><div className="muted" style={{ textAlign: "center", margin: "12px 0", fontSize: 13 }}>or</div>
-        <button className="btn" style={full} disabled={busy} onClick={() => run(async () => { await signInWithGoogle(config, session); done(); })}>Continue with Google</button></>}
+        <GoogleButton block disabled={busy} onClick={() => run(async () => { await signInWithGoogle(config, session); done(); })} /></>}
       <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
         {mode === "signin" ? <><a href="#" onClick={e => { e.preventDefault(); setMode("signup"); }}>Create an account</a> · <a href="#" onClick={e => { e.preventDefault(); setMode("reset"); }}>Forgot password?</a></>
           : <a href="#" onClick={e => { e.preventDefault(); setMode("signin"); }}>Back to sign in</a>}

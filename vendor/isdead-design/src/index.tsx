@@ -42,3 +42,5 @@ export function Footer({ columns, note }: { columns: { title: string; links: { h
 }
 export const themes = ["calendly", "superhuman", "wisprflow"] as const;
 export type ThemeName = (typeof themes)[number];
+
+export * from "./google";
