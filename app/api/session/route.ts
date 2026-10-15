@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   if (!firebaseConfigured()) return NextResponse.json({ error: "Sign-in is not configured yet." }, { status: 503 });
   const { idToken } = await req.json().catch(() => ({}));
   if (typeof idToken !== "string" || !idToken) return NextResponse.json({ error: "idToken required" }, { status: 400 });
-  let s; try { s = await createSessionFromIdToken(idToken); } catch { return NextResponse.json({ error: "Sign-in failed. Try again." }, { status: 401 }); }
+  let s; try { s = await createSessionFromIdToken(idToken); } catch (e) { console.error("session: createSessionFromIdToken failed", (e as { code?: string })?.code, String((e as Error)?.message).slice(0, 200)); return NextResponse.json({ error: "Sign-in failed. Try again." }, { status: 401 }); }
   const u = await upsertFirebaseUser(s.identity);
   if ("error" in u) return NextResponse.json({ error: u.error }, { status: 403 });
   const res = new NextResponse(null, { status: 204 });
