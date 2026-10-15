@@ -1,10 +1,11 @@
+import { BP } from "./basepath";
 import { and, eq, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
 import { sendMail } from "./email";
 const { teams, teamMembers: tm, teamInvites: ti, eventTypes, eventTypeHosts: eth, users } = schema;
 export const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek"] as const;
-const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
 export async function role(userId: string, teamId: string): Promise<string | null> {
   const db = await getDb();

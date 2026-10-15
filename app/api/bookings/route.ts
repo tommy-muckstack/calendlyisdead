@@ -1,3 +1,4 @@
+import { BP } from "@/lib/basepath";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createBooking, baseUrl, getBooking } from "@/lib/booking";
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
       checkoutUrl = stripeConfigured()
         ? (await createCheckout({ uid: b.uid, title: et.title, amountCents: b.amountCents, currency: et.currency, email: b.inviteeEmail,
             successUrl: `${baseUrl()}/booking/${b.uid}?new=1&paid=1${e}`, cancelUrl: `${baseUrl()}/booking/${b.uid}/cancel?unpaid=1${e}` })).url
-        : `/pay/${b.uid}${e ? "?embed=1" : ""}`;
+        : `${BP}/pay/${b.uid}${e ? "?embed=1" : ""}`;
     }
     let redirectUrl: string | undefined;
     if (et.redirectUrl && !checkoutUrl) {

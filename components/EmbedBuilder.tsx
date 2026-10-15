@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useState } from "react";
 export function EmbedBuilder({ base, username, types }: { base: string; username: string; types: { slug: string; title: string }[] }) {
   const [kind, setKind] = useState<"inline" | "widget" | "text">("inline");
@@ -23,7 +24,7 @@ export function EmbedBuilder({ base, username, types }: { base: string; username
       <label className="f">Code</label>
       <pre className="code" data-testid="embed-code">{code}</pre>
       <button className="btn" onClick={() => navigator.clipboard?.writeText(code)}>Copy code</button>
-      <a className="btn" style={{ marginLeft: 8 }} href="/embed-demo.html" target="_blank">See a live demo page</a>
+      <a className="btn" style={{ marginLeft: 8 }} href={BP + "/embed-demo.html"} target="_blank">See a live demo page</a>
     </div>
   </>;
 }

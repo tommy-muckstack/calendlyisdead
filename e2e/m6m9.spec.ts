@@ -1,7 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 const shots = "research/ours";
 const login = async (page: Page) => {
-  await page.goto("/login");
+  await page.goto("login");
   await page.getByRole("button", { name: "Use the demo account" }).click();
   await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
 };
@@ -14,7 +14,7 @@ const pickFirstSlot = async (page: Page, nthDay = 0, nthSlot = 0) => {
 
 test.describe.serial("M6-M9", () => {
   test("landing page compares prices", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("");
     await expect(page.getByRole("heading", { name: /never sends you a bill/ })).toBeVisible();
     await expect(page.getByTestId("cost-standard")).toHaveText("$1,200");
     await page.getByLabel(/Team size/).fill("50");
@@ -26,9 +26,9 @@ test.describe.serial("M6-M9", () => {
 
   test("paid booking via demo checkout, Zoom demo room", async ({ page }) => {
     await login(page);
-    const et = await (await page.request.post("/api/event-types")).json();
-    expect((await page.request.patch(`/api/event-types/${et.id}`, { data: { title: "Paid coaching", slug: "coaching", priceCents: 4900, location: "Zoom" } })).ok()).toBe(true);
-    await page.goto("/demo/coaching");
+    const et = await (await page.request.post("api/event-types")).json();
+    expect((await page.request.patch(`api/event-types/${et.id}`, { data: { title: "Paid coaching", slug: "coaching", priceCents: 4900, location: "Zoom" } })).ok()).toBe(true);
+    await page.goto("demo/coaching");
     await expect(page.getByTestId("price")).toContainText("$49.00");
     await pickFirstSlot(page);
     await page.getByLabel("Name").fill("Pat Payer"); await page.getByLabel("Email", { exact: true }).fill("pat@example.com");
@@ -39,29 +39,29 @@ test.describe.serial("M6-M9", () => {
     await expect(page.getByTestId("confirm-heading")).toHaveText("You're booked");
     await expect(page.getByTestId("paid")).toContainText("$49.00");
     await expect(page.getByTestId("meeting-url")).toContainText("/meet/zoom-");
-    await page.goto("/app/analytics");
+    await page.goto("app/analytics");
     await expect(page.getByTestId("stat-revenue")).toHaveText("$49.00");
     await page.screenshot({ path: `${shots}/22-analytics.png`, fullPage: true });
   });
 
   test("branding: color, hide powered-by", async ({ page }) => {
     await login(page);
-    await page.goto("/demo/30min");
+    await page.goto("demo/30min");
     await expect(page.getByTestId("powered-by")).toBeVisible();
-    await page.goto("/app/branding");
+    await page.goto("app/branding");
     await page.getByLabel(/Hide "Powered by/).check();
     await expect(page.getByRole("status")).toHaveText("Saved");
-    expect((await page.request.patch("/api/me/branding", { data: { brandColor: "#7a3cff" } })).ok()).toBe(true);
-    expect((await page.request.patch("/api/me/branding", { data: { logoUrl: "javascript:alert(1)" } })).status()).toBe(400);
-    await page.goto("/demo/30min");
+    expect((await page.request.patch("api/me/branding", { data: { brandColor: "#7a3cff" } })).ok()).toBe(true);
+    expect((await page.request.patch("api/me/branding", { data: { logoUrl: "javascript:alert(1)" } })).status()).toBe(400);
+    await page.goto("demo/30min");
     await expect(page.getByTestId("powered-by")).toHaveCount(0);
     const brand = await page.getByTestId("brand-frame").evaluate(el => getComputedStyle(el).getPropertyValue("--brand").trim());
     expect(brand).toBe("#7a3cff");
-    await page.request.patch("/api/me/branding", { data: { brandColor: null, hideBranding: false } });
+    await page.request.patch("api/me/branding", { data: { brandColor: null, hideBranding: false } });
   });
 
   test("embeds: inline, popup text and popup widget on a third-party page", async ({ page }) => {
-    await page.goto("/embed-demo.html");
+    await page.goto("embed-demo.html");
     const inline = page.frameLocator(".cid-inline iframe");
     await expect(inline.getByRole("heading", { name: /Quick chat/ })).toBeVisible();
     await page.getByRole("link", { name: "Open the popup" }).click();
@@ -84,14 +84,14 @@ test.describe.serial("M6-M9", () => {
   });
 
   test("embed builder shows a snippet", async ({ page }) => {
-    await login(page); await page.goto("/app/embed");
+    await login(page); await page.goto("app/embed");
     await expect(page.getByTestId("embed-code")).toContainText('class="cid-inline"');
     await page.getByRole("tab", { name: "Popup widget" }).click();
     await expect(page.getByTestId("embed-code")).toContainText("initPopupWidget");
   });
 
   test("one-off link works once", async ({ page }) => {
-    await login(page); await page.goto("/app/one-off");
+    await login(page); await page.goto("app/one-off");
     await page.getByLabel("Meeting name").fill("Intro with Jordan");
     await page.getByRole("button", { name: "Create one-off link" }).click();
     const href = await page.getByTestId("one-off").first().getByRole("link", { name: "Open" }).getAttribute("href");
@@ -104,14 +104,14 @@ test.describe.serial("M6-M9", () => {
   });
 
   test("meeting poll: create, vote, book", async ({ page, browser }) => {
-    await login(page); await page.goto("/app/polls");
+    await login(page); await page.goto("app/polls");
     await page.getByLabel("Meeting name").fill("Offsite planning");
     const d = new Date(Date.now() + 9 * 864e5); const ymd = d.toISOString().slice(0, 10);
     await page.getByLabel("Option 1").fill(`${ymd}T10:00`); await page.getByLabel("Option 2").fill(`${ymd}T15:00`);
     await page.getByRole("button", { name: "Create poll" }).click();
     const poll = page.getByTestId("poll").first(); await expect(poll).toContainText("Offsite planning");
     const href = await poll.getByRole("link").first().getAttribute("href");
-    const ctx = await browser.newContext({ baseURL: "http://localhost:3123", timezoneId: "America/New_York" }); const v = await ctx.newPage();
+    const ctx = await browser.newContext({ baseURL: "http://localhost:3123/calendlyisdead/", timezoneId: "America/New_York" }); const v = await ctx.newPage();
     await v.goto(href!); await v.getByRole("checkbox").nth(1).check();
     await v.getByLabel("Name").fill("Val Voter"); await v.getByLabel("Email").fill("val@example.com");
     await v.getByRole("button", { name: "Send my vote" }).click(); await expect(v.getByTestId("voted")).toBeVisible(); await ctx.close();
@@ -122,7 +122,7 @@ test.describe.serial("M6-M9", () => {
   });
 
   test("email assistant drafts a reply with real times", async ({ page }) => {
-    await login(page); await page.goto("/app/assistant");
+    await login(page); await page.goto("app/assistant");
     await page.getByRole("button", { name: "Find times and draft reply" }).click();
     await expect(page.getByTestId("assistant-result")).toContainText("Jordan Lee");
     await expect(page.getByTestId("proposed").first()).toBeVisible();

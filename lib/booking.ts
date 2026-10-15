@@ -1,3 +1,4 @@
+import { BP } from "./basepath";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { DateTime } from "luxon";
 import { nanoid } from "nanoid";
@@ -113,7 +114,7 @@ export async function pickHost(et: any, hosts: Host[], candidates: string[]) {
     (et.rrMode === "priority" ? prio(b) - prio(a) : 0) || count(a) - count(b) || last(a) - last(b) || a.localeCompare(b))[0];
 }
 
-export const baseUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+export const baseUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
 export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
   const when = DateTime.fromJSDate(b.start).setZone(b.inviteeTz).toFormat("cccc, LLLL d, yyyy 'at' h:mm a ZZZZ");

@@ -1,3 +1,4 @@
+import { BP } from "@/lib/basepath";
 import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
@@ -29,7 +30,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
     adapter: DrizzleAdapter(db, { usersTable: schema.users, accountsTable: schema.accounts, sessionsTable: schema.sessions, verificationTokensTable: schema.verificationTokens } as any),
     session: { strategy: "jwt" },
     providers,
-    pages: { signIn: "/login", verifyRequest: "/login?sent=1" },
+    basePath: `${BP}/api/auth`,
+    pages: { signIn: `${BP}/login`, verifyRequest: `${BP}/login?sent=1` },
     callbacks: {
       jwt({ token, user }) { if (user?.id) token.uid = user.id; return token; },
       session({ session, token }) { (session.user as any).id = token.uid ?? token.sub; return session; },

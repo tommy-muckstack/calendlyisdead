@@ -1,10 +1,11 @@
+import { BP } from "./basepath";
 import { and, eq, lte } from "drizzle-orm";
 import { DateTime } from "luxon";
 import { getDb, schema } from "./db";
 import { sendMail } from "./email";
 import { sendSms } from "./sms";
 const { workflows, scheduledMessages: sm, bookings, eventTypes, users } = schema;
-const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
 export const TEMPLATE_VARS = ["invitee.name", "invitee.first_name", "invitee.email", "event.name", "event.date", "event.time", "event.duration", "event.location",
   "host.name", "host.email", "meeting_url", "reschedule_url", "cancel_url", "invitee.timezone", "answers.<question id>"];

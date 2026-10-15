@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useEffect, useRef, useState } from "react";
 type W = { id: string; name: string; trigger: string; offsetMin: number; channel: string; recipient: string; subject: string; body: string; eventTypeIds: string[]; active: boolean };
 const TRIG: Record<string, string> = { on_booked: "When a meeting is booked", before_start: "Before the meeting starts", after_end: "After the meeting ends", on_cancelled: "When a meeting is cancelled" };
@@ -7,7 +8,7 @@ export function WorkflowsPanel({ initial, eventTypes, vars }: { initial: W[]; ev
   const [list, setList] = useState(initial);
   return <>
     <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Workflows</h1>
-      <button className="btn primary" onClick={async () => { const w = await (await fetch("/api/workflows", { method: "POST" })).json(); setList([...list, w]); }}>+ New workflow</button></div>
+      <button className="btn primary" onClick={async () => { const w = await (await fetch(BP + "/api/workflows", { method: "POST" })).json(); setList([...list, w]); }}>+ New workflow</button></div>
     <p className="muted">Automatic emails and texts around your meetings. Variables: {vars.map(v => <code key={v} style={{ marginRight: 6 }}>{`{{${v}}}`}</code>)}</p>
     {list.map(w => <WorkflowCard key={w.id} w={w} eventTypes={eventTypes} onDelete={() => setList(list.filter(x => x.id !== w.id))} />)}
   </>;
@@ -16,7 +17,7 @@ function WorkflowCard({ w, eventTypes, onDelete }: { w: W; eventTypes: { id: str
   const [d, setD] = useState(w); const [st, setSt] = useState(""); const t = useRef<any>(null), first = useRef(true);
   useEffect(() => { if (first.current) { first.current = false; return; } clearTimeout(t.current); t.current = setTimeout(async () => {
     const { id, ...body } = d as any; delete body.userId;
-    const r = await fetch(`/api/workflows/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const r = await fetch(`${BP}/api/workflows/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     setSt(r.ok ? "Saved" : (await r.json()).error === "sms_to_host_unsupported" ? "Texts go to invitees only" : "Check the fields"); }, 500); }, [d]);
   const timed = d.trigger === "before_start" || d.trigger === "after_end";
   return <div className="card" style={{ padding: 20, marginTop: 16 }} data-testid="workflow">
@@ -36,6 +37,6 @@ function WorkflowCard({ w, eventTypes, onDelete }: { w: W; eventTypes: { id: str
       onChange={x => setD({ ...d, eventTypeIds: x.target.checked ? [...d.eventTypeIds, e.id] : d.eventTypeIds.filter(y => y !== e.id) })} /> {e.title}</label>)}</div>
     {d.channel === "email" && <><label className="f">Subject</label><input className="input" aria-label="Subject" value={d.subject} onChange={e => setD({ ...d, subject: e.target.value })} /></>}
     <label className="f">Message</label><textarea className="input" aria-label="Message" rows={5} value={d.body} onChange={e => setD({ ...d, body: e.target.value })} />
-    <button className="btn danger" style={{ marginTop: 10 }} onClick={async () => { if (confirm("Delete workflow?")) { await fetch(`/api/workflows/${d.id}`, { method: "DELETE" }); onDelete(); } }}>Delete</button>
+    <button className="btn danger" style={{ marginTop: 10 }} onClick={async () => { if (confirm("Delete workflow?")) { await fetch(`${BP}/api/workflows/${d.id}`, { method: "DELETE" }); onDelete(); } }}>Delete</button>
   </div>;
 }

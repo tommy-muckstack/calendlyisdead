@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
@@ -14,7 +15,7 @@ export function EventTypesBoard({ initial, username, schedules }: { initial: ET[
   const open = items.find(i => i.id === openId) ?? null;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
   async function create() {
-    const r = await fetch("/api/event-types", { method: "POST" }); const et = await r.json();
+    const r = await fetch(BP + "/api/event-types", { method: "POST" }); const et = await r.json();
     setItems(x => [...x, et]); setOpenId(et.id);
   }
   return <>
@@ -27,12 +28,12 @@ export function EventTypesBoard({ initial, username, schedules }: { initial: ET[
         <div style={{ fontWeight: 700, fontSize: 17 }}>{et.title}</div>
         <div className="muted" style={{ fontSize: 14 }}>{et.durationMin} min · {et.location || "No location"} · {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-one"}{et.managedParentId ? " · Managed by your team" : ""}</div>
       </div>
-      <button className="btn" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}/${username}/${et.slug}`); flash("Link copied"); }}>Copy link</button>
-      <a className="btn" href={`/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>View</a>
+      <button className="btn" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }}>Copy link</button>
+      <a className="btn" href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>View</a>
     </div>)}
     {open && <Editor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
-      onDelete={async () => { await fetch(`/api/event-types/${open.id}`, { method: "DELETE" }); setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null); }} />}
+      onDelete={async () => { await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" }); setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null); }} />}
     {toast && <div className="toast" role="status">{toast}</div>}
   </>;
 }
@@ -50,7 +51,7 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
       const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.lockedFields ?? []).includes(k)).map(k => [k, (d as any)[k]]));
       if (d.managedParentId) delete body.kind; if (!body.scheduleId) delete body.scheduleId;
       if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
-      const r = await fetch(`/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (r.ok) { setErr(""); onChange(await r.json()); onSaved(); } else { const j = await r.json(); setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values"); }
     }, 600);
     return () => clearTimeout(timer.current);

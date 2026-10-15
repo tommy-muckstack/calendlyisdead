@@ -1,8 +1,9 @@
+import { BP } from "./basepath";
 /** Video conferencing for bookings. Real providers when configured, otherwise a clearly-labelled demo room so keyless DEMO_MODE still works. */
 export type Conf = "zoom" | "meet" | null;
 export const confFor = (location: string): Conf => /\bzoom\b/i.test(location) ? "zoom" : /google meet/i.test(location) ? "meet" : null;
 export const zoomConfigured = () => !!(process.env.ZOOM_ACCOUNT_ID && process.env.ZOOM_CLIENT_ID && process.env.ZOOM_CLIENT_SECRET);
-const base = () => process.env.APP_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
+const base = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 export const demoRoomUrl = (kind: "zoom" | "meet", uid: string) => `${base()}/meet/${kind}-${uid}`;
 
 let zoomToken: { v: string; exp: number } | null = null;

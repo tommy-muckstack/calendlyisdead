@@ -1,11 +1,12 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useState } from "react";
 type B = { brandColor: string | null; logoUrl: string | null; hideBranding: boolean };
 export function BrandingPanel({ username, initial }: { username: string; initial: B }) {
   const [b, setB] = useState(initial), [msg, setMsg] = useState("");
   async function save(n: Partial<B>) {
     const next = { ...b, ...n }; setB(next);
-    const r = await fetch("/api/me/branding", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(n) });
+    const r = await fetch(BP + "/api/me/branding", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(n) });
     setMsg(r.ok ? "Saved" : (await r.json()).error === "bad_logo" ? "Logo must be an https link or an image under 200 KB" : "Couldn't save"); setTimeout(() => setMsg(""), 1600);
   }
   function upload(f?: File) {
@@ -24,7 +25,7 @@ export function BrandingPanel({ username, initial }: { username: string; initial
       {b.logoUrl && <div className="row" style={{ marginTop: 10 }}><img src={b.logoUrl} alt="Your logo" style={{ maxHeight: 48 }} /><button className="btn" onClick={() => save({ logoUrl: null })}>Remove logo</button></div>}
       <label className="f" style={{ marginTop: 16 }}><input type="checkbox" checked={b.hideBranding} onChange={e => save({ hideBranding: e.target.checked })} /> Hide "Powered by CalendlyIsDead"</label>
       <p className="muted" style={{ fontSize: 13 }}>Calendly charges for this. Here it's a checkbox.</p>
-      <a className="btn" href={`/${username}`} target="_blank">Preview booking page</a>
+      <a className="btn" href={`${BP}/${username}`} target="_blank">Preview booking page</a>
     </div>
     {msg && <div className="toast" role="status">{msg}</div>}
   </>;

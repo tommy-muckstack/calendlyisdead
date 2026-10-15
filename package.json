@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run tests/unit",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

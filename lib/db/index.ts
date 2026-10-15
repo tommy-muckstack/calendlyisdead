@@ -36,6 +36,8 @@ export function getDb(): Promise<DB> {
 export const DEMO_USER_ID = "demo-user";
 export const DEMO_MATE_ID = "demo-mate";
 async function seed(db: DB) {
+  // demo accounts only exist outside production or when DEMO_MODE=1
+  if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "1") return;
   const { users, schedules, eventTypes } = schema;
   // second demo account (a teammate), idempotent so older dev databases get it too
   await db.insert(users).values({ id: DEMO_MATE_ID, name: "Sam Rivera", email: "sam@calendlyisdead.local", username: "sam", timezone: "America/Chicago" }).onConflictDoNothing();

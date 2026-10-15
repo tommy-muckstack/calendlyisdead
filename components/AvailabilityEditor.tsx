@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useEffect, useRef, useState } from "react";
 type R = { start: string; end: string };
 type S = { id: string; name: string; isDefault: boolean; timezone: string; weekly: Record<string, R[]>; overrides: Record<string, R[]>; holidayCountry: string | null };
@@ -11,7 +12,7 @@ export function AvailabilityEditor({ schedules, countries }: { schedules: S[]; c
   return <>
     <div className="row" style={{ flexWrap: "wrap", marginBottom: 12 }} role="tablist">
       {list.map(x => <button key={x.id} role="tab" aria-selected={x.id === curId} className={`btn ${x.id === curId ? "primary" : ""}`} onClick={() => setCurId(x.id)}>{x.name}{x.isDefault ? " · default" : ""}</button>)}
-      <button className="btn" onClick={async () => { const r = await fetch("/api/schedules", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "New schedule" }) });
+      <button className="btn" onClick={async () => { const r = await fetch(BP + "/api/schedules", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "New schedule" }) });
         const n = await r.json(); setList([...list, { ...n, overrides: n.overrides ?? {}, holidayCountry: null }]); setCurId(n.id); }}>+ New schedule</button>
     </div>
     <ScheduleEditor key={curId} initial={list.find(x => x.id === curId)!} countries={countries} canDelete={list.length > 1}
@@ -30,7 +31,7 @@ function ScheduleEditor({ initial, countries, canDelete, onSaved, onDeleted }: {
     clearTimeout(t.current); setStatus("Saving…");
     t.current = setTimeout(async () => {
       const { id, ...body } = s;
-      const r = await fetch(`/api/schedules/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(`${BP}/api/schedules/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       setStatus(r.ok ? "Saved" : "Couldn't save. Check that each start is before its end."); if (r.ok) onSaved(s);
     }, 600);
   }, [s]);
@@ -50,7 +51,7 @@ function ScheduleEditor({ initial, countries, canDelete, onSaved, onDeleted }: {
         <div style={{ flex: 1, minWidth: 220 }}><label className="f" htmlFor="sname">Schedule name</label><input id="sname" className="input" value={s.name} onChange={e => setS({ ...s, name: e.target.value })} /></div>
         {!s.isDefault && <button className="btn" onClick={() => setS({ ...s, isDefault: true })}>Make default</button>}
         {canDelete && <button className="btn danger" onClick={async () => { if (!confirm("Delete this schedule? Event types using it move to another schedule.")) return;
-          const r = await fetch(`/api/schedules/${s.id}`, { method: "DELETE" }); if (r.ok) onDeleted(); }}>Delete</button>}
+          const r = await fetch(`${BP}/api/schedules/${s.id}`, { method: "DELETE" }); if (r.ok) onDeleted(); }}>Delete</button>}
       </div>
       <label className="f" htmlFor="tz">Time zone</label>
       <select id="tz" className="input" style={{ maxWidth: 360 }} value={s.timezone} onChange={e => setS({ ...s, timezone: e.target.value })}>{ZONES.map(z => <option key={z}>{z}</option>)}</select>

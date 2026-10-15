@@ -1,3 +1,4 @@
+import { BP } from "@/lib/basepath";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser, signOut } from "@/auth";
@@ -20,10 +21,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Link className="nav" href="/app/analytics">▤ Analytics</Link>
       <Link className="nav" href="/app/branding">◐ Branding</Link>
       <Link className="nav" href="/app/embed">⧉ Embed</Link>
-      <a className="nav" href={`/${u.username}`} target="_blank">↗ My booking page</a>
+      <a className="nav" href={`${BP}/${u.username}`} target="_blank">↗ My booking page</a>
       <div style={{ flex: 1 }} />
       <div className="muted" style={{ fontSize: 13, padding: "0 12px" }}>{u.email}</div>
-      <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}><button className="btn" style={{ margin: 8 }}>Sign out</button></form>
+      <form action={async () => { "use server"; await signOut({ redirectTo: BP + "/" }); }}><button className="btn" style={{ margin: 8 }}>Sign out</button></form>
     </aside>
     <main className="main">{children}</main>
   </div>;

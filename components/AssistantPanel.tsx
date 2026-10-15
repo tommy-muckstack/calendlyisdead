@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useState } from "react";
 import { DateTime } from "luxon";
 const SAMPLE = `From: Jordan Lee <jordan@example.com>
@@ -14,7 +15,7 @@ export function AssistantPanel({ types, llm }: { types: { slug: string; title: s
   const [thread, setThread] = useState(SAMPLE), [slug, setSlug] = useState(types[0]?.slug ?? ""), [r, setR] = useState<any>(null), [busy, setBusy] = useState(false), [copied, setCopied] = useState(false);
   async function run() {
     setBusy(true); setR(null);
-    const res = await fetch("/api/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ thread, slug }) });
+    const res = await fetch(BP + "/api/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ thread, slug }) });
     setR(await res.json()); setBusy(false);
   }
   return <>

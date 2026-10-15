@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -24,7 +25,7 @@ export function BookingWidget(p: Props) {
   useEffect(() => {
     setSlots(null);
     const from = m.startOf("month").toISODate(), to = m.endOf("month").toISODate();
-    fetch(`/api/slots?user=${encodeURIComponent(p.username)}&slug=${p.slug}&from=${from}&to=${to}&tz=${encodeURIComponent(tz)}${p.reschedule ? `&exclude=${p.reschedule.uid}` : ""}`)
+    fetch(`${BP}/api/slots?user=${encodeURIComponent(p.username)}&slug=${p.slug}&from=${from}&to=${to}&tz=${encodeURIComponent(tz)}${p.reschedule ? `&exclude=${p.reschedule.uid}` : ""}`)
       .then(r => r.json()).then(j => setSlots(j.slots ?? {}));
   }, [month, tz]);
   const cells = useMemo(() => { const first = m.startOf("month"); const pad = first.weekday % 7; return [...Array(pad).fill(null), ...Array.from({ length: first.daysInMonth! }, (_, i) => first.plus({ days: i }))]; }, [month, tz]);
@@ -34,7 +35,7 @@ export function BookingWidget(p: Props) {
     e.preventDefault(); setBusy(true); setErr("");
     const fd = new FormData(e.currentTarget);
     const guests = String(fd.get("guests") ?? "").split(/[,\s]+/).filter(Boolean);
-    const r = await fetch("/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+    const r = await fetch(BP + "/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
       username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid, embed: !!p.embed,
       answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
     const j = await r.json(); setBusy(false);

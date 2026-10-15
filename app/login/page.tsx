@@ -1,9 +1,11 @@
+import { BP } from "@/lib/basepath";
 import { signIn, demoEnabled } from "@/auth";
 import { Logo } from "@/components/Logo";
 export const dynamic = "force-dynamic";
 export default async function Login({ searchParams }: { searchParams: Promise<{ sent?: string; callbackUrl?: string }> }) {
   const { sent, callbackUrl } = await searchParams;
-  const to = callbackUrl && /^\/(?!\/)/.test(callbackUrl) ? callbackUrl : "/app";
+  const rel = callbackUrl?.startsWith(BP + "/") ? callbackUrl.slice(BP.length) : callbackUrl;
+  const to = BP + (rel && /^\/(?!\/)/.test(rel) ? rel : "/app");
   return <main style={{ maxWidth: 420, margin: "80px auto", padding: 24 }}>
     <Logo />
     <div className="card" style={{ padding: 28, marginTop: 24 }}>

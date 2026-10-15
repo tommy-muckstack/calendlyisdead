@@ -46,3 +46,13 @@ Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET` (also e
 
 ## Status
 M0-M9 built (see docs/PLAN.md), including meeting polls and one-off links. Launch thread draft: `docs/launch/X_THREAD_DRAFT.md` (not posted). Not deployed.
+
+## Hosting under a sub-path
+
+The app is served at `https://yourappisdead.com/calendlyisdead` via Next.js `basePath` (set in `next.config.mjs`, override with `NEXT_PUBLIC_BASE_PATH` at build time). Server-side absolute links use `APP_URL` (include the base path, e.g. `https://yourappisdead.com/calendlyisdead`); Auth.js runs at `${basePath}/api/auth`, so set `AUTH_URL=https://yourappisdead.com/calendlyisdead/api/auth`. Client code uses `BP`/`withBase` from `lib/basepath.ts` for `fetch`, plain `<a>` and `location.href`.
+
+- Cron: `/calendlyisdead/api/cron/workflows` (vercel.json)
+- OAuth callbacks: `${APP_URL}/api/auth/callback/google`, `${APP_URL}/api/integrations/{google,microsoft}/callback`
+- Stripe webhook: `${APP_URL}/api/stripe/webhook`; inbound mail: `${APP_URL}/api/inbound/email`
+- `npm run db:migrate` applies `lib/db/ddl.sql` to `DATABASE_URL` (the app also applies it on cold start).
+- Without `RESEND_API_KEY`, mail is logged and skipped; booking and cancelling still succeed.

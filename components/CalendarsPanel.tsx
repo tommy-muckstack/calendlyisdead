@@ -1,4 +1,5 @@
 "use client";
+import { BP, withBase } from "@/lib/basepath";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 type Conn = { id: string; provider: string; accountEmail: string; status: string };
@@ -10,14 +11,14 @@ export function CalendarsPanel({ conns, cals: initialCals, addToId, available, f
   const [cals, setCals] = useState(initialCals);
   useEffect(() => setCals(initialCals), [initialCals]);
   const [msg, setMsg] = useState(flash); const [icloud, setIcloud] = useState(false); const [busy, setBusy] = useState(false);
-  const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
+  const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(withBase(url), { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
   return <>
     <h1 style={{ marginTop: 0 }}>Calendars</h1>
     <p className="muted">Connect the calendars we should check so nobody books over your existing plans, and pick where new bookings go.</p>
     {msg && <p role="status" className="card" style={{ padding: 12 }}>{msg}</p>}
     <div className="row" style={{ flexWrap: "wrap", margin: "16px 0 24px" }}>
-      <a className="btn" href="/api/integrations/google/connect" aria-disabled={!available.google} onClick={e => { if (!available.google) { e.preventDefault(); setMsg("Google isn't configured on this server. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET."); } }}>+ Google Calendar</a>
-      <a className="btn" href="/api/integrations/microsoft/connect" onClick={e => { if (!available.microsoft) { e.preventDefault(); setMsg("Outlook isn't configured on this server. Set AUTH_MICROSOFT_ID and AUTH_MICROSOFT_SECRET."); } }}>+ Outlook</a>
+      <a className="btn" href={BP + "/api/integrations/google/connect"} aria-disabled={!available.google} onClick={e => { if (!available.google) { e.preventDefault(); setMsg("Google isn't configured on this server. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET."); } }}>+ Google Calendar</a>
+      <a className="btn" href={BP + "/api/integrations/microsoft/connect"} onClick={e => { if (!available.microsoft) { e.preventDefault(); setMsg("Outlook isn't configured on this server. Set AUTH_MICROSOFT_ID and AUTH_MICROSOFT_SECRET."); } }}>+ Outlook</a>
       <button className="btn" onClick={() => setIcloud(!icloud)}>+ iCloud</button>
       {available.mock && <button className="btn" onClick={async () => { await call("/api/integrations/mock", "POST"); setMsg("Connected demo calendar."); }}>+ Demo calendar</button>}
     </div>

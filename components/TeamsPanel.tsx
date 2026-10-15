@@ -1,4 +1,5 @@
 "use client";
+import { BP, withBase } from "@/lib/basepath";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 type Member = { userId: string; role: string; name: string; email: string };
@@ -9,7 +10,7 @@ const LOCKABLE = ["title", "description", "durationMin", "location", "color", "q
 
 export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
-  const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
+  const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(withBase(url), { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
   return <>
     <h1 style={{ marginTop: 0 }}>Teams</h1>
     {msg && <p role="status" className="card" style={{ padding: 12 }}>{msg}</p>}
@@ -20,7 +21,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
       <button className="btn primary">Create team</button>
     </form>
     {teams.map(t => { const admin = ["owner", "admin"].includes(t.role); return <section key={t.id} className="card" style={{ padding: 22, marginBottom: 20 }} data-testid={`team-${t.slug}`}>
-      <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{t.name}</h2><a className="btn" href={`/team/${t.slug}`} target="_blank">Team page ↗</a></div>
+      <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>{t.name}</h2><a className="btn" href={`${BP}/team/${t.slug}`} target="_blank">Team page ↗</a></div>
       <h3>Members</h3>
       {t.members.map(m => <div key={m.userId} className="row" style={{ padding: "4px 0" }}><span style={{ flex: 1 }}>{m.name} <span className="muted">{m.email} · {m.role}</span></span>
         {admin && m.role !== "owner" && m.userId !== me && <button className="btn" onClick={() => call(`/api/teams/${t.id}/members/${m.userId}`, "DELETE")}>Remove</button>}</div>)}
@@ -32,7 +33,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
       <h3>Team event types</h3>
       {t.eventTypes.map(e => <div key={e.id} className="card" style={{ padding: 14, marginBottom: 10 }} data-testid="team-et">
         <div className="row" style={{ justifyContent: "space-between" }}><b>{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {KIND[e.kind]} · {e.durationMin} min</span></b>
-          {e.kind !== "managed" && <a className="btn" href={`/team/${t.slug}/${e.slug}`} target="_blank">View</a>}</div>
+          {e.kind !== "managed" && <a className="btn" href={`${BP}/team/${t.slug}/${e.slug}`} target="_blank">View</a>}</div>
         {admin && e.kind !== "managed" && <>
           {e.kind === "round_robin" && <label className="f">Distribution <select className="input" aria-label={`Distribution for ${e.title}`} style={{ width: 260 }} value={e.rrMode}
             onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { rrMode: x.target.value })}><option value="even">Spread evenly</option><option value="priority">By priority, then evenly</option></select></label>}

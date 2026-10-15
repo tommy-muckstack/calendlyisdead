@@ -1,4 +1,5 @@
 "use client";
+import { BP } from "@/lib/basepath";
 import { useEffect, useRef, useState } from "react";
 type Field = { id: string; label: string; type: "text" | "email" | "select"; required: boolean; options?: string[] };
 type Action = { type: "event" | "url" | "message"; value: string };
@@ -10,7 +11,7 @@ export function RoutingPanel({ initial, targets }: { initial: Form[]; targets: {
   const [list, setList] = useState(initial);
   return <>
     <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Routing forms</h1>
-      <button className="btn primary" onClick={async () => { const f = await (await fetch("/api/forms", { method: "POST" })).json(); setList([...list, { ...f, responses: 0 }]); }}>+ New form</button></div>
+      <button className="btn primary" onClick={async () => { const f = await (await fetch(BP + "/api/forms", { method: "POST" })).json(); setList([...list, { ...f, responses: 0 }]); }}>+ New form</button></div>
     <p className="muted">Ask a few questions first, then send people to the right event type, a URL, or a message. Rules are checked top to bottom; the first match wins.</p>
     {list.map(f => <FormCard key={f.id} f={f} targets={targets} onDelete={() => setList(list.filter(x => x.id !== f.id))} />)}
   </>;
@@ -28,7 +29,7 @@ function ActionPicker({ a, onChange, targets, label }: { a: Action; onChange(a: 
 function FormCard({ f, targets, onDelete }: { f: Form; targets: { value: string; label: string }[]; onDelete(): void }) {
   const [d, setD] = useState(f); const [st, setSt] = useState(""); const t = useRef<any>(null), first = useRef(true);
   useEffect(() => { if (first.current) { first.current = false; return; } clearTimeout(t.current); t.current = setTimeout(async () => {
-    const r = await fetch(`/api/forms/${d.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: d.name, fields: d.fields.map(x => x.type === "select" ? { ...x, options: (x.options ?? []).filter(Boolean) } : { ...x, options: undefined }), rules: d.rules, fallback: d.fallback }) });
+    const r = await fetch(`${BP}/api/forms/${d.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: d.name, fields: d.fields.map(x => x.type === "select" ? { ...x, options: (x.options ?? []).filter(Boolean) } : { ...x, options: undefined }), rules: d.rules, fallback: d.fallback }) });
     setSt(r.ok ? "Saved" : "Not saved: check URLs and choices"); }, 500); }, [d]);
   const setField = (i: number, n: Partial<Field>) => setD({ ...d, fields: d.fields.map((x, j) => j === i ? { ...x, ...n } : x) });
   const setRule = (i: number, n: Partial<Rule>) => setD({ ...d, rules: d.rules.map((x, j) => j === i ? { ...x, ...n } : x) });
@@ -36,7 +37,7 @@ function FormCard({ f, targets, onDelete }: { f: Form; targets: { value: string;
     <div className="row" style={{ justifyContent: "space-between" }}>
       <input className="input" aria-label="Form name" style={{ maxWidth: 340, fontWeight: 700 }} value={d.name} onChange={e => setD({ ...d, name: e.target.value })} />
       <span className="muted" role="status">{st}</span>
-      <a className="btn" href={`/f/${d.id}`} target="_blank">Open form ↗</a></div>
+      <a className="btn" href={`${BP}/f/${d.id}`} target="_blank">Open form ↗</a></div>
     <p className="muted" style={{ fontSize: 13 }}>{f.responses} responses · share <code>/f/{d.id}</code></p>
     <h3>Questions</h3>
     {d.fields.map((x, i) => <div key={i} className="row" style={{ flexWrap: "wrap", marginBottom: 6 }}>
@@ -61,6 +62,6 @@ function FormCard({ f, targets, onDelete }: { f: Form; targets: { value: string;
     </div>)}
     <button className="btn" onClick={() => setD({ ...d, rules: [...d.rules, { match: "all", conditions: [{ fieldId: d.fields[0]?.id ?? "", op: "equals", value: "" }], action: targets[0] ? { type: "event", value: targets[0].value } : { type: "message", value: "" } }] })}>+ Add rule</button>
     <h3>Otherwise</h3><ActionPicker a={d.fallback} targets={targets} label="Fallback" onChange={a => setD({ ...d, fallback: a })} />
-    <button className="btn danger" style={{ marginTop: 14 }} onClick={async () => { if (confirm("Delete form?")) { await fetch(`/api/forms/${d.id}`, { method: "DELETE" }); onDelete(); } }}>Delete form</button>
+    <button className="btn danger" style={{ marginTop: 14 }} onClick={async () => { if (confirm("Delete form?")) { await fetch(`${BP}/api/forms/${d.id}`, { method: "DELETE" }); onDelete(); } }}>Delete form</button>
   </div>;
 }
