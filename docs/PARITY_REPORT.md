@@ -1,6 +1,6 @@
 # CalendlyIsDead parity report
 
-Audit started: 2026-10-15. **Incomplete; no parity matches certified and no PRs opened yet.**
+Audit started: 2026-10-15. **Incomplete; no parity matches certified. Audit baseline is open as draft PR #1.**
 
 Product constraint confirmed by the user: **the replica is completely free**. Full parity must not introduce subscriptions, paid feature gates, upgrade prompts or trial limits. Prices and access restrictions on the original are intentional exceptions. Visual and functional comparisons still apply to the surrounding experience.
 
@@ -134,13 +134,13 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Production build | PASS | `npm run build` compiles, typechecks and generates routes. Existing workspace-root warning remains. |
 | Capture-tool syntax/help | PASS | Script syntax/help checked; execution blocked by B2. |
 | Browser/E2E | BLOCKED | No screenshots or computed styles captured. |
-| GitHub PR publication | AVAILABLE | Connected GitHub app verified current main and push access; CLI DNS still fails. |
+| GitHub PR publication | PASS | Draft PR #1 opened through the connected GitHub app. CLI DNS still fails. |
 
 ## Review queue
 
 | Logical area | Branch / PR | State |
 | --- | --- | --- |
-| Current audit baseline, free capabilities, scope, capture tooling | `qa/parity-audit-current` / pending PR | Current-main source review; no visual claims. |
+| Current audit baseline, free capabilities, scope, capture tooling | [PR #1](https://github.com/tommy-muckstack/calendlyisdead/pull/1) | Current-main source review; no visual claims. |
 | Event-type default schedule | `fix/event-default-schedule` / pending replay | Older snapshot regression fix: 71 tests/TypeScript passed; revalidate on current main. |
 | Availability input validation | `fix/availability-validation` / pending replay | Older snapshot regression fix: 81 tests/TypeScript passed; revalidate on current main. |
 
