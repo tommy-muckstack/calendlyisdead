@@ -24,7 +24,7 @@ User clarification, 2026-10-15: marketing parity is limited to **homepage and lo
 | ID | Evidence | Required next step |
 | --- | --- | --- |
 | B1 | RESOLVED for repository access: connected GitHub app can read current main and has push permission. CLI Git/gh still fail DNS. | Publish scoped review branches through the connector; never merge. |
-| B2 | In-app browser Node execution tool is unavailable. Standalone Playwright full Chromium and headless shell both failed at macOS launch, including escalated execution (`bootstrap_check_in`, process closed). No page loaded in a real browser. | Restore working Playwright execution or obtain worker captures and authenticated reference observations. |
+| B2 | In-app browser Node execution tool is unavailable. Standalone Playwright full Chromium and headless shell both failed at macOS launch, including escalated execution (`bootstrap_check_in`, process closed). No page loaded in a real browser. macOS app-launch fallback also failed (`kLSNoExecutableErr`). | Restore working Playwright execution or obtain worker captures and authenticated reference observations. |
 | B3 | Current `npm run lint` fails: missing script. No lint config/dependency exists; npm registry DNS failed and ESLint is not cached. | Add lint tooling once the dependency can be installed; this is not a pass. |
 | B4 | Current source now confirms Firebase auth and `/calendlyisdead` prefix, but deployed behavior is unverified. | Check both deployed targets in the browser. |
 | B5 | RESOLVED on current source: local fonts replace the old remote-font dependency; production build passed. | Rebuild each code PR. |
@@ -70,7 +70,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | E02 | Create event: one-on-one/group/collective/round robin/managed | unverified | P1 | Personal creation immediately POSTs; personal/group editor and separate team flows exist. Compare all original steps/fields. | pending B2 |
 | E03 | Basics: name, duration, type, color, active state | unverified | P2 | Editor fields present; inspect validation and save/reload behavior. | pending B2 |
 | E04 | Location, conferencing, description and link | unverified | P2 | Text/datalist location field; compare original location-specific fields. | pending B2 |
-| E05 | Availability schedule selection | differs | P1 | Current main still removes falsy scheduleId before PATCH and rejects null. Existing local regression fix needs replay/validation on current main. | pending B2 |
+| E05 | Availability schedule selection | differs | P1 | Local fix preserves null scheduleId in editor PATCH and API validation. Real route/database tests verify clearing an explicit schedule, following a changed default, ownership rejection and empty-ID rejection. Browser parity remains unverified. | pending B2 |
 | E06 | Limits, buffers, notice, future range | unverified | P1 | Fields exist; numerical boundary and scheduling checks needed. | pending B2 |
 | E07 | Questions: types, required, choices, reorder/delete | unverified | P2 | Four local question types; compare original options and validation. | pending B2 |
 | E08 | Event notifications and cancellation policy | missing | P2 | No event notification editor or cancellation-policy controls; separate workflows exist. | pending B2 |
@@ -141,8 +141,8 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Logical area | Branch / PR | State |
 | --- | --- | --- |
 | Current audit baseline, free capabilities, scope, capture tooling | [PR #1](https://github.com/tommy-muckstack/calendlyisdead/pull/1) | Current-main source review; no visual claims. |
-| Event-type default schedule | `fix/event-default-schedule` / pending replay | Older snapshot regression fix: 71 tests/TypeScript passed; revalidate on current main. |
-| Availability input validation | `codex/availability-validation` / draft PR pending | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
+| Event-type default schedule | `codex/event-default-schedule` / draft PR pending | 91 tests, standalone TypeScript and production build pass on current main plus PR #2. Browser evidence and lint remain blocked. |
+| Availability input validation | [PR #2](https://github.com/tommy-muckstack/calendlyisdead/pull/2) | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
 
 ## Capturing evidence with other workers
 
@@ -158,3 +158,7 @@ REA has not been installed or executed here. Its browser inspection still needs 
 ### Availability validation change
 
 Compared the real schedule PUT handler and persisted PGlite state before/after. Invalid `98:00`, `09:61`, `24:01`, weekdays outside 1–7, nonexistent dates and empty timezone now return 400 without changing saved hours. Valid split days, closed days, leap dates and `24:00` range ends remain supported. No UI, payment, auth or secret changes. Screenshots are pending B2; API/database tests are not a visual parity claim.
+
+### Default event schedule change
+
+Selecting Default schedule after choosing explicit hours now clears the saved schedule ID. Reloaded booking availability follows the host’s current default, including subsequent default changes. Three API/database regressions cover persistence, fallback behavior, ownership and empty IDs. The editor retains null in its request body. Screenshots and keyboard interaction remain pending B2; no visual parity claim.
