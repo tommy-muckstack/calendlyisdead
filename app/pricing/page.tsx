@@ -2,8 +2,6 @@ import Link from "next/link";
 import "../marketing.css";
 import { cmSans, cmSerif } from "@/components/mk/fonts";
 import { Banner, Nav, Footer, Arrow } from "@/components/mk/chrome";
-import { PriceCalc } from "@/components/PriceCalc";
-import { CALENDLY } from "@/lib/pricing";
 import { Check, ICON } from "@/components/mk/icons";
 import { COMPARE } from "@/lib/pricingRows";
 import { Reel } from "@/components/mk/home";
@@ -37,29 +35,26 @@ const faqs = [
 export default function Pricing() {
   return <div className={`cm ${cmSans.variable} ${cmSerif.variable}`}><Banner /><Nav />
     <section className="cm-sec"><div className="cm-price">
-      <div className="cm-ptop"><h1>Add Notetaker and an AI assistant to Standard or Teams plans, still free</h1>
-        <div><p>Meeting recaps and action items are on the roadmap, plus an AI assistant to help with the work around meetings.</p>
+      <div className="cm-ptop"><h1>Add an assistant to Standard or Teams plans, still free</h1>
+        <div><p>Meeting recaps are on the roadmap, plus an AI assistant to help with the work around meetings.</p>
           <div className="cm-bill"><span><i className="rad" />Billed monthly</span><span><i className="rad on" />Billed yearly</span><em>Save 100%</em></div></div></div>
-      <div className="cm-plans">{plans.map(p => <div key={p.n} className={"cm-plan" + (p.pop ? " pop" : "")}>
-        <h3>{p.n}</h3><div className="amt">{p.amt}{p.per && <small> {p.per}</small>}</div><div className="was">{p.was}</div>
-        <Link className={"btn" + (p.fill ? " fill" : "")} href="/signup">{p.btn}<Arrow s={14} /></Link>
-        <div className="inc">{p.inc}</div>
-        {p.groups.map(g => <div key={g.t + (g.note || "")} className={g.dim ? "dim" : ""}><h5><span style={{ width: 16, height: 16, borderRadius: 4, background: g.c, display: "grid", placeItems: "center" }}>{g.ic}</span>{g.t}{g.note && <em>{g.note}</em>}{g.tag && <em>{g.tag}</em>}</h5><ul>{g.l.map(x => <li key={x}><Check />{x}</li>)}</ul></div>)}
-      </div>)}</div>
-      <p className="cm-pnote"><b>Prices compared</b> are Calendly’s list prices per seat, billed yearly, as of October 2026. Notetaker is not part of CalendlyIsDead yet.</p>
+      <div className="cm-plans">{plans.map(p => <div key={p.n} className={"cm-pw" + (p.pop ? " pop" : "")}>{p.pop && <span className="lab">POPULAR PLAN</span>}<div className="cm-plan">
+        <div className="top"><h3>{p.n}</h3><div className="amt">{p.amt}{p.per && <small> {p.per}</small>}</div><div className="was">{p.was}</div>
+          <Link className={"btn" + (p.fill ? " fill" : "")} href="/signup">{p.btn}<Arrow s={14} /></Link></div>
+        <div className="bd"><div className="inc">{p.inc}</div>
+        {p.groups.map(g => <div key={g.t + (g.note || "")} className={g.dim ? "dim" : ""}><h5><span style={{ width: 16, height: 16, borderRadius: 4, background: g.c, display: "grid", placeItems: "center" }}>{g.ic}</span>{g.t}{g.note && <em>{g.note}</em>}{g.tag && <em>{g.tag}</em>}</h5><ul>{g.l.map(x => <li key={x}><Check />{x}</li>)}</ul></div>)}</div>
+      </div></div>)}</div>
+      <p className="cm-pnote"><b>Prices compared</b> are Calendly’s list prices per seat, billed yearly, as of October 2026. Notetaker is not part of CalendlyIsDead yet. <Link href="/pricing/calculator" style={{ textDecoration: "underline" }}>See what your team would pay</Link>.</p>
     </div></section>
     <section className="cm-cmpsec">
       <h2 className="cm-cmph">Compare features</h2>
       <div className="cm-ct" data-testid="feature-table">
-        <div className="cm-cth"><div className="lab" />{[["Free", "Get started"], ["Standard", "Get started"], ["Teams", "Get started"], ["Enterprise", "Self-host it"]].map(([n, b]) => <div key={n} className="col"><span>{n}</span><Link className={"b" + (n === "Teams" ? " fill" : "")} href="/signup">{b}</Link></div>)}</div>
-        {COMPARE.map(g => <section key={g.t} className="cm-cts">
-          <div className="gh"><i>{({ Scheduling: ICON.cal, Notetaker: ICON.doc, Callie: ICON.spark, Payments: ICON.card, Contacts: ICON.team, Automations: ICON.flow, Personalizations: ICON.pen, "Admin tools": ICON.grid, Security: ICON.box, Support: ICON.at } as Record<string, React.ReactNode>)[g.t]}</i><h3>{g.t === "Callie" ? "AI assistant" : g.t}</h3>{g.beta && <em>Beta</em>}</div>
+        <div className="cm-cth"><div className="lab"><div className="gh"><i>{ICON.cal}</i><h3>Scheduling</h3></div></div>{[["Free", "Get started"], ["Standard", "Get started"], ["Teams", "Get started"], ["Enterprise", "Self-host it"]].map(([n, b]) => <div key={n} className="col"><span>{n}</span><Link className={"b" + (n === "Teams" ? " fill" : "")} href="/signup">{b}</Link></div>)}</div>
+        {COMPARE.map((g, gi) => <section key={g.t} className="cm-cts">
+          {gi > 0 && <div className="gh"><i>{({ Scheduling: ICON.cal, Notetaker: ICON.doc, Callie: ICON.spark, Payments: ICON.card, Contacts: ICON.team, Automations: ICON.flow, Personalizations: ICON.pen, "Admin tools": ICON.grid, Security: ICON.box, Support: ICON.at } as Record<string, React.ReactNode>)[g.t]}</i><h3>{g.t === "Callie" ? "AI assistant" : g.t}</h3>{g.beta && <em>Beta</em>}</div>}
           {g.rows.map(([l, v]) => <div key={l} className="r"><div className="l"><span>{l}</span></div><div className="v">{v.map((c, i) => <div key={i} className={c === "–" ? "no" : ""}>{c === "✓" ? <span className="cm-chk"><Check c="#fff" /></span> : c}</div>)}</div></div>)}
         </section>)}
       </div>
-      <div className="cm-cmp" id="calculator"><h2>What your team is paying for scheduling</h2>
-        <div style={{ marginTop: 32 }}><PriceCalc /></div>
-        <p style={{ fontSize: 13, opacity: .7 }}>Calendly list prices per seat, billed yearly, as of {CALENDLY.asOf}: Standard ${CALENDLY.standard}/mo, Teams ${CALENDLY.teams}/mo, Enterprise from ${CALENDLY.enterpriseFromYear.toLocaleString()}/yr. Self-hosting has your own hosting costs; small instances fit in free tiers.</p></div>
     </section>
     <section className="cm-sec"><div className="cm-faq"><h2>Frequently asked questions</h2><Faq items={faqs as [string, string][]} /></div></section>
     <section className="cm-final">

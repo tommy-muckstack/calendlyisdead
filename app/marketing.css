@@ -132,8 +132,6 @@
 .cm-bill{display:flex;gap:12px;align-items:center;font-size:12px;margin-top:12px}.cm-bill .rad{width:14px;height:14px;border-radius:50%;border:1px solid var(--ink);display:inline-block;margin-right:6px;vertical-align:-2px}.cm-bill .rad.on{background:radial-gradient(var(--ink) 40%,transparent 45%)}.cm-bill em{font-style:normal;background:rgba(7,26,49,.07);border-radius:4px;padding:3px 8px;font-size:11px}
 .cm-plans{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:136px;align-items:start}
 .cm-plan{background:#fff;border-radius:24px;padding:24px;box-shadow:0 8px 24px rgba(95,109,119,.1);position:relative}
-.cm-plan.pop{margin-top:-20px;background:#fff;border:6px solid #2e6cc0;border-radius:28px;box-shadow:0 0 0 1px #2e6cc0,0 0 60px rgba(160,120,250,.35);padding:24px 18px 18px}
-.cm-plan.pop:before{content:"POPULAR PLAN";position:absolute;top:-24px;left:-6px;right:-6px;height:24px;background:#2e6cc0;color:#fff;font-size:10px;letter-spacing:.5px;font-weight:600;padding:8px 14px;border-radius:14px 14px 0 0;line-height:10px}
 .cm-plan h3{font-family:var(--serif);font-weight:500;font-size:32px;line-height:36px;letter-spacing:-1px}
 .cm-plan .amt{font-family:var(--sans);font-weight:500;font-size:44px;line-height:48px;letter-spacing:-1.5px;margin:36px 0 4px;min-height:56px}.cm-plan .amt small{font-size:10px;letter-spacing:0;color:var(--ink2);font-family:"IsDead Geist",sans-serif}
 .cm-plan .was{font-size:11px;color:var(--ink2);min-height:16px}
@@ -187,18 +185,32 @@
 .cm-plan.dim h5,.cm-plan.dim li{color:rgba(7,26,49,.35)}.cm-plan h5 em,.cm-ct .gh em{font-style:normal;background:rgba(7,26,49,.05);color:var(--ink3);border-radius:8px;padding:4px 8px;font-size:12px;line-height:16.8px;font-weight:500;margin-left:2px}.cm-plan.dim h5 em{color:rgba(7,26,49,.45)}
 .cm-pnote{font-size:12px;margin:28px 0 0;display:flex;gap:6px;align-items:center}.cm-pnote b{font-weight:600}
 .cm-cmpsec{padding:96px 120px 0;max-width:1440px;margin:0 auto}
-.cm-cmph{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 47px}
+.cm-cmph{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 48px}
 .cm-ct{width:100%}.cm-cth{display:grid;grid-template-columns:306px repeat(4,212px);column-gap:16px;height:133px;border-bottom:1px solid var(--line);align-items:end;padding-bottom:0}
 .cm-cth .col{display:flex;flex-direction:column;align-items:center;gap:16px;padding-bottom:0;height:128px;justify-content:center}.cm-cth .col span{font-family:var(--sans);font-weight:500;font-size:20px;line-height:28px}
 .cm-cth .b{display:flex;width:100%;height:38px;align-items:center;justify-content:center;border:1px solid var(--ink);border-radius:16px;font-size:14px;font-weight:500;line-height:19.6px}.cm-cth .b.fill{background:var(--ink);color:var(--bg)!important;height:40px}
 .cm-cts{margin-top:48px}.cm-cts:first-of-type{margin-top:0}
 .cm-ct .gh{height:66px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line)}.cm-ct .gh i{width:32px;height:32px;display:grid;place-items:center}.cm-ct .gh i svg{width:20px;height:20px;stroke-width:1.2}.cm-ct .gh h3{font-family:var(--sans);font-weight:500;font-size:24px;line-height:33.6px;letter-spacing:-.5px;margin:0 8px 0 0}
-.cm-ct .r{display:grid;grid-template-columns:306px 894px;border-bottom:1px solid var(--line);align-items:stretch}
-.cm-ct .l{padding:16px 16px 16px 16px;display:flex;align-items:center;font-size:14px;line-height:20px}.cm-ct .l span{text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:rgba(7,26,49,.5);max-width:274px}
+.cm-ct .r{min-height:53px;display:grid;grid-template-columns:306px 894px;border-bottom:1px solid var(--line);align-items:stretch}
+.cm-ct .l{padding:16px 16px 15px;display:flex;align-items:center;font-size:14px;line-height:20px}.cm-ct .l span{text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:rgba(7,26,49,.5);max-width:274px}
 .cm-ct .v{display:grid;grid-template-columns:repeat(4,212px);column-gap:16px}.cm-ct .v>div{background:rgba(245,243,238,.5);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;color:var(--ink)}.cm-ct .v>div.no{color:var(--ink2)}
 .cm-cmpsec .cm-cmp{margin-top:96px}
-.cm-faq{background:var(--card);border-radius:48px;padding:144px 24px 119px;margin-top:100px}.cm-faq h2{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 21px}
+.cm-faq{background:var(--card);border-radius:48px;padding:144px 24px 119px;margin-top:126px}.cm-faq h2{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 21px}
 .cm-faql{max-width:770px;margin:0 auto;border-top:1px solid var(--line)}.cm-faql>div{border-bottom:1px solid var(--line)}
 .cm-faql button{all:unset;display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;min-height:80px;padding:0 6px;font-size:16px;line-height:22px;font-weight:500;cursor:pointer}.cm-faql button i{width:28px;height:28px;border-radius:8px;background:rgba(7,26,49,.06);display:grid;place-items:center;flex:none}
 .cm-faql p{margin:0;padding:0 6px 24px 48px;font-size:14px;line-height:19.6px;color:var(--ink2)}
 @media(max-width:1100px){.cm-cmpsec{padding:64px 24px 0}.cm-cth,.cm-ct .r{grid-template-columns:200px 1fr}.cm-cth{grid-template-columns:200px repeat(4,1fr);column-gap:8px}.cm-ct .v{grid-template-columns:repeat(4,1fr);column-gap:8px}.cm-ct .r{grid-template-columns:200px 1fr}.cm-price{padding:64px 32px 40px}.cm-ct .l span{max-width:none}}
+/* pricing cards: outer #fcfbf8 card (radius 48, pad 8/8/24) holding a white top card (266x301, radius 40) and the feature lists */
+.cm-price{padding:96px 96px 120px}.cm-ptop{grid-template-columns:676px 1fr;gap:0}.cm-ptop p{margin-top:0;max-width:420px;font-size:14px;line-height:20px}.cm-bill{margin-top:14px}
+.cm-plans{display:grid;grid-template-columns:repeat(4,282px);gap:0 24px;margin-top:84px;align-items:stretch}
+.cm-pw{padding-top:40px;position:relative;display:flex}
+.cm-pw .lab{display:none}.cm-pw.pop .lab{display:block;position:absolute;left:0;right:0;top:0;height:60px;border-radius:48px 48px 0 0;background:#2e6cc0;color:#fff;font-size:10px;letter-spacing:.5px;font-weight:600;padding:12px 16px;line-height:12px;box-shadow:0 0 60px rgba(160,120,250,.35)}
+.cm-pw.pop:after{content:"";position:absolute;left:-3px;right:-3px;top:0;bottom:-3px;border-radius:50px;border:3px solid #2e6cc0;pointer-events:none;z-index:2}
+.cm-pw .cm-plan{background:var(--bg);border-radius:48px;padding:8px 8px 24px;box-shadow:none;margin:0;border:0;flex:1;position:relative;z-index:1;min-height:932px}
+.cm-pw .cm-plan.pop{margin:0}
+.cm-pw .top{background:#fff;border-radius:40px;padding:24px;height:301px;display:flex;flex-direction:column}
+.cm-pw .top h3{font-size:36px;line-height:39.6px;letter-spacing:-1px}.cm-pw .top .amt{margin:auto 0 0;min-height:0;font-size:44px;line-height:48px}.cm-pw .top .was{min-height:16px;margin:4px 0 0}.cm-pw .top .btn{margin:16px 0 0;height:44px}
+.cm-pw .bd{padding:24px 16px 0}.cm-pw .bd .inc{margin-bottom:6px}
+.cm-pnote{margin:32px 0 0;height:20px;line-height:20px}
+
+.cm-cth .lab{align-self:stretch;display:flex;align-items:flex-end}.cm-cth .lab .gh{border-bottom:0;width:100%}
