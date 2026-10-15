@@ -2,7 +2,7 @@ import { test, expect, Page } from "@playwright/test";
 import fs from "node:fs";
 const shots = "research/ours";
 const tz = "America/New_York";
-const login = async (page: Page) => { await page.goto("login"); await page.getByRole("button", { name: "Use the demo account" }).click(); await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible(); };
+const login = async (page: Page) => { await page.goto("login"); await page.getByRole("button", { name: "Use the demo account" }).click(); await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible(); };
 const slots = async (page: Page, slug: string, from: string, to: string) => (await (await page.request.get(`api/slots?user=demo&slug=${slug}&from=${from}&to=${to}&tz=${tz}`)).json()).slots as Record<string, string[]>;
 const nyTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
 const mockEvents = () => JSON.parse(fs.readFileSync(".data/e2e/mock-calendar.json", "utf8")).events as any[];

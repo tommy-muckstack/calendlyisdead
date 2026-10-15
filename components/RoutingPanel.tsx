@@ -10,7 +10,7 @@ const OPS: Record<string, string> = { equals: "is", not_equals: "is not", contai
 export function RoutingPanel({ initial, targets }: { initial: Form[]; targets: { value: string; label: string }[] }) {
   const [list, setList] = useState(initial);
   return <>
-    <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Routing forms</h1>
+    <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>Routing forms</h2>
       <button className="btn primary" onClick={async () => { const f = await (await fetch(BP + "/api/forms", { method: "POST" })).json(); setList([...list, { ...f, responses: 0 }]); }}>+ New form</button></div>
     <p className="muted">Ask a few questions first, then send people to the right event type, a URL, or a message. Rules are checked top to bottom; the first match wins.</p>
     {list.map(f => <FormCard key={f.id} f={f} targets={targets} onDelete={() => setList(list.filter(x => x.id !== f.id))} />)}

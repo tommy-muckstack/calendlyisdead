@@ -60,7 +60,7 @@ test("a taken slot disappears for the next invitee", async ({ request }) => {
 test("host edits an event type in the slide-in editor and it auto-saves", async ({ page }) => {
   await page.goto("login");
   await page.getByRole("button", { name: "Use the demo account" }).click();
-  await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible();
   await page.screenshot({ path: `${shots}/07-event-types.png` });
   await page.getByTestId("event-type").first().click();
   await page.getByLabel("Name").fill("Quick chat (edited)");

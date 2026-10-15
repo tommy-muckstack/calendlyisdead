@@ -19,7 +19,7 @@ export function AssistantPanel({ types, llm }: { types: { slug: string; title: s
     setR(await res.json()); setBusy(false);
   }
   return <>
-    <h1>Email assistant</h1>
+    <h2>Email assistant</h2>
     <p className="muted">Paste a scheduling thread. It reads who, how long, which days and what time zone, checks your real availability, and drafts a reply with one-click booking links. It never sends anything for you.
       {llm ? " Using your configured LLM." : " Running on the built-in parser (set LLM_API_KEY for an LLM)."}</p>
     <div className="card" style={{ padding: 18 }}>

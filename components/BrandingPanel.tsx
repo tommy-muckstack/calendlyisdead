@@ -14,7 +14,7 @@ export function BrandingPanel({ username, initial }: { username: string; initial
     const rd = new FileReader(); rd.onload = () => save({ logoUrl: String(rd.result) }); rd.readAsDataURL(f);
   }
   return <>
-    <h1>Branding</h1>
+    <h2>Branding</h2>
     <p className="muted">Applies to your booking pages, confirmation pages and embeds. All free.</p>
     <div className="card" style={{ padding: 20, maxWidth: 560 }}>
       <label className="f" htmlFor="br-color">Brand color</label>

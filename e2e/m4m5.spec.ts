@@ -5,13 +5,13 @@ const login = async (page: Page, who: "demo" | "mate" = "demo", cb = "") => {
   const q = new URLSearchParams(); if (cb) q.set("callbackUrl", cb); if (who === "mate") q.set("as", "mate");
   await page.goto(`login${q.size ? `?${q}` : ""}`);
   await page.getByRole("button", { name: "Use the demo account" }).click();
-  if (!cb) await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
+  if (!cb) await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible();
 };
 const mails = () => fs.readdirSync(".data/outbox").map(f => JSON.parse(fs.readFileSync(`.data/outbox/${f}`, "utf8")));
 
 test.describe.serial("M4 teams and M5 automations", () => {
   test("team: create, invite by email, teammate accepts, round robin + collective booking pages", async ({ page, browser }) => {
-    await login(page); await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
+    await login(page); await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible();
     await page.goto("app/teams");
     await page.getByLabel("Team name").fill("Acme Support"); await page.getByLabel("Team link").fill("acme-support");
     await page.getByRole("button", { name: "Create team" }).click();

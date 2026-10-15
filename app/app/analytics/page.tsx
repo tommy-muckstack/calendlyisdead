@@ -12,7 +12,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
   const max = Math.max(1, ...s.byType.map(t => t.bookings));
   const hmax = Math.max(1, ...s.heat.flat());
   return <>
-    <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Analytics</h1>
+    <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>Last {days} days</h2>
       <div className="row">{[7, 30, 90, 365].map(d => <Link key={d} className={`btn ${d === days ? "primary" : ""}`} href={`/app/analytics?days=${d}`}>{d === 365 ? "1 year" : `${d} days`}</Link>)}</div></div>
     <div className="stats" data-testid="stats">
       <div className="card"><span className="muted">New bookings</span><b data-testid="stat-new">{s.newBookings}</b></div>

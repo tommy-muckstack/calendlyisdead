@@ -45,7 +45,7 @@ function ScheduleEditor({ initial, countries, canDelete, onSaved, onDeleted }: {
     <button className="btn" style={{ alignSelf: "flex-start" }} onClick={() => onSet([...rs, { start: "09:00", end: "17:00" }])}>+ Add hours</button>
   </div>;
   return <>
-    <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Availability</h1><span className="muted" role="status">{status}</span></div>
+    <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>Availability</h2><span className="muted" role="status">{status}</span></div>
     <div className="card" style={{ padding: 24, marginTop: 20 }}>
       <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}><label className="f" htmlFor="sname">Schedule name</label><input id="sname" className="input" value={s.name} onChange={e => setS({ ...s, name: e.target.value })} /></div>

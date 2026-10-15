@@ -10,7 +10,7 @@ export function EmbedBuilder({ base, username, types }: { base: string; username
     : kind === "widget" ? `${script}\n<script>\n  window.addEventListener("load", () => CalendlyIsDead.initPopupWidget({ url: "${url}", text: ${JSON.stringify(text)}, color: "${color}" }));\n</script>`
     : `<a href="#" data-cid-popup="${url}" data-color="${color}">${text.replace(/</g, "&lt;")}</a>\n${script}`;
   return <>
-    <h1>Add to your website</h1>
+    <h2>Add to your website</h2>
     <p className="muted">Paste one snippet into any site. No account or tracking script needed on the visitor's side.</p>
     <div className="row" style={{ gap: 8, margin: "12px 0" }} role="tablist">
       {([["inline", "Inline embed"], ["widget", "Popup widget"], ["text", "Popup text link"]] as const).map(([k, l]) =>

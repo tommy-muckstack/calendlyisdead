@@ -18,7 +18,7 @@ export function PollsPanel({ initial, tz }: { initial: P[]; tz: string }) {
     if (r.ok) location.reload(); else setErr("That time is no longer free.");
   }
   return <>
-    <h1>Meeting polls</h1>
+    <h2>Meeting polls</h2>
     <p className="muted">Offer a few times, share the link, let people vote, then book the winner.</p>
     <div className="card" style={{ padding: 18, maxWidth: 560 }}>
       <label className="f" htmlFor="pl-title">Meeting name</label><input id="pl-title" className="input" value={title} onChange={e => setTitle(e.target.value)} />

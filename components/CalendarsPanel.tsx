@@ -13,7 +13,7 @@ export function CalendarsPanel({ conns, cals: initialCals, addToId, available, f
   const [msg, setMsg] = useState(flash); const [icloud, setIcloud] = useState(false); const [busy, setBusy] = useState(false);
   const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(withBase(url), { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
   return <>
-    <h1 style={{ marginTop: 0 }}>Calendars</h1>
+    <h2 style={{ marginTop: 0 }}>Calendars</h2>
     <p className="muted">Connect the calendars we should check so nobody books over your existing plans, and pick where new bookings go.</p>
     {msg && <p role="status" className="card" style={{ padding: 12 }}>{msg}</p>}
     <div className="row" style={{ flexWrap: "wrap", margin: "16px 0 24px" }}>

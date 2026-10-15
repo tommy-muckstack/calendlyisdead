@@ -12,7 +12,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
   const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(withBase(url), { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
   return <>
-    <h1 style={{ marginTop: 0 }}>Teams</h1>
+    <h2 style={{ marginTop: 0 }}>Teams</h2>
     {msg && <p role="status" className="card" style={{ padding: 12 }}>{msg}</p>}
     <form className="row" style={{ marginBottom: 24 }} onSubmit={async e => { e.preventDefault(); const fd = new FormData(e.currentTarget);
       const r = await call("/api/teams", "POST", { name: fd.get("name"), slug: fd.get("slug") }); setMsg(r.ok ? "Team created." : "That team link is taken or invalid."); }}>

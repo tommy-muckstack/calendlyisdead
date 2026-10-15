@@ -9,7 +9,7 @@ export function OneOffPanel({ username, bases, initial }: { username: string; ba
     const et = await r.json(); setLinks([{ id: et.id, slug: et.slug, title: et.title, durationMin: et.durationMin, used: false }, ...links]); setTitle("");
   }
   return <>
-    <h1>One-off links</h1>
+    <h2>One-off links</h2>
     <p className="muted">A private link that books exactly one meeting, then stops working.</p>
     <div className="card" style={{ padding: 18, maxWidth: 560 }}>
       <label className="f" htmlFor="oo-from">Copy settings from (optional)</label>

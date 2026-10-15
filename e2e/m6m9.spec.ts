@@ -3,7 +3,7 @@ const shots = "research/ours";
 const login = async (page: Page) => {
   await page.goto("login");
   await page.getByRole("button", { name: "Use the demo account" }).click();
-  await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible();
 };
 const pickFirstSlot = async (page: Page, nthDay = 0, nthSlot = 0) => {
   await page.locator("button.day.open").first().waitFor();

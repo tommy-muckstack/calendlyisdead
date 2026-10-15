@@ -7,7 +7,7 @@ const TRIG: Record<string, string> = { on_booked: "When a meeting is booked", be
 export function WorkflowsPanel({ initial, eventTypes, vars }: { initial: W[]; eventTypes: { id: string; title: string }[]; vars: string[] }) {
   const [list, setList] = useState(initial);
   return <>
-    <div className="row" style={{ justifyContent: "space-between" }}><h1 style={{ margin: 0 }}>Workflows</h1>
+    <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ margin: 0 }}>Workflows</h2>
       <button className="btn primary" onClick={async () => { const w = await (await fetch(BP + "/api/workflows", { method: "POST" })).json(); setList([...list, w]); }}>+ New workflow</button></div>
     <p className="muted">Automatic emails and texts around your meetings. Variables: {vars.map(v => <code key={v} style={{ marginRight: 6 }}>{`{{${v}}}`}</code>)}</p>
     {list.map(w => <WorkflowCard key={w.id} w={w} eventTypes={eventTypes} onDelete={() => setList(list.filter(x => x.id !== w.id))} />)}
