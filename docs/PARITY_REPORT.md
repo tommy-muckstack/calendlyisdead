@@ -88,7 +88,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | B10 | Reschedule, preserved answers and cancellation | unverified | P1 | Existing happy-path E2E source; inspect state and notification semantics. | pending B2 |
 | B11 | Personal/team booking indexes and inactive events | unverified | P2 | Dynamic user/team pages exist; compare empty/not-found states. | pending B2 |
 | V01 | Availability schedules, defaults and weekly hours | unverified | P1 | `AvailabilityEditor`; compare all controls and persistence. | pending B2 |
-| V02 | Date overrides, holidays and overlap validation | differs | P1 | Current main still accepts invalid hours, dates, weekdays and empty timezone. 10 invalid-input cases reproduced in the older source; replay fix and tests on current main. | pending B2 |
+| V02 | Date overrides, holidays and overlap validation | differs | P1 | Local fix on current main rejects invalid clock times, calendar dates, weekdays and empty timezone before saving. All 13 API/database regressions pass; valid 24:00 ends, leap dates and closed days persist. Original/browser parity remains unverified. | pending B2 |
 | M01 | Meetings list, filters, search and export | missing | P1 | No host meetings-list route in source. | pending B2 |
 | M02 | Host meeting detail | missing | P2 | Public booking detail exists; no host meeting detail experience. | pending B2 |
 | C01 | Contacts list/detail, history and actions | missing | P2 | No contacts route or component. | pending B2 |
@@ -142,7 +142,7 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | --- | --- | --- |
 | Current audit baseline, free capabilities, scope, capture tooling | [PR #1](https://github.com/tommy-muckstack/calendlyisdead/pull/1) | Current-main source review; no visual claims. |
 | Event-type default schedule | `fix/event-default-schedule` / pending replay | Older snapshot regression fix: 71 tests/TypeScript passed; revalidate on current main. |
-| Availability input validation | `fix/availability-validation` / pending replay | Older snapshot regression fix: 81 tests/TypeScript passed; revalidate on current main. |
+| Availability input validation | `codex/availability-validation` / draft PR pending | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
 
 ## Capturing evidence with other workers
 
@@ -154,3 +154,7 @@ The user supplied [morluto/rea](https://github.com/morluto/rea). Its authored co
 
 REA has not been installed or executed here. Its browser inspection still needs a working Chrome-family browser; it does not resolve B2. Capture comparison may be useful when worker evidence arrives. Only sanitized test-account evidence should be shared. No target source maps, proprietary scripts, credentials or session material should be copied into the replica. No REA code has been copied into this repository.
 
+
+### Availability validation change
+
+Compared the real schedule PUT handler and persisted PGlite state before/after. Invalid `98:00`, `09:61`, `24:01`, weekdays outside 1–7, nonexistent dates and empty timezone now return 400 without changing saved hours. Valid split days, closed days, leap dates and `24:00` range ends remain supported. No UI, payment, auth or secret changes. Screenshots are pending B2; API/database tests are not a visual parity claim.
