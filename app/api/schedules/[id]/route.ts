@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
+import { DateTime } from "luxon";
 import Holidays from "date-holidays";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 export const runtime = "nodejs";
-const R = z.array(z.object({ start: z.string().regex(/^\d\d:\d\d$/), end: z.string().regex(/^\d\d:\d\d$/) }).refine(r => r.start < r.end, "start must be before end"));
-const Body = z.object({ name: z.string().min(1).max(80), timezone: z.string(), weekly: z.record(z.string(), R), overrides: z.record(z.string().regex(/^\d{4}-\d\d-\d\d$/), R),
+const ClockTime = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+const R = z.array(z.object({ start: ClockTime, end: z.union([ClockTime, z.literal("24:00")]) }).refine(r => r.start < r.end, "start must be before end"));
+const ScheduleDate = z.string().regex(/^\d{4}-\d\d-\d\d$/).refine(value => DateTime.fromISO(value, { zone: "UTC" }).isValid, "invalid calendar date");
+const Body = z.object({ name: z.string().min(1).max(80), timezone: z.string().min(1), weekly: z.record(z.string().regex(/^[1-7]$/), R), overrides: z.record(ScheduleDate, R),
   holidayCountry: z.string().max(10).nullable(), isDefault: z.boolean() }).partial();
 const countries = Object.keys(new Holidays().getCountries());
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
