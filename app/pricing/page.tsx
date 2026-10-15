@@ -4,40 +4,70 @@ import { cmSans, cmSerif } from "@/components/mk/fonts";
 import { Banner, Nav, Footer, Arrow } from "@/components/mk/chrome";
 import { PriceCalc } from "@/components/PriceCalc";
 import { CALENDLY } from "@/lib/pricing";
-import { Check } from "@/components/mk/icons";
-import { ICON } from "@/components/mk/icons";
+import { Check, ICON } from "@/components/mk/icons";
+import { COMPARE } from "@/lib/pricingRows";
+import { Reel } from "@/components/mk/home";
+import { Faq } from "@/components/mk/Faq";
 export const metadata = { title: "Pricing | CalendlyIsDead" };
+const SC = "#6fb3ff", PM = "#5ddfd7", NT = "#b89ffa", CL = "#dbee9f";
 const plans = [
-  { n: "Free", amt: "Always free", was: "", btn: "Get started", inc: "Includes:", groups: [{ t: "Scheduling", c: "#6fb3ff", l: ["Unlimited event types", "Connect Google, Outlook, iCloud, CalDAV", "One-on-one scheduling", "Customizable booking page", "Embeds on any website"] }] },
-  { n: "Standard", amt: "$0", per: "/seat/mo", was: "Calendly charges $10", btn: "Get started", inc: "Everything in Free, and:", groups: [{ t: "Scheduling", c: "#6fb3ff", l: ["Automations & reminders", "Multiple calendars", "Meeting polls & one-off links", "Webhooks & API"] }, { t: "Payments", c: "#5ddfd7", l: ["Connect your own Stripe"] }, { t: "Assistant", c: "#dbee9f", l: ["AI email replies with your times", "Bring your own AI provider"] }] },
-  { n: "Teams", amt: "$0", per: "/seat/mo", was: "Calendly charges $16", btn: "Get started", fill: true, pop: true, inc: "Everything in Standard, and:", groups: [{ t: "Scheduling", c: "#6fb3ff", l: ["Round-robin & team scheduling", "Collective events", "Routing forms", "Analytics for every event type", "Branding controls"] }, { t: "Admin", c: "#b89ffa", l: ["Teams and roles", "Audit-friendly Postgres data"] }] },
-  { n: "Enterprise", amt: "$0", per: "license", was: "Calendly starts at $15k/yr", btn: "Self-host it", inc: "Everything in Teams, and:", groups: [{ t: "Scheduling", c: "#6fb3ff", l: ["Run it on your servers", "Bring your own SSO", "Export all data any time", "Fork it, change it, ship it"] }] },
+  { n: "Free", amt: "Always free", was: "", btn: "Get started", inc: "Includes:", groups: [{ t: "Scheduling", c: SC, ic: ICON.cal, l: ["One event type", "One calendar connection", "One-on-one scheduling", "Customizable booking page", "Browser extension"] }] },
+  { n: "Standard", amt: "$0", per: "/seat/mo", was: "Calendly charges $10 per seat", btn: "Get started", inc: "Everything in Free, and:", groups: [
+    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Unlimited event types", "Connect multiple calendars", "Automations & reminders", "Connect webhooks, Zapier"] },
+    { t: "Payments", c: PM, ic: ICON.card, l: ["Connect your own Stripe"] },
+    { t: "Notetaker", c: NT, ic: ICON.doc, note: "Not built yet", l: ["Recordings & transcripts", "Shareable meeting recaps", "Joins Zoom, Google Meet, Teams"], dim: true },
+    { t: "AI assistant", c: CL, ic: ICON.spark, tag: "Beta", l: ["Replies to email threads with your times", "Bring your own AI provider"] }] },
+  { n: "Teams", amt: "$0", per: "/seat/mo", was: "Calendly charges $16 per seat", btn: "Get started", fill: true, pop: true, inc: "Everything in Standard, and:", groups: [
+    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Round-robin & team scheduling", "Qualify, route, & schedule leads", "Centrally managed event types", "Analytics for every event type", "Branding controls"] },
+    { t: "Admin", c: NT, ic: ICON.team, l: ["Teams and roles", "Export all of your data"] },
+    { t: "Notetaker", c: NT, ic: ICON.doc, note: "Not built yet", l: ["Advanced admin controls"], dim: true }] },
+  { n: "Enterprise", amt: "$0", per: "license", was: "Calendly starts at $15k/yr", btn: "Self-host it", inc: "Everything in Teams, and:", groups: [
+    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Run it on your own servers", "Bring your own SSO", "Export all data any time", "Fork it, change it, ship it", "Audit-friendly Postgres data"] },
+    { t: "AI assistant", c: CL, ic: ICON.spark, tag: "Beta", l: ["Point it at your own model"] }] },
 ];
-const rows: [string, (string | boolean)[]][] = [
-  ["__Scheduling", []], ["One-on-one meetings", ["Unlimited", "Unlimited", "Unlimited", "Unlimited"]], ["Connect calendars", ["Unlimited", "Unlimited", "Unlimited", "Unlimited"]],
-  ["Unlimited meetings", [true, true, true, true]], ["Customize your booking link", [true, true, true, true]], ["Mobile and browser embed", [true, true, true, true]], ["Meeting polls and one-off links", [true, true, true, true]],
-  ["Control your meeting availability", [true, true, true, true]], ["Multi-person meeting types", [true, true, true, true]], ["Round-robin meeting distribution", [true, true, true, true]], ["Reminders and follow-up workflows", [true, true, true, true]],
-  ["Routing forms", [true, true, true, true]], ["Analytics", [true, true, true, true]], ["__Payments", []], ["Collect payment through Stripe", [true, true, true, true]], ["__Assistant", []], ["AI email assistant", [true, true, true, true]], ["__Admin", []], ["Teams and roles", [true, true, true, true]], ["Export your data", [true, true, true, true]],
+const faqs = [
+  ["What happens at the end of my trial?", "There is no trial. CalendlyIsDead is free and open source, so nothing expires and nothing is billed. Your hosting provider may charge for your own server if you outgrow its free tier."],
+  ["Which plan is best for me and my team?", "Every plan has the same code. Pick Free to try a single booking page, Standard for multiple calendars and reminders, or Teams for round robin, routing forms and shared event types."],
+  ["Can we try CalendlyIsDead with multiple users?", "Yes. Sign up, create a team, and invite your teammates. Invitees booking a meeting never need an account."],
+  ["What does the renewal process look like?", "There is nothing to renew. You can run the same deployment for as long as you like, and update it by pulling the latest changes from GitHub."],
+  ["How do I upgrade or downgrade?", "Plans here describe how Calendly gates features. In CalendlyIsDead every feature that exists is available to everyone, so there is nothing to switch."],
+  ["We’re a non-profit organization, is there special pricing available?", "It is free for everyone, including non-profits, schools and volunteer groups."],
+  ["What payment methods do you accept?", "None are needed to use CalendlyIsDead. If you collect payments from your own invitees, you connect your own Stripe account and the money goes straight to you."],
 ];
 export default function Pricing() {
   return <div className={`cm ${cmSans.variable} ${cmSerif.variable}`}><Banner /><Nav />
     <section className="cm-sec"><div className="cm-price">
-      <div className="cm-ptop"><h1>Add a team to any plan, still free</h1>
-        <div><p>Every feature is included in every plan. Pick how you want to run it, and see what you would have paid.</p>
+      <div className="cm-ptop"><h1>Add Notetaker and an AI assistant to Standard or Teams plans, still free</h1>
+        <div><p>Meeting recaps and action items are on the roadmap, plus an AI assistant to help with the work around meetings.</p>
           <div className="cm-bill"><span><i className="rad" />Billed monthly</span><span><i className="rad on" />Billed yearly</span><em>Save 100%</em></div></div></div>
       <div className="cm-plans">{plans.map(p => <div key={p.n} className={"cm-plan" + (p.pop ? " pop" : "")}>
         <h3>{p.n}</h3><div className="amt">{p.amt}{p.per && <small> {p.per}</small>}</div><div className="was">{p.was}</div>
         <Link className={"btn" + (p.fill ? " fill" : "")} href="/signup">{p.btn}<Arrow s={14} /></Link>
         <div className="inc">{p.inc}</div>
-        {p.groups.map(g => <div key={g.t}><h5><span style={{ width: 16, height: 16, borderRadius: 4, background: g.c, display: "grid", placeItems: "center" }}>{ICON.cal}</span>{g.t}</h5><ul>{g.l.map(x => <li key={x}><Check />{x}</li>)}</ul></div>)}
+        {p.groups.map(g => <div key={g.t + (g.note || "")} className={g.dim ? "dim" : ""}><h5><span style={{ width: 16, height: 16, borderRadius: 4, background: g.c, display: "grid", placeItems: "center" }}>{g.ic}</span>{g.t}{g.note && <em>{g.note}</em>}{g.tag && <em>{g.tag}</em>}</h5><ul>{g.l.map(x => <li key={x}><Check />{x}</li>)}</ul></div>)}
       </div>)}</div>
-      <p style={{ fontSize: 12, margin: "28px 0 0", display: "flex", gap: 8, alignItems: "center" }}><b style={{ fontWeight: 600 }}>Prices compared</b> are Calendly’s list prices per seat, billed yearly, as of October 2026.</p>
-      <div className="cm-cmp"><h2>Compare features</h2>
-        <table className="cm-tbl" data-testid="feature-table"><thead><tr><th style={{ width: "28%" }} /><th>Free</th><th>Standard</th><th>Teams</th><th>Enterprise</th></tr></thead>
-          <tbody>{rows.map(([n, v]) => n.startsWith("__") ? <tr className="grp" key={n}><td colSpan={5}>{n.slice(2)}</td></tr> : <tr key={n}><td>{n}</td>{v.map((c, i) => <td key={i}>{c === true ? <span className="cm-chk"><Check c="#fff" /></span> : c}</td>)}</tr>)}</tbody></table></div>
+      <p className="cm-pnote"><b>Prices compared</b> are Calendly’s list prices per seat, billed yearly, as of October 2026. Notetaker is not part of CalendlyIsDead yet.</p>
+    </div></section>
+    <section className="cm-cmpsec">
+      <h2 className="cm-cmph">Compare features</h2>
+      <div className="cm-ct" data-testid="feature-table">
+        <div className="cm-cth"><div className="lab" />{[["Free", "Get started"], ["Standard", "Get started"], ["Teams", "Get started"], ["Enterprise", "Self-host it"]].map(([n, b]) => <div key={n} className="col"><span>{n}</span><Link className={"b" + (n === "Teams" ? " fill" : "")} href="/signup">{b}</Link></div>)}</div>
+        {COMPARE.map(g => <section key={g.t} className="cm-cts">
+          <div className="gh"><i>{({ Scheduling: ICON.cal, Notetaker: ICON.doc, Callie: ICON.spark, Payments: ICON.card, Contacts: ICON.team, Automations: ICON.flow, Personalizations: ICON.pen, "Admin tools": ICON.grid, Security: ICON.box, Support: ICON.at } as Record<string, React.ReactNode>)[g.t]}</i><h3>{g.t === "Callie" ? "AI assistant" : g.t}</h3>{g.beta && <em>Beta</em>}</div>
+          {g.rows.map(([l, v]) => <div key={l} className="r"><div className="l"><span>{l}</span></div><div className="v">{v.map((c, i) => <div key={i} className={c === "–" ? "no" : ""}>{c === "✓" ? <span className="cm-chk"><Check c="#fff" /></span> : c}</div>)}</div></div>)}
+        </section>)}
+      </div>
       <div className="cm-cmp" id="calculator"><h2>What your team is paying for scheduling</h2>
         <div style={{ marginTop: 32 }}><PriceCalc /></div>
         <p style={{ fontSize: 13, opacity: .7 }}>Calendly list prices per seat, billed yearly, as of {CALENDLY.asOf}: Standard ${CALENDLY.standard}/mo, Teams ${CALENDLY.teams}/mo, Enterprise from ${CALENDLY.enterpriseFromYear.toLocaleString()}/yr. Self-hosting has your own hosting costs; small instances fit in free tiers.</p></div>
-    </div></section>
+    </section>
+    <section className="cm-sec"><div className="cm-faq"><h2>Frequently asked questions</h2><Faq items={faqs as [string, string][]} /></div></section>
+    <section className="cm-final">
+      <span className="cm-eyebrow">Get started</span>
+      <h2 className="cm-h2 cm-sans">From the first meeting to the follow-up</h2>
+      <p className="cm-p">All of the work around meetings, handled in one place. Book time, capture every discussion, and keep next steps moving without the manual work.</p>
+      <Link className="cm-btn fill" href="/signup">Start for free</Link>
+      <Reel />
+    </section>
     <Footer /></div>;
 }

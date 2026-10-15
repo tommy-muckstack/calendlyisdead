@@ -181,3 +181,24 @@
   .cm-mhero .mini{background:#fff;border-radius:12px;padding:10px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 12px rgba(7,26,49,.08);font-size:10px}.cm-mhero .mini b{display:block;font-weight:500}.cm-mhero .mini i{font-style:normal;color:var(--ink2)}
   .cm-hero{padding-bottom:8px}.cm-logo{font-size:15px;width:auto;flex:none}.cm-nav .cm-navr .cm-btn.fill{height:40px;padding:0 12px;font-size:14px;border-radius:12px}
 }
+/* pricing: real compare matrix, FAQ (parity with calendly.com/pricing) */
+.cm-price{padding:96px 96px 40px}.cm-price h1{max-width:640px}
+.cm-plans{gap:24px;margin-top:104px}
+.cm-plan.dim h5,.cm-plan.dim li{color:rgba(7,26,49,.35)}.cm-plan h5 em,.cm-ct .gh em{font-style:normal;background:rgba(7,26,49,.05);color:var(--ink3);border-radius:8px;padding:4px 8px;font-size:12px;line-height:16.8px;font-weight:500;margin-left:2px}.cm-plan.dim h5 em{color:rgba(7,26,49,.45)}
+.cm-pnote{font-size:12px;margin:28px 0 0;display:flex;gap:6px;align-items:center}.cm-pnote b{font-weight:600}
+.cm-cmpsec{padding:96px 120px 0;max-width:1440px;margin:0 auto}
+.cm-cmph{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 47px}
+.cm-ct{width:100%}.cm-cth{display:grid;grid-template-columns:306px repeat(4,212px);column-gap:16px;height:133px;border-bottom:1px solid var(--line);align-items:end;padding-bottom:0}
+.cm-cth .col{display:flex;flex-direction:column;align-items:center;gap:16px;padding-bottom:0;height:128px;justify-content:center}.cm-cth .col span{font-family:var(--sans);font-weight:500;font-size:20px;line-height:28px}
+.cm-cth .b{display:flex;width:100%;height:38px;align-items:center;justify-content:center;border:1px solid var(--ink);border-radius:16px;font-size:14px;font-weight:500;line-height:19.6px}.cm-cth .b.fill{background:var(--ink);color:var(--bg)!important;height:40px}
+.cm-cts{margin-top:48px}.cm-cts:first-of-type{margin-top:0}
+.cm-ct .gh{height:66px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line)}.cm-ct .gh i{width:32px;height:32px;display:grid;place-items:center}.cm-ct .gh i svg{width:20px;height:20px;stroke-width:1.2}.cm-ct .gh h3{font-family:var(--sans);font-weight:500;font-size:24px;line-height:33.6px;letter-spacing:-.5px;margin:0 8px 0 0}
+.cm-ct .r{display:grid;grid-template-columns:306px 894px;border-bottom:1px solid var(--line);align-items:stretch}
+.cm-ct .l{padding:16px 16px 16px 16px;display:flex;align-items:center;font-size:14px;line-height:20px}.cm-ct .l span{text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:rgba(7,26,49,.5);max-width:274px}
+.cm-ct .v{display:grid;grid-template-columns:repeat(4,212px);column-gap:16px}.cm-ct .v>div{background:rgba(245,243,238,.5);display:flex;align-items:center;justify-content:center;font-size:12px;line-height:16px;color:var(--ink)}.cm-ct .v>div.no{color:var(--ink2)}
+.cm-cmpsec .cm-cmp{margin-top:96px}
+.cm-faq{background:var(--card);border-radius:48px;padding:144px 24px 119px;margin-top:100px}.cm-faq h2{font-family:var(--serif);font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px;text-align:center;margin:0 0 21px}
+.cm-faql{max-width:770px;margin:0 auto;border-top:1px solid var(--line)}.cm-faql>div{border-bottom:1px solid var(--line)}
+.cm-faql button{all:unset;display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;min-height:80px;padding:0 6px;font-size:16px;line-height:22px;font-weight:500;cursor:pointer}.cm-faql button i{width:28px;height:28px;border-radius:8px;background:rgba(7,26,49,.06);display:grid;place-items:center;flex:none}
+.cm-faql p{margin:0;padding:0 6px 24px 48px;font-size:14px;line-height:19.6px;color:var(--ink2)}
+@media(max-width:1100px){.cm-cmpsec{padding:64px 24px 0}.cm-cth,.cm-ct .r{grid-template-columns:200px 1fr}.cm-cth{grid-template-columns:200px repeat(4,1fr);column-gap:8px}.cm-ct .v{grid-template-columns:repeat(4,1fr);column-gap:8px}.cm-ct .r{grid-template-columns:200px 1fr}.cm-price{padding:64px 32px 40px}.cm-ct .l span{max-width:none}}
