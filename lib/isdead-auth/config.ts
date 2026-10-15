@@ -15,6 +15,9 @@ export const firebaseConfigured = () => !!firebaseClientConfig() && !!env("FIREB
 /** One cookie, path "/", shared by /calendlyisdead, /superhumanisdead, /wisprflowisdead … */
 export const SESSION_COOKIE = "isdead_session";
 export const DEMO_COOKIE = "isdead_demo";
+/** Guest sessions: anyone can use an app without signing up. Per-visitor signed id, path "/", long-lived. */
+export const GUEST_COOKIE = "isdead_guest";
+export const GUEST_MAX_AGE_S = 60 * 60 * 24 * 180;
 export const SESSION_MAX_AGE_S = 60 * 60 * 24 * 14; // Firebase allows 5 min – 14 days
 export function cookieOptions(maxAge = SESSION_MAX_AGE_S) {
   const domain = env("ISDEAD_COOKIE_DOMAIN"); // optional, e.g. "yourappisdead.com" to include subdomains
