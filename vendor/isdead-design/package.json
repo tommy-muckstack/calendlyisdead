@@ -1,0 +1,39 @@
+{
+  "name": "@isdead/design",
+  "version": "0.1.0",
+  "description": "Shared design system for the IsDead open-source clones (CalendlyIsDead, SuperhumanIsDead, WisprFlowIsDead).",
+  "license": "Apache-2.0",
+  "repository": "github:tommy-muckstack/isdead-design",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./css/*": "./css/*",
+    "./tokens/*": "./tokens/*",
+    "./tailwind": "./tailwind/preset.cjs",
+    "./fonts/*": "./fonts/*"
+  },
+  "files": [
+    "dist",
+    "css",
+    "tokens",
+    "tailwind",
+    "fonts",
+    "swift",
+    "templates"
+  ],
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc -p ."
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "typescript": "^5"
+  }
+}

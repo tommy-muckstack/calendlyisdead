@@ -1,0 +1,20 @@
+{
+  "name": "calendly",
+  "source": "calendly.com marketing + booking CSS (brand-2026), login screenshot 2026-10-14, /workspace/calendly-research",
+  "font": { "sans": "Geist", "files": { "Geist": "calendly/Geist-Variable.woff2" }, "display": "Geist", "mono": "ui-monospace, SFMono-Regular, Menlo, monospace", "note": "calendly.com ships Geist (OFL) on its 2026 marketing pages; the app's Proxima Nova is proprietary and NOT copied" },
+  "color": {
+    "bg": "#FCFBF8", "surface": "#FFFFFF", "surfaceAlt": "#F4F9FF",
+    "text": "#071A31", "textMuted": "#476788", "textSubtle": "#748491",
+    "border": "#D8DCE0", "borderStrong": "#071A31",
+    "primary": "#071A31", "primaryHover": "#0C2D54", "onPrimary": "#FFFFFF",
+    "accent": "#006BFF", "accentHover": "#0055CC", "accentSoft": "#EDF5FF", "onAccent": "#FFFFFF",
+    "danger": "#C84545", "success": "#008A00", "warning": "#FFC354",
+    "focus": "#006BFF",
+    "heroFrom": "#4890E3", "heroMid": "#6BB1FF", "heroTo": "#BAF0EC"
+  },
+  "radius": { "xs": "4px", "sm": "8px", "md": "10px", "lg": "16px", "xl": "24px", "pill": "9999px" },
+  "space": { "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px" },
+  "shadow": { "sm": "0 1px 2px rgba(7,26,49,.06)", "md": "0 4px 16px rgba(7,26,49,.08)", "lg": "0 12px 40px rgba(7,26,49,.12)" },
+  "type": { "xs": "12px", "sm": "14px", "md": "16px", "lg": "18px", "xl": "24px", "2xl": "32px", "3xl": "44px", "4xl": "64px", "weightBody": 400, "weightStrong": 600, "weightHeading": 600, "tracking": "-0.02em", "lineHeight": 1.5 },
+  "control": { "height": "48px", "heightSm": "36px", "borderWidth": "1.5px", "buttonRadius": "10px", "inputRadius": "10px", "cardRadius": "24px" }
+}

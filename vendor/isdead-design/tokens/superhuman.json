@@ -1,0 +1,20 @@
+{
+  "name": "superhuman",
+  "source": "DuperHuman docs/SUPERHUMAN_SPEC.md (pixel-sampled live app, 2026-10-14)",
+  "font": { "sans": "Inter", "files": { "Inter": "superhuman/Inter-Variable.woff2" }, "display": "Inter", "mono": "ui-monospace, SFMono-Regular, Menlo, monospace", "note": "Superhuman's grotesk/SuperMailSerif/Adelle are proprietary; Inter (OFL) is the closest open stand-in" },
+  "color": {
+    "bg": "#FFFFFF", "surface": "#FFFFFF", "surfaceAlt": "#FCFAF7",
+    "text": "#141414", "textMuted": "#73716D", "textSubtle": "#9C9A96",
+    "border": "#DEDBD5", "borderStrong": "#141414",
+    "primary": "#714CB6", "primaryHover": "#5B3FA8", "onPrimary": "#FFFFFF",
+    "accent": "#714CB6", "accentHover": "#5B3FA8", "accentSoft": "#F7F5FF", "onAccent": "#FFFFFF",
+    "danger": "#D14343", "success": "#2E8540", "warning": "#E8A33B",
+    "focus": "#714CB6", "unread": "#71C0EA", "hintBar": "#EDEEFA", "palette": "#232323", "paletteText": "#D6D6D6",
+    "heroFrom": "#EDEEFA", "heroMid": "#F7F5FF", "heroTo": "#FCE7F3"
+  },
+  "radius": { "xs": "4px", "sm": "6px", "md": "8px", "lg": "8px", "xl": "12px", "pill": "9999px" },
+  "space": { "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px" },
+  "shadow": { "sm": "0 1px 2px rgba(0,0,0,.06)", "md": "0 4px 16px rgba(0,0,0,.10)", "lg": "0 8px 32px rgba(0,0,0,.18)" },
+  "type": { "xs": "12px", "sm": "13px", "md": "14px", "lg": "16px", "xl": "22px", "2xl": "30px", "3xl": "44px", "4xl": "56px", "weightBody": 400, "weightStrong": 600, "weightHeading": 500, "tracking": "0", "lineHeight": 1.6 },
+  "control": { "height": "36px", "heightSm": "28px", "borderWidth": "1px", "buttonRadius": "6px", "inputRadius": "6px", "cardRadius": "8px" }
+}

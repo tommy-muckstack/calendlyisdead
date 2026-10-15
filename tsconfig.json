@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@isdead/design": [
+        "./vendor/isdead-design/src/index.tsx"
       ]
     }
   },

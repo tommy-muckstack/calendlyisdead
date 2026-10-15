@@ -1,0 +1,20 @@
+{
+  "name": "wisprflow",
+  "source": "wisprflowisdead docs/WISPRFLOW_SPEC.md §10 (wisprflow.ai CSS, 2026-10-14)",
+  "font": { "sans": "Figtree", "display": "EB Garamond", "files": { "Figtree": "wisprflow/Figtree-Variable.woff2", "EB Garamond": "wisprflow/EBGaramond-Variable.woff2" }, "mono": "ui-monospace, SFMono-Regular, Menlo, monospace", "note": "Wispr Flow itself uses Figtree + EB Garamond, both OFL, so we ship the same open fonts" },
+  "color": {
+    "bg": "#FFFFEB", "surface": "#FFFDF9", "surfaceAlt": "#F5F4F0",
+    "text": "#1A1A1A", "textMuted": "#71716E", "textSubtle": "#9A9A96",
+    "border": "rgba(26,26,26,.3)", "borderStrong": "#1A1A1A",
+    "primary": "#1A1A1A", "primaryHover": "#333333", "onPrimary": "#FFFFEB",
+    "accent": "#034F46", "accentHover": "#023B34", "accentSoft": "#F0D7FF", "onAccent": "#FFFFFF",
+    "danger": "#7F1C34", "success": "#114E0B", "warning": "#5E5515",
+    "focus": "#2D62FF", "pink": "#FFBCF2", "flare": "#FF6C4C", "glow": "#FFA946", "divider": "#E4E4D0",
+    "heroFrom": "#FFFFEB", "heroMid": "#F0D7FF", "heroTo": "#FFBCF2"
+  },
+  "radius": { "xs": "4px", "sm": "8px", "md": "8px", "lg": "12px", "xl": "16px", "pill": "9999px" },
+  "space": { "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px" },
+  "shadow": { "sm": "0 1px 2px rgba(0,0,0,.06)", "md": "0 4px 16px rgba(0,0,0,.25)", "lg": "0 12px 40px rgba(0,0,0,.18)" },
+  "type": { "xs": "12px", "sm": "14px", "md": "16px", "lg": "18px", "xl": "24px", "2xl": "36px", "3xl": "52px", "4xl": "72px", "weightBody": 400, "weightStrong": 600, "weightHeading": 400, "tracking": "-0.01em", "lineHeight": 1.5 },
+  "control": { "height": "44px", "heightSm": "32px", "borderWidth": "1px", "buttonRadius": "9999px", "inputRadius": "8px", "cardRadius": "12px" }
+}
