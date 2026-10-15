@@ -36,7 +36,7 @@ export function Nav({ variant = "home" }: { variant?: "home" | "login" | "signup
       <div className="cm-navr">
         <a className="cm-btn text" href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">Talk to sales</a>
         {variant !== "login" && <Link className="cm-btn outline" href="/login">Log In</Link>}
-        {variant !== "signup" && <Link className="cm-btn fill" href="/signup">Get started for free</Link>}
+        {variant !== "signup" && <Link className="cm-btn fill" href="/signup">Get started<span className="cm-fr"> for free</span></Link>}
         <button className="cm-burger" aria-label="Menu" aria-expanded={m} onClick={() => setM(!m)}>{m ? <svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 3l12 12M15 3L3 15" stroke="#071A31" strokeWidth="1.8" strokeLinecap="round" /></svg> : <svg width="20" height="14" viewBox="0 0 20 14"><path d="M1 1h18M1 7h18M1 13h18" stroke="#071A31" strokeWidth="1.8" strokeLinecap="round" /></svg>}</button>
       </div>
     </header>

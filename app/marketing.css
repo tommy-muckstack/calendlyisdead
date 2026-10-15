@@ -273,4 +273,4 @@
 
 /* measured 390px layout of the original home (components/mk/m/home390.json) */
 .cm .mp{font-family:"IsDead Geist",system-ui,sans-serif}
-@media(max-width:900px){.cm-mwrap{margin-top:-124px;position:relative;z-index:0}.cm-nav,.cm-banner{position:relative;z-index:60}}
+@media(max-width:900px){.cm-mwrap{margin-top:-124px;position:relative;z-index:0}.cm-banner{position:relative;z-index:60}.cm-navr .cm-fr{display:none}}
