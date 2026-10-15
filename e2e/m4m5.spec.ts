@@ -2,8 +2,9 @@ import { test, expect, Page, Browser } from "@playwright/test";
 import fs from "node:fs";
 const shots = "research/ours";
 const login = async (page: Page, who: "demo" | "mate" = "demo", cb = "") => {
-  await page.goto(`login${cb ? `?callbackUrl=${encodeURIComponent(cb)}` : ""}`);
-  await page.getByRole("button", { name: who === "demo" ? "Use the demo account" : "Use the demo teammate account" }).click();
+  const q = new URLSearchParams(); if (cb) q.set("callbackUrl", cb); if (who === "mate") q.set("as", "mate");
+  await page.goto(`login${q.size ? `?${q}` : ""}`);
+  await page.getByRole("button", { name: "Use the demo account" }).click();
   if (!cb) await expect(page.getByRole("heading", { name: "Event types" })).toBeVisible();
 };
 const mails = () => fs.readdirSync(".data/outbox").map(f => JSON.parse(fs.readFileSync(`.data/outbox/${f}`, "utf8")));
@@ -22,7 +23,9 @@ test.describe.serial("M4 teams and M5 automations", () => {
     // teammate in a separate browser session
     const ctx = await (browser as Browser).newContext({ baseURL: "http://localhost:3123/calendlyisdead/", timezoneId: "America/Chicago" }); const sam = await ctx.newPage();
     await sam.goto(url.pathname); await sam.getByRole("link", { name: "Sign in to accept" }).click();
-    await sam.getByRole("button", { name: "Use the demo teammate account" }).click();
+    await sam.waitForURL(/\/login/); const lu = new URL(sam.url()); lu.searchParams.set("as", "mate"); await sam.goto(lu.toString());
+    await expect(sam.getByRole("button", { name: /teammate/ })).toHaveCount(0);
+    await sam.getByRole("button", { name: "Use the demo account" }).click();
     await sam.getByRole("button", { name: "Accept invite" }).click();
     await expect(sam.getByTestId("team-acme-support")).toContainText("Sam Rivera");
     await ctx.close();

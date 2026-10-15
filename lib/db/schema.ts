@@ -14,6 +14,7 @@ export const users = pgTable("users", {
   brandColor: text("brandColor"),
   logoUrl: text("logoUrl"),
   hideBranding: boolean("hideBranding").notNull().default(false),
+  firebaseUid: text("firebase_uid").unique(),
 });
 export const accounts = pgTable("accounts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),

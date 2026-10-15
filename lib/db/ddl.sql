@@ -50,3 +50,5 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "amountCents" integer NOT NULL DEF
 CREATE TABLE IF NOT EXISTS page_views ("eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE, day text NOT NULL, count integer NOT NULL DEFAULT 0, PRIMARY KEY ("eventTypeId", day));
 CREATE TABLE IF NOT EXISTS polls (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, title text NOT NULL, "durationMin" integer NOT NULL DEFAULT 30, location text NOT NULL DEFAULT '', options jsonb NOT NULL DEFAULT '[]', status text NOT NULL DEFAULT 'open', chosen text, "bookingUid" text, "createdAt" timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS poll_votes (id text PRIMARY KEY, "pollId" text NOT NULL REFERENCES polls(id) ON DELETE CASCADE, name text NOT NULL, email text NOT NULL, picks jsonb NOT NULL DEFAULT '[]', "createdAt" timestamptz NOT NULL DEFAULT now());
+ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid_key ON users (firebase_uid);

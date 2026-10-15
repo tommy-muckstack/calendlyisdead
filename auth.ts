@@ -1,59 +1,66 @@
-import { BP } from "@/lib/basepath";
-import NextAuth, { type NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
+// Sign-in for CalendlyIsDead: shared IsDead Firebase session (lib/isdead-auth) or, in demo mode, a signed demo cookie.
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { getDb, schema, DEMO_USER_ID, DEMO_MATE_ID } from "@/lib/db";
-import { sendMail } from "@/lib/email";
+import { getDb, schema, DEMO_USER_ID } from "@/lib/db";
 import { defaultWeekly } from "@/lib/slots";
+import { SESSION_COOKIE, DEMO_COOKIE, verifySessionCookie, verifyDemo, revokeSessions, firebaseConfigured, type FirebaseIdentity } from "@/lib/isdead-auth/server";
 
+export { firebaseConfigured };
 export const demoEnabled = () => process.env.NODE_ENV !== "production" || process.env.DEMO_MODE === "1";
+export type User = typeof schema.users.$inferSelect;
 
-export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
+/** Find the app user for a Firebase identity, linking by verified email or creating one. */
+export async function upsertFirebaseUser(id: FirebaseIdentity): Promise<User | { error: string }> {
   const db = await getDb();
-  const providers: NextAuthConfig["providers"] = [
-    {
-      id: "email", name: "Email", type: "email", maxAge: 60 * 60 * 24, from: process.env.EMAIL_FROM ?? "noreply@calendlyisdead.local",
-      async sendVerificationRequest({ identifier, url }: { identifier: string; url: string }) {
-        await sendMail({ to: identifier, subject: "Your sign-in link", text: `Sign in to CalendlyIsDead:\n${url}\n\nThis link expires in 24 hours.` });
-      },
-    } as any,
-  ];
-  if (process.env.AUTH_GOOGLE_ID) providers.push(Google({ allowDangerousEmailAccountLinking: true }));
-  if (demoEnabled()) providers.push(Credentials({ id: "demo", name: "Demo", credentials: { who: {} }, authorize: async (c: any) => {
-    const id = c?.who === "mate" ? DEMO_MATE_ID : DEMO_USER_ID;
-    const [u] = await db.select().from(schema.users).where(eq(schema.users.id, id)); return u ?? null; } }));
-  return {
-    secret: process.env.AUTH_SECRET ?? "dev-only-secret-change-me-in-production",
-    trustHost: true,
-    adapter: DrizzleAdapter(db, { usersTable: schema.users, accountsTable: schema.accounts, sessionsTable: schema.sessions, verificationTokensTable: schema.verificationTokens } as any),
-    session: { strategy: "jwt" },
-    providers,
-    basePath: `${BP}/api/auth`,
-    pages: { signIn: `${BP}/login`, verifyRequest: `${BP}/login?sent=1` },
-    callbacks: {
-      jwt({ token, user }) { if (user?.id) token.uid = user.id; return token; },
-      session({ session, token }) { (session.user as any).id = token.uid ?? token.sub; return session; },
-    },
-    events: {
-      async createUser({ user }) {
-        const base = (user.email ?? "user").split("@")[0].toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 24) || "user";
-        let username = base, n = 1;
-        while ((await db.select().from(schema.users).where(eq(schema.users.username, username))).length) username = `${base}-${++n}`;
-        await db.update(schema.users).set({ username }).where(eq(schema.users.id, user.id!));
-        await db.insert(schema.schedules).values({ id: crypto.randomUUID(), userId: user.id!, timezone: "America/New_York", weekly: defaultWeekly(), overrides: {} });
-        await db.insert(schema.eventTypes).values({ id: crypto.randomUUID(), userId: user.id!, slug: "30min", title: "30 minute meeting", durationMin: 30 });
-      },
-    },
-  } satisfies NextAuthConfig;
-});
+  const [byUid] = await db.select().from(schema.users).where(eq(schema.users.firebaseUid, id.uid));
+  if (byUid) return byUid;
+  const email = id.email?.toLowerCase() ?? null;
+  if (email) {
+    const [byEmail] = await db.select().from(schema.users).where(eq(schema.users.email, email));
+    if (byEmail) {
+      if (byEmail.firebaseUid) return { error: "This email is linked to a different sign-in." };
+      if (!id.emailVerified) return { error: "Verify your email address (check your inbox), then sign in again." };
+      await db.update(schema.users).set({ firebaseUid: id.uid }).where(eq(schema.users.id, byEmail.id));
+      return { ...byEmail, firebaseUid: id.uid };
+    }
+  }
+  const userId = crypto.randomUUID();
+  const base = (email ?? "user").split("@")[0].replace(/[^a-z0-9-]/g, "-").slice(0, 24) || "user";
+  let username = base, n = 1;
+  while ((await db.select().from(schema.users).where(eq(schema.users.username, username))).length) username = `${base}-${++n}`;
+  await db.insert(schema.users).values({ id: userId, firebaseUid: id.uid, email, name: id.name, image: id.picture, username, emailVerified: id.emailVerified ? new Date() : null });
+  await db.insert(schema.schedules).values({ id: crypto.randomUUID(), userId, timezone: "America/New_York", weekly: defaultWeekly(), overrides: {} });
+  await db.insert(schema.eventTypes).values({ id: crypto.randomUUID(), userId, slug: "30min", title: "30 minute meeting", durationMin: 30 });
+  const [u] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+  return u;
+}
 
-export async function requireUser() {
-  const s = await auth();
-  const id = (s?.user as any)?.id as string | undefined;
+async function currentUserId(): Promise<string | null> {
+  const jar = await cookies();
+  if (demoEnabled()) { const d = verifyDemo(jar.get(DEMO_COOKIE)?.value); if (d) return d; }
+  const id = await verifySessionCookie(jar.get(SESSION_COOKIE)?.value);
   if (!id) return null;
+  const u = await upsertFirebaseUser(id);
+  return "error" in u ? null : u.id;
+}
+
+/** Same shape the app used with Auth.js: `{ user: { id } } | null`. */
+export async function auth() { const id = await currentUserId(); return id ? { user: { id } } : null; }
+
+export async function requireUser(): Promise<User | null> {
+  const id = await currentUserId(); if (!id) return null;
   const db = await getDb();
   const [u] = await db.select().from(schema.users).where(eq(schema.users.id, id));
   return u ?? null;
 }
+
+/** Server-action sign out: clears the shared cookie (all IsDead apps) and revokes Firebase refresh tokens. */
+export async function signOut({ redirectTo }: { redirectTo: string }) {
+  const jar = await cookies();
+  const id = await verifySessionCookie(jar.get(SESSION_COOKIE)?.value);
+  if (id) await revokeSessions(id.uid);
+  jar.delete({ name: SESSION_COOKIE, path: "/" }); jar.delete({ name: DEMO_COOKIE, path: "/" });
+  redirect(redirectTo);
+}
+export { DEMO_USER_ID };

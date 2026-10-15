@@ -11,12 +11,22 @@ npm run dev        # http://localhost:3000, embedded Postgres (PGlite) in .data/
 ```
 - Demo booking page: http://localhost:3000/demo/30min
 - Host dashboard: /login, then "Use the demo account" (dev only, or `DEMO_MODE=1`)
-- Magic-link email and booking emails print to the server log (and `.data/outbox/`) unless `RESEND_API_KEY` is set.
+- Booking emails print to the server log (and `.data/outbox/`) unless `RESEND_API_KEY` is set.
 
-Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET` (also encrypts stored calendar tokens), `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `AUTH_MICROSOFT_ID`/`AUTH_MICROSOFT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`.
+Env (all optional in dev): `DATABASE_URL` (Postgres/Neon), `AUTH_SECRET` (signs the demo cookie and encrypts stored calendar tokens), `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` (Google *calendar* connect only), `AUTH_MICROSOFT_ID`/`AUTH_MICROSOFT_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`.
+
+## Sign-in (shared across yourappisdead.com)
+Firebase Authentication, email/password + Google, shared by every IsDead app (`lib/isdead-auth`, canonical copy in isdead-design/auth).
+The browser signs in with the Firebase JS SDK and POSTs the ID token to `/calendlyisdead/api/session`; firebase-admin verifies it,
+maps the Firebase uid to `users.firebase_uid` (linking an existing row by *verified* email), and sets an httpOnly `isdead_session`
+session cookie with `Path=/`, so /superhumanisdead and /wisprflowisdead see the same sign-in. Sign out clears it and revokes refresh tokens.
+
+Env: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`,
+`NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`, `FIREBASE_SERVICE_ACCOUNT_JSON` (whole JSON key), optional `ISDEAD_COOKIE_DOMAIN`.
+Without them the login page says "Sign-in not configured" (demo button still works with `DEMO_MODE=1`).
 
 ## Calendar sync
-- **Google**: same OAuth client as sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
+- **Google**: its own OAuth client (`AUTH_GOOGLE_ID`), separate from Firebase sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
 - **Outlook / Microsoft 365**: Entra app (multi-tenant + personal accounts), redirect `{APP_URL}/api/integrations/microsoft/callback`, delegated `Calendars.ReadWrite offline_access User.Read`.
 - **iCloud**: CalDAV at caldav.icloud.com with the Apple ID and an app-specific password.
 - **Demo calendar**: keyless mock (dev or `DEMO_MODE=1`), busy 12-1pm ET on weekdays.
