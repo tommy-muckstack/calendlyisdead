@@ -1,0 +1,6 @@
+.mp{isolation:isolate;position:relative;width:100%;max-width:100vw;overflow:hidden;font-family:var(--ids-font-sans);display:none}
+.mp-b,.mp-i,.mp-ph{position:absolute;box-sizing:border-box;overflow:hidden}
+.mp-i svg{display:block}
+.mp-ph{background:linear-gradient(135deg,#eef1f8,#dfe5f3)}
+.mp-t{position:absolute;white-space:nowrap;margin:0;text-decoration:none}
+@media(max-width:900px){.mp{display:block}.mp-desk{display:none!important}}
