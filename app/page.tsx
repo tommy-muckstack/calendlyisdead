@@ -1,75 +1,65 @@
 import Link from "next/link";
-import { Hero, Section, Footer, Pill } from "@isdead/design";
-import { SiteNav } from "@/components/SiteNav";
-import { PriceCalc } from "@/components/PriceCalc";
-import { CALENDLY, FEATURES } from "@/lib/pricing";
-import { BP } from "@/lib/basepath";
-const GH = "https://github.com/tommy-muckstack/calendlyisdead";
-// Layout follows the marketing-site template in @isdead/design (templates/marketing-site.md):
-// nav → hero + product shot → audience strip → 4-step tabs → alternating feature rows → proof stats → integrations → pricing → final CTA → footer.
-const Shot = ({ src, alt }: { src: string; alt: string }) =>
-  <img src={`${BP}/home/${src}`} alt={alt} style={{ width: "100%", borderRadius: 16, border: "1px solid var(--ids-color-border)", boxShadow: "var(--ids-shadow-lg)", display: "block", background: "#fff" }} />;
-const steps = [
-  { t: "Book", d: "Share a link, embed a widget, or let routing forms send people to the right person." },
-  { t: "Prep", d: "Invitee questions, buffers, limits and calendar checks happen before anyone joins." },
-  { t: "Meet", d: "Zoom, Google Meet, phone or in person, added to every invite automatically." },
-  { t: "Follow up", d: "Workflows send reminders and thank-you emails, and analytics show what's working." },
-];
-const rows = [
-  { id: "product", k: "Scheduling", h: "Book meetings without the back-and-forth", p: "Event types, availability rules, holidays, round robin and collective team events. Your booking page shows only the times that really work.", img: "event-types.png" },
-  { id: "assistant", k: "AI assistant", h: "Paste an email thread, get a reply with times", p: "The email assistant reads the conversation, picks the right event type and drafts a reply with booking links you can send as-is.", img: "assistant.png" },
-  { id: "analytics", k: "Insights", h: "See who books, when, and how often", p: "Bookings, cancellations and popular hours across every event type and teammate, with no plan upgrade required.", img: "analytics.png" },
-  { id: "payments", k: "Payments", h: "Collect payment when people book", p: "Connect your own Stripe account to charge for sessions upfront. CalendlyIsDead never takes a cut or charges you.", img: "booking.png" },
-];
+import "./marketing.css";
+import { cmSans, cmSerif } from "@/components/mk/fonts";
+import { Banner, Nav, Footer } from "@/components/mk/chrome";
+import { HeroArt, MobileHero, Story, Tiles, Stories, Reel } from "@/components/mk/home";
+import { ICON, G, MsMark } from "@/components/mk/icons";
+import { Wordmark } from "@/components/mk/chrome";
+// Structure mirrors calendly.com's 2026 homepage: banner, nav, cream hero card with OAuth buttons, icon intro, scroll-driven
+// "Scheduling" story, three accordion stories, gradient "why" section, integrations, final CTA, dark footer. Copy and art are original.
+export const metadata = { title: "CalendlyIsDead: free, open-source scheduling" };
 export default function Home() {
-  return <>
-    <SiteNav />
-    <Hero eyebrow={<Pill>Free · Open source · Apache-2.0</Pill>}
-      title={<>Scheduling that never<br />sends you a bill.</>}
-      subtitle="Booking pages, team round robin, reminders, payments, embeds, routing and an AI email assistant. Everything a per-seat subscription sells, for $0."
-      actions={<><Link className="ids-btn ids-btn--primary" href="/login">Get started for free</Link><Link className="ids-btn ids-btn--outline" href="/demo/30min">Try a booking page</Link></>}>
-      <div style={{ maxWidth: 1080, margin: "56px auto 0" }}><Shot src="booking.png" alt="A CalendlyIsDead booking page with a month calendar and open times" /></div>
-    </Hero>
-    <p className="ids-muted" style={{ textAlign: "center", padding: "40px 24px 0", fontWeight: 600 }}>Built for coaches, recruiters, sales teams, support desks, clinics and anyone whose work runs on meetings</p>
-    <Section id="solutions" title="There's more to meetings than finding a time">
-      <div className="ids-grid" style={{ marginTop: 48 }}>{steps.map((s, i) =>
-        <div key={s.t} className="ids-card" style={{ padding: 28 }}><span className="ids-pill">{i + 1}</span><h3 className="ids-h3" style={{ margin: "16px 0 8px" }}>{s.t}</h3><p className="ids-muted" style={{ margin: 0 }}>{s.d}</p></div>)}</div>
-    </Section>
-    {rows.map((r, i) =>
-      <Section key={r.id} id={r.id} style={{ paddingTop: 48, paddingBottom: 48 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 56, alignItems: "center", direction: i % 2 ? "rtl" : "ltr" }}>
-          <div style={{ direction: "ltr" }}><span className="ids-pill">{r.k}</span><h2 className="ids-h2" style={{ margin: "16px 0 12px", fontSize: "var(--ids-type-3xl)" }}>{r.h}</h2><p className="ids-muted" style={{ fontSize: 18 }}>{r.p}</p>
-            <Link className="ids-btn ids-btn--outline" href="/login" style={{ marginTop: 12 }}>Try it free</Link></div>
-          <div style={{ direction: "ltr" }}><Shot src={r.img} alt={r.h} /></div>
-        </div>
-      </Section>)}
-    <Section id="resources" title="Real numbers, no fine print">
-      <div className="stats" style={{ marginTop: 40 }}>
-        <div className="card"><b>$0</b><span className="muted">per seat, per month, forever</span></div>
-        <div className="card"><b>1 snippet</b><span className="muted">Inline, popup widget or popup link on any site</span></div>
-        <div className="card"><b>Your data</b><span className="muted">Self-host on Postgres. Export anything.</span></div>
-        <div className="card"><b>No lock-in</b><span className="muted">Apache-2.0. Fork it, change it, ship it.</span></div>
+  return <div className={`cm ${cmSans.variable} ${cmSerif.variable}`}>
+    <Banner /><Nav />
+    <section className="cm-sec"><div className="cm-hero">
+      <h1 className="cm-h1 cm-sans">Easy scheduling ahead.</h1>
+      <p className="cm-lead">Join the people who book meetings for free with the open-source scheduling tool.</p>
+      <div className="cm-cta">
+        <Link className="cm-oauth" href="/signup?provider=google"><span className="ico"><G /></span>Sign up with Google</Link>
+        <Link className="cm-oauth" href="/signup?provider=microsoft"><span className="ico"><MsMark /></span>Sign up with Microsoft</Link>
       </div>
-    </Section>
-    <Section title="Connects with the tools you already use" subtitle="Google Calendar, Outlook, iCloud and CalDAV calendars; Zoom and Google Meet; Stripe; Resend email; webhooks and embeds." />
-    <Section id="pricing" title="What your team is paying for scheduling">
-      <div style={{ marginTop: 32 }}><PriceCalc /></div>
-      <p className="muted" style={{ fontSize: 13 }}>Calendly list prices per seat, billed yearly, as of {CALENDLY.asOf}: Standard ${CALENDLY.standard}/mo, Teams ${CALENDLY.teams}/mo, Enterprise from ${CALENDLY.enterpriseFromYear.toLocaleString()}/yr. Monthly billing costs more. Self-hosting has your own hosting costs; small instances fit in free tiers.</p>
-      <h3 className="ids-h2" style={{ textAlign: "center", margin: "56px 0 24px" }}>Every feature, no plan gates</h3>
-      <div className="card" style={{ padding: 8 }}>
-        <table className="t" data-testid="feature-table"><thead><tr><th>Feature</th><th>Calendly plan you'd need</th><th>CalendlyIsDead</th></tr></thead>
-          <tbody>{FEATURES.map(f => <tr key={f.name}><td>{f.name}</td><td className="muted">{f.plan}</td><td style={{ color: "var(--ids-color-accent)", fontWeight: 700 }}>✓ Free</td></tr>)}</tbody></table>
-      </div>
-    </Section>
-    <section style={{ margin: "0 16px 16px", borderRadius: 24, background: "var(--ids-gradient-hero)", padding: "96px 24px", textAlign: "center" }}>
-      <h2 className="ids-h1" style={{ fontSize: "var(--ids-type-3xl)" }}>From the first booking to the follow-up</h2>
-      <div style={{ marginTop: 28, display: "flex", gap: 12, justifyContent: "center" }}><Link className="ids-btn ids-btn--primary" href="/login">Get started for free</Link><a className="ids-btn ids-btn--outline" href={GH}>View on GitHub</a></div>
+      <p className="cm-fine"><Link href="/signup">Sign up with email</Link> • No credit card required</p>
+      <HeroArt /><MobileHero />
+    </div></section>
+    <section className="cm-intro" id="product">
+      <div className="cm-icons">{["#6fb3ff", "#dbee9f", "#b89ffa", "#5ddfd7"].map((c, i) => <i key={c} style={{ background: c }}>{[ICON.cal, ICON.spark, ICON.doc, ICON.card][i]}</i>)}</div>
+      <h2 className="cm-h2 cm-sans">There’s more to meetings than finding a time.</h2>
+      <p className="cm-p">Book meetings, capture discussions and decisions, and keep next steps moving with tools that help you handle the work before, during, and after every meeting.</p>
     </section>
-    <Footer columns={[
-      { title: "Product", links: [{ href: BP + "/#product", label: "Scheduling" }, { href: BP + "/#assistant", label: "AI assistant" }, { href: BP + "/#payments", label: "Payments" }, { href: BP + "/#analytics", label: "Analytics" }] },
-      { title: "Get started", links: [{ href: BP + "/login", label: "Log in" }, { href: BP + "/demo/30min", label: "Demo booking page" }, { href: BP + "/#pricing", label: "Price comparison" }] },
-      { title: "Open source", links: [{ href: GH, label: "GitHub" }, { href: GH + "/blob/main/LICENSE", label: "Apache-2.0 license" }, { href: GH + "#self-hosting", label: "Self-hosting" }] },
-      { title: "More IsDead apps", links: [{ href: "/superhumanisdead", label: "SuperhumanIsDead" }, { href: "/wisprflowisdead", label: "WisprFlowIsDead" }] },
-    ]} note="CalendlyIsDead is an independent open-source project. It is not affiliated with, endorsed by or sponsored by Calendly LLC. Calendly is a trademark of its owner." />
-  </>;
+    <Story id="scheduling" tall tag="Scheduling" tagBg="#6fb3ff" title="A better way to book your meetings"
+      items={[{ icon: ICON.cal, t: "Full control over your calendar", d: "Connect your calendars, set your hours, and control exactly when you’re available to meet." }, { icon: ICON.list, t: "Meeting templates for every scenario", d: "From one-on-one calls to multi-host meetings, pre-built event types make scheduling easy for everyone." }, { icon: ICON.flow, t: "Automated email & text workflows", d: "Reduce no-shows with personalized email reminders, and let invitees reschedule when needed without the back-and-forth." }, { icon: ICON.embed, t: "Website embeds and routing forms", d: "Let visitors schedule right from your website. Add routing forms to qualify leads and match them with the right team member." }, { icon: ICON.grid, t: "Scheduling whenever, wherever", d: "Use it from any browser, embed it anywhere, or connect it with your favorite tools through webhooks and an API." }, { icon: ICON.team, t: "Tools for teams of all sizes", d: "Add teammates, set permissions, and run round robin and collective events without switching tools." }]}
+      art="avail" />
+    <Story id="assistant" flip tag="AI assistant" badge="Beta" tagBg="#dbee9f" title="Meet your AI scheduling assistant"
+      items={[{ icon: ICON.at, t: "Conversational scheduling", d: "Paste an email thread and the assistant picks the right event type and drafts a reply with booking links. Say what you need and let it take it from there." }, { icon: ICON.cal, t: "Precise coordination" }, { icon: ICON.link, t: "24/7 assistance with meeting tasks" }]}
+      art="assist" />
+    <Story id="recaps" tag="Insights" badge="New" tagBg="#b89ffa" title="See what your meetings add up to"
+      items={[{ icon: ICON.list, t: "Clear summaries with next steps", d: "See bookings, cancellations and busy hours at a glance, so nothing falls through the cracks." }, { icon: ICON.edit, t: "Pre-drafted follow-up emails" }, { icon: ICON.grid, t: "Works with your tools" }, { icon: ICON.spark, t: "Instant meeting recall" }]}
+      art="recap" />
+    <Story id="payments" flip tag="Payments" badge="New" tagBg="#5ddfd7" title="Flexible payment options that fit your business"
+      items={[{ icon: ICON.card, t: "Upfront meeting payments", d: "Collect payment when clients book with you through your own Stripe account, with no cut taken by us." }, { icon: ICON.box, t: "Meeting packages" }, { icon: ICON.doc, t: "Invoices" }, { icon: ICON.link, t: "Payment links" }]}
+      art="pay" />
+    <section className="cm-cust">
+      <div className="head"><span className="cm-eyebrow">Why people switch</span><h2 className="cm-h2 cm-sans">Real features. Real savings.</h2></div>
+      <Stories />
+    </section>
+    <section className="cm-int" id="integrations">
+      <span className="cm-eyebrow">Integrations</span>
+      <h2 className="cm-h2 cm-sans">Connect it with your favorite tools</h2>
+      <p className="cm-p">Calendars, video, payments and webhooks make it flexible.</p>
+      <Link className="cm-more" href="/pricing">View all integrations →</Link>
+      <Tiles />
+      <div className="cm-two">
+        <div className="cm-sc"><span style={{ display: "inline-flex" }}><G s={16} /></span><span className="go">↗</span><h3>Google suite</h3><p>Get your job done faster by connecting to Google Calendar and Meet.</p></div>
+        <div className="cm-sc"><span style={{ display: "inline-flex" }}><MsMark s={16} /></span><span className="go">↗</span><h3>Microsoft suite</h3><p>Make your day easier with Outlook, Teams and CalDAV calendar support.</p></div>
+      </div>
+    </section>
+    <section className="cm-final">
+      <span className="cm-eyebrow">Get started</span>
+      <h2 className="cm-h2 cm-sans">From the first meeting to the follow-up</h2>
+      <p className="cm-p">All of the work around meetings, handled in one place. Book time, capture every discussion, and keep next steps moving without the manual work.</p>
+      <Link className="cm-btn fill" href="/signup">Start for free</Link>
+      <Reel />
+    </section>
+    <Footer />
+  </div>;
 }

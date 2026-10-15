@@ -90,7 +90,7 @@ test.describe.serial("calendar sync and M2", () => {
 
 test("login without Firebase env: shows not-configured and exactly one demo button", async ({ page }) => {
   await page.goto("login");
-  await expect(page.getByText("Sign-in not configured")).toBeVisible();
+  await expect(page.getByText(/Sign-in isn.t configured/)).toBeVisible();
   await expect(page.getByRole("button", { name: /demo/i })).toHaveCount(1);
   expect((await page.request.post("api/session", { data: { idToken: "x" } })).status()).toBe(503);
 });

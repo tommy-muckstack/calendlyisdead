@@ -15,7 +15,9 @@ const pickFirstSlot = async (page: Page, nthDay = 0, nthSlot = 0) => {
 test.describe.serial("M6-M9", () => {
   test("landing page compares prices", async ({ page }) => {
     await page.goto("");
-    await expect(page.getByRole("heading", { name: /never sends you a bill/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goto("pricing");
+    await expect(page.getByRole("heading", { name: "Compare features" })).toBeVisible();
     await expect(page.getByTestId("cost-standard")).toHaveText("$1,200");
     await page.getByLabel(/Team size/).fill("50");
     await expect(page.getByTestId("cost-teams")).toHaveText("$9,600");
