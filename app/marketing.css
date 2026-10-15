@@ -214,3 +214,46 @@
 .cm-pnote{margin:32px 0 0;height:20px;line-height:20px}
 
 .cm-cth .lab{align-self:stretch;display:flex;align-items:flex-end}.cm-cth .lab .gh{border-bottom:0;width:100%}
+.cm-mt{display:none}
+@media(max-width:900px){
+  .cm-ct{display:none}.cm-mt{display:block}
+  .cm-price{border-radius:64px;padding:48px 16px 48px}.cm-price h1{font-size:28px;line-height:30.8px;letter-spacing:-.8px;text-align:center;max-width:320px;margin:0 auto}
+  .cm-ptop{display:block}.cm-ptop p{display:none}.cm-bill{justify-content:center;margin-top:36px}
+  .cm-plans{grid-template-columns:282px;justify-content:center;gap:24px;margin-top:48px}
+  .cm-pw{padding-top:0}.cm-pw.pop{padding:16px 8px 8px;margin:0 -8px;border-radius:40px;background:linear-gradient(160deg,#2e6cc0,#b99cf3)}.cm-pw.pop .lab{display:block;position:static;height:auto;background:none;box-shadow:none;padding:0 4px 12px;border-radius:0}.cm-pw.pop:after{display:none}
+  .cm-pw .cm-plan{min-height:0;border-radius:40px;padding:4px 4px 16px}.cm-pw .top{border-radius:32px;padding:16px;height:auto;min-height:231px}.cm-pw .bd{padding:16px 12px 0}
+  .cm-pnote{margin:60px 0 0;height:auto;line-height:16.8px;display:block;max-width:282px;margin-left:auto;margin-right:auto}
+  .cm-cmpsec{padding:48px 24px 0}.cm-cmph{font-size:28px;line-height:30.8px;letter-spacing:-.8px;margin:0 0 24px}
+  .cm-mt{margin:0 -24px}.cm-mt .mh{display:grid;grid-template-columns:252px 138px;height:53px;border-bottom:1px solid var(--line);background:var(--bg)}
+  .cm-mt .gh{display:flex;align-items:center;gap:8px;padding:0 12px;height:56px}.cm-mt .gh i{width:32px;height:32px;display:grid;place-items:center}.cm-mt .gh i svg{width:20px;height:20px;stroke-width:1.2}.cm-mt .gh h3{font-family:var(--sans);font-weight:500;font-size:20px;line-height:28px;margin:0}.cm-mt .gh em{font-style:normal;background:rgba(7,26,49,.05);color:var(--ink3);border-radius:8px;padding:4px 8px;font-size:12px;line-height:16.8px;font-weight:500}
+  .cm-mt .mh .gh{height:52px}.cm-mt .gh.sec{border-bottom:1px solid var(--line);height:57px;box-sizing:border-box}
+  .cm-mt .sel{position:relative;background:var(--card);display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:18px;font-weight:500;color:var(--ink)}.cm-mt .sel select{all:unset;position:absolute;inset:0;padding:0 40px 0 12px;font-size:18px;font-weight:500;cursor:pointer}.cm-mt .sel svg{margin-left:auto;pointer-events:none}
+  .cm-mt .r{display:grid;grid-template-columns:252px 138px;border-bottom:1px solid var(--line);min-height:53px}
+  .cm-mt .l{padding:12px 12px 11px 12px;display:flex;align-items:center;font-size:14px;line-height:20px}.cm-mt .l span{text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:rgba(7,26,49,.5)}
+  .cm-mt .v{background:var(--card);display:flex;align-items:center;justify-content:center;font-size:14px;line-height:19.6px;text-align:center}.cm-mt .v.no{color:var(--ink2)}
+  .cm-faq{border-radius:64px;padding:48px 16px;margin-top:48px}.cm-faq h2{font-size:28px;line-height:30.8px;letter-spacing:-.8px;margin:0 0 32px}
+  .cm-faql button{min-height:72px;font-size:15px;line-height:21px}
+}
+
+/* plan cards: measured from calendly.com/pricing (top card gap 24, bd gap 20, groups gap 12, li 14/19.6 gap 8) */
+.cm-pw .top{gap:24px;justify-content:space-between}.cm-pw .nm{display:flex;flex-direction:column;gap:8px;min-height:40px}
+.cm-pw .tg{display:flex;align-items:center;gap:8px;font-size:16px;line-height:22.4px;font-weight:500;color:#6a4bcf}.cm-pw .tg i{width:36px;height:20px;border-radius:10px;background:#e3e1dc;position:relative;display:block}.cm-pw .tg i:after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.cm-pw .pr{display:flex;flex-direction:column;gap:0}.cm-pw .amt{display:flex;align-items:baseline;gap:4px;margin:0;min-height:53px;font-family:var(--sans);line-height:52.8px}.cm-pw .amt b{font-weight:500;font-size:48px;line-height:52.8px;letter-spacing:-1.5px}.cm-pw .amt small{font-size:10px;line-height:14px;color:var(--ink2);margin-right:4px}.cm-pw .amt em{font-style:normal;font-family:"IsDead Geist",sans-serif;font-size:12px;line-height:16.8px;font-weight:500;background:rgba(7,26,49,.05);color:var(--ink3);border-radius:8px;padding:4px 8px;align-self:center}
+.cm-pw .amt.free{font-family:var(--serif);font-weight:500;font-size:40px;letter-spacing:-1px;align-items:center}
+.cm-pw .was{font-size:11px;line-height:16px;color:var(--ink2);min-height:16px;margin:2px 0 14px}
+.cm-pw .top .btn{height:50px;border-radius:16px;font-size:16px;margin:0}
+.cm-pw .bd{display:flex;flex-direction:column;gap:20px;padding:24px 12px 0}.cm-pw .bd .inc{font-size:12px;line-height:16.8px;margin:0}.cm-pw .bd>div{display:flex;flex-direction:column;gap:12px}
+.cm-pw .bd h5{margin:0;font-size:16px;line-height:24px;font-weight:500;gap:4px}.cm-pw .bd h5 span{width:24px!important;height:24px!important;border-radius:6px!important}.cm-pw .bd h5 em{margin-left:4px}
+.cm-pw .bd ul{display:flex;flex-direction:column;gap:8px}.cm-pw .bd li{margin:0;font-size:14px;line-height:19.6px;gap:8px}.cm-pw .bd li svg{flex:none;margin-top:2px;width:16px;height:16px}
+@media(max-width:900px){
+  .cm-pw{display:block}.cm-pw.pop{padding:16px 8px 8px}.cm-pw.pop .cm-plan{background:var(--bg)}.cm-pw .top{padding:16px;min-height:0;height:auto}.cm-pw .bd{padding:16px 12px 0}
+}
+@media(max-width:900px){.cm-pw .top[data-p=Free],.cm-pw .top[data-p=Standard]{min-height:280px}.cm-pw .top[data-p=Teams]{min-height:263px}.cm-pw .top[data-p=Enterprise]{min-height:231px}}
+.cm-pnote .calc{text-decoration:underline;margin-left:8px}
+@media(max-width:900px){
+  .cm-pnote .calc{display:none}
+  .cm-pw .cm-plan[data-p=Free]{min-height:519px}.cm-pw .cm-plan[data-p=Standard]{min-height:879px}.cm-pw .cm-plan[data-p=Teams]{min-height:630px}.cm-pw .cm-plan[data-p=Enterprise]{min-height:733px}
+  .cm-faq h2{max-width:260px;margin-left:auto;margin-right:auto;margin-bottom:32px}.cm-faql button{min-height:84px}
+  .cm-final.pr{min-height:0;padding:57px 80px 48px}.cm-final.pr .cm-h2{font-size:36px;line-height:39.6px;letter-spacing:-1px}.cm-final.pr .cm-p{font-size:16px;line-height:22.4px;margin:24px auto 32px}.cm-final.pr .cm-btn{width:100%;height:50px;border-radius:20px;font-size:16px}
+  .cm-final.pr .cm-reel{gap:11px;margin:48px -80px 0;width:100vw;justify-content:center}.cm-final.pr .cm-reel .c{width:340px;height:200px}.cm-final.pr .cm-reel .s{width:240px}.cm-final.pr .cm-reel>div{height:180px;border-radius:24px}.cm-final.pr .cm-reel .cap span{font-size:20px;padding:6px 12px}
+}
