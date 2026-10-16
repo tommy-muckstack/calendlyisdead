@@ -18,7 +18,7 @@ export type Surface = "marketing" | "auth" | "app" | "booking" | "other";
 const staticRoutes: Record<string, Surface> = {
   "/": "marketing", "/pricing": "marketing", "/pricing/calculator": "marketing",
   "/login": "auth", "/signup": "auth", "/onboarding": "auth", "/app": "app", "/app/contact-settings": "app", "/app/contacts/reminders": "app", "/app/contacts/automations": "app",
-  ...Object.fromEntries(["analytics", "assistant", "availability", "availability/advanced", "branding", "calendars", "contacts", "embed", "meetings", "one-off", "opportunities", "opportunities/automations", "polls", "profile", "routing", "teams", "workflows"].map(p => [`/app/${p}`, "app" as const])),
+  ...Object.fromEntries(["analytics", "assistant", "availability", "availability/advanced", "branding", "calendars", "contacts", "embed", "meetings", "one-off", "opportunities", "opportunities/automations", "polls", "people", "workspace", "profile", "routing", "teams", "workflows"].map(p => [`/app/${p}`, "app" as const])),
 };
 const dynamicRoutes: [RegExp, string, Surface][] = [
   [/^\/app\/opportunities\/[^/]+$/, "/app/opportunities/[id]", "app"],
@@ -27,6 +27,7 @@ const dynamicRoutes: [RegExp, string, Surface][] = [
   [/^\/booking\/[^/]+\/cancel$/, "/booking/[uid]/cancel", "booking"],
   [/^\/booking\/[^/]+\/reschedule$/, "/booking/[uid]/reschedule", "booking"],
   [/^\/booking\/[^/]+$/, "/booking/[uid]", "booking"],
+  [/^\/invite\/workspace\/[^/]+$/, "/invite/workspace/[token]", "auth"],
   [/^\/invite\/[^/]+$/, "/invite/[token]", "auth"],
   [/^\/f\/[^/]+$/, "/f/[id]", "booking"],
   [/^\/poll\/[^/]+$/, "/poll/[id]", "booking"],

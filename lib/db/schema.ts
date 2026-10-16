@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Weekly } from "../slots";
 import type { BookingDateRange } from "../booking-date-range";
@@ -31,6 +31,28 @@ export const accountOnboarding = pgTable("account_onboarding", {
   version: integer("version").notNull().default(1),
   lastRequest: jsonb("lastRequest"),
   completedAt: timestamp("completedAt", { mode: "date", withTimezone: true }),
+});
+export const workspaces = pgTable("workspaces", {
+  id: text("id").primaryKey(), name: text("name").notNull(), version: integer("version").notNull().default(1),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+});
+export const workspaceMembers = pgTable("workspace_members", {
+  id: text("id").primaryKey(), workspaceId: text("workspaceId").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").$type<"owner" | "admin" | "user">().notNull(),
+  joinedAt: timestamp("joinedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, m => [uniqueIndex("workspace_one_membership").on(m.userId), uniqueIndex("workspace_one_owner").on(m.workspaceId).where(sql`${m.role} = 'owner'`), check("workspace_member_role", sql`${m.role} IN ('owner', 'admin', 'user')`)]);
+export const workspaceInvitations = pgTable("workspace_invitations", {
+  id: text("id").primaryKey(), workspaceId: text("workspaceId").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+  email: text("email").notNull(), role: text("role").$type<"admin" | "user">().notNull(),
+  invitedBy: text("invitedBy").notNull().references(() => users.id), tokenHash: text("tokenHash").notNull().unique(),
+  requestHash: text("requestHash").notNull(), expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+  acceptedMembershipId: text("acceptedMembershipId"), revokedAt: timestamp("revokedAt", { mode: "date", withTimezone: true }),
+  delivery: text("delivery").$type<"pending" | "sent" | "undelivered">().notNull().default("pending"),
+}, i => [uniqueIndex("workspace_pending_email").on(i.workspaceId, i.email).where(sql`${i.acceptedMembershipId} IS NULL AND ${i.revokedAt} IS NULL`), check("workspace_invitation_role", sql`${i.role} IN ('admin', 'user')`)]);
+// Receipts survive workspace deletion so an uncertain retry cannot recreate it.
+export const workspaceCreations = pgTable("workspace_creations", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), requestHash: text("requestHash").notNull(),
 });
 export const accounts = pgTable("accounts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),

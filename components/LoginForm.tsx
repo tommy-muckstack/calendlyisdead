@@ -33,6 +33,7 @@ export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }:
     });
   };
   const signup = mode === "signup";
+  const authQuery = to === BP + "/app" ? "" : `?callbackUrl=${encodeURIComponent(to)}`;
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const fd = new FormData(e.currentTarget);
     if (step === "email") { const v = String(fd.get("email") || "").trim(); if (!v) return; setEmail(v); if (mode === "reset") { runAuth("email", async () => { await resetPassword(config!, v); setNote("If that email has an account, a reset link is on its way."); setMode("login"); }); return; } setStep("password"); return; }
     const password = String(fd.get("password") ?? ""), name = String(fd.get("name") ?? "");
@@ -61,7 +62,7 @@ export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }:
       </>}</>}
     {signup && <p className="cm-aft">Continue with Google to connect your calendar.</p>}
     <p className="cm-aft" style={{ marginTop: signup ? 28 : 28 }}>
-      {signup ? <>Already have a CalendlyIsDead account? <Link href="/login">Log In <Arrow /></Link></> : <>Don’t have an account? <Link href="/signup">Sign up for free <Arrow /></Link></>}</p>
+      {signup ? <>Already have a CalendlyIsDead account? <Link href={"/login" + authQuery}>Log In <Arrow /></Link></> : <>Don’t have an account? <Link href={"/signup" + authQuery}>Sign up for free <Arrow /></Link></>}</p>
     {demo && <div className="cm-demo"><button disabled={busy} onClick={demoLogin}>Use the demo account</button></div>}
   </div>;
   if (!signup) return form;
