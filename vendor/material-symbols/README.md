@@ -5,3 +5,7 @@ Locally bundled subset of [Google Material Symbols Outlined](https://github.com/
 Modified representation: SVG path data is wrapped in reusable React components in `components/app/icons.tsx`, using currentColor, configurable pixel size and decorative accessibility attributes. Paths retain Google's geometry. These are general interface symbols, not Calendly assets.
 
 Source file URLs and Git blob hashes are recorded in `sources.json` for reproducibility.
+
+The `auto_awesome` source uses a native 24 × 24 coordinate system. Its React
+wrapper uses `0 0 24 24`; the other bundled symbols use `0 -960 960 960`.
+Preserving each source's coordinates prevents clipping when sizing the SVG.
