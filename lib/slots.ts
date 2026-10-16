@@ -21,6 +21,7 @@ export type SlotInput = {
   blockedDates?: string[]; // host-tz dates fully off (e.g. holidays); explicit overrides still win
   limits?: { perDay?: number | null; perWeek?: number | null };
   existing?: string[]; // ISO starts of confirmed bookings of THIS event type (for limits)
+  joinableStarts?: string[]; // Existing group sessions may accept seats without consuming another meeting allowance.
 };
 
 /** Returns invitee-local date -> sorted ISO (UTC) slot starts. */
@@ -36,6 +37,14 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
   const busy = (i.busy ?? []).map(b => Interval.fromDateTimes(DateTime.fromISO(b.start), DateTime.fromISO(b.end)));
   const out: Record<string, string[]> = {};
   const blocked = new Set(i.blockedDates ?? []);
+  const joinable = new Set<string>(), joinableDays = new Set<string>();
+  for (const start of i.joinableStarts ?? []) {
+    const session = DateTime.fromISO(start).setZone(hostTz);
+    if (session.isValid) {
+      joinable.add(session.toUTC().toISO()!);
+      joinableDays.add(session.toISODate()!);
+    }
+  }
   const perDay = new Map<string, number>(), perWeek = new Map<string, number>();
   for (const e of i.existing ?? []) {
     const d = DateTime.fromISO(e).setZone(hostTz);
@@ -49,7 +58,7 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
     const key = day.toFormat("yyyy-MM-dd");
     const full = (i.limits?.perDay != null && (perDay.get(key) ?? 0) >= i.limits.perDay)
       || (i.limits?.perWeek != null && (perWeek.get(day.toFormat("kkkk-WW")) ?? 0) >= i.limits.perWeek);
-    const ranges = full ? [] : i.schedule.overrides[key] ?? (blocked.has(key) ? [] : i.schedule.weekly[day.weekday] ?? []);
+    const ranges = full && !joinableDays.has(key) ? [] : i.schedule.overrides[key] ?? (blocked.has(key) ? [] : i.schedule.weekly[day.weekday] ?? []);
     for (const r of ranges) {
       const [sh, sm] = r.start.split(":").map(Number), [eh, em] = r.end.split(":").map(Number);
       // build wall-clock times in host tz; Luxon shifts nonexistent (spring-forward) times forward
@@ -58,6 +67,7 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
         : DateTime.fromObject({ year: day.year, month: day.month, day: day.day, hour: eh, minute: em }, { zone: hostTz });
       for (let s = rs; s.plus({ minutes: i.durationMin }) <= re; s = s.plus({ minutes: interval })) {
         const e = s.plus({ minutes: i.durationMin });
+        if (full && !joinable.has(s.toUTC().toISO()!)) continue;
         if (s < earliest || s < winStart || s > winEnd) continue;
         if (latest && s >= latest) continue;
         const blocked = Interval.fromDateTimes(s.minus({ minutes: bb }), e.plus({ minutes: ba }));

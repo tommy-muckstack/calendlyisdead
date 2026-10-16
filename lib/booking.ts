@@ -59,7 +59,7 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
   // was checked in the preflight; never hold database locks during network I/O.
   const ext = transaction ? { busy: [], errors: [] } : await externalBusy(h.user.id, lo, hi);
   // a group session that already exists is shown on the host's external calendar too; don't let that hide its own open seats
-  const ownStarts = new Set(existing.filter((b: any) => b.eventTypeId === et.id).map((b: any) => b.start.toISOString()));
+  const ownStarts = new Set<string>(existing.filter((b: any) => b.eventTypeId === et.id).map((b: any) => b.start.toISOString()));
   const extBusy = isGroup ? ext.busy.filter(b => !ownStarts.has(new Date(b.start).toISOString())) : ext.busy;
   const busy = [...busyRows.map((b: any) => ({ start: b.start.toISOString(), end: b.end.toISOString() })), ...extBusy];
   const wLo = DateTime.fromJSDate(lo).startOf("week").minus({ days: 1 }).toJSDate(), wHi = DateTime.fromJSDate(hi).endOf("week").plus({ days: 1 }).toJSDate();
@@ -72,7 +72,8 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
   let slots = generateSlots({ schedule: { timezone: sc.timezone, weekly: sc.weekly, overrides: sc.overrides ?? {} },
     durationMin: et.durationMin, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin, minNoticeMin: et.minNoticeMin,
     rangeDays: et.rangeDays, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
-    limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek }, existing: isGroup ? forLimits.filter(s => !ownStarts.has(s)) : forLimits });
+    limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek }, existing: forLimits,
+    joinableStarts: isGroup ? [...ownStarts] : [] });
   if (isGroup) {
     const taken = new Map<string, number>();
     for (const b of existing) if (b.eventTypeId === et.id) taken.set(b.start.toISOString(), (taken.get(b.start.toISOString()) ?? 0) + 1);
