@@ -267,3 +267,13 @@ export const opportunityMoves = pgTable("opportunity_moves", {
 export const opportunityDeletions = pgTable("opportunity_deletions", {
   id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), version: integer("version").notNull(),
 });
+export const opportunityAutomations = pgTable("opportunity_automations", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), eventTypeId: text("eventTypeId").notNull(),
+  name: text("name").notNull(), stage: text("stage").notNull(), opportunityName: text("opportunityName").notNull(), enabled: boolean("enabled").notNull().default(true), version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, a => [index("opportunity_automation_event").on(a.userId, a.eventTypeId)]);
+export const opportunityBookings = pgTable("opportunity_bookings", {
+  opportunityId: text("opportunityId").primaryKey().references(() => opportunities.id, { onDelete: "cascade" }), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bookingUid: text("bookingUid").references(() => bookings.uid, { onDelete: "set null" }), originalBookingUid: text("originalBookingUid").references(() => bookings.uid, { onDelete: "set null" }),
+  automationId: text("automationId").notNull(), automationName: text("automationName").notNull(), eventTitle: text("eventTitle").notNull(),
+});

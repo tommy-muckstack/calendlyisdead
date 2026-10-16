@@ -10,6 +10,7 @@ import { BOOKING_TIMEZONES } from "@/lib/booking-timezone";
 import { dateRangeSummary, effectiveDateRange, withDateRangeLocks, type BookingDateRange } from "@/lib/booking-date-range";
 import { BookingDateRangeFields } from "./BookingDateRangeFields";
 import { ContactCustomFieldAutomations } from "./ContactFieldAutomation";
+import { OpportunityAutomationsPanel } from "./OpportunityAutomations";
 import { ContactListAutomationPanel } from "./ContactListAutomation";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
@@ -310,7 +311,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
                 value={(q.options ?? []).join(", ")} onChange={e => up({ options: e.target.value.split(",").map(x => x.trim()) })} />}
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
-        {S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /></> })}
+        {S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /><OpportunityAutomationsPanel eventId={et.id} /></> })}
         {S({ id: "pay", title: "Payment and confirmation", summary: `${d.priceCents ? `${(d.priceCents / 100).toFixed(2)} ${d.currency.toUpperCase()}` : "Free"}${d.redirectUrl ? " · redirects after booking" : ""}`, children: <>
           <label className="f" htmlFor="et-price">Price (0 = free)</label>
           <input id="et-price" className="input" type="number" min={0} step="0.01" value={(d.priceCents ?? 0) / 100} onChange={e => setD({ ...d, priceCents: Math.round(Number(e.target.value || 0) * 100) })} />

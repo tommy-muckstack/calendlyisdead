@@ -206,3 +206,13 @@ CREATE TABLE IF NOT EXISTS opportunity_moves (
 CREATE INDEX IF NOT EXISTS opportunity_move_history ON opportunity_moves ("opportunityId", at);
 CREATE TABLE IF NOT EXISTS opportunity_deletions (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, version integer NOT NULL);
 ALTER TABLE opportunity_moves ADD COLUMN IF NOT EXISTS revision integer NOT NULL DEFAULT 1;
+CREATE TABLE IF NOT EXISTS opportunity_automations (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "eventTypeId" text NOT NULL,
+  name text NOT NULL, stage text NOT NULL, "opportunityName" text NOT NULL, enabled boolean NOT NULL DEFAULT true, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz
+);
+CREATE INDEX IF NOT EXISTS opportunity_automation_event ON opportunity_automations ("userId", "eventTypeId");
+CREATE TABLE IF NOT EXISTS opportunity_bookings (
+  "opportunityId" text PRIMARY KEY REFERENCES opportunities(id) ON DELETE CASCADE, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "bookingUid" text REFERENCES bookings(uid) ON DELETE SET NULL, "originalBookingUid" text REFERENCES bookings(uid) ON DELETE SET NULL,
+  "automationId" text NOT NULL, "automationName" text NOT NULL, "eventTitle" text NOT NULL
+);
