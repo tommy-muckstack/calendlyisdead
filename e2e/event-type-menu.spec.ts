@@ -53,6 +53,7 @@ for (const width of [1440, 390]) {
       await page.screenshot({ path: info.outputPath("duplicate-editor.png") });
       const saved = page.waitForResponse(r => r.request().method() === "PATCH" && r.url().includes("/api/event-types/"));
       await editor.getByLabel("Name", { exact: true }).fill(`Renamed copy ${width}`);
+      await editor.getByRole("button", { name: "Save changes", exact: true }).click();
       expect((await saved).ok()).toBeTruthy();
       await editor.getByRole("button", { name: "Close", exact: true }).click();
       await page.reload();
@@ -111,7 +112,9 @@ for (const width of [1440, 390]) {
       const editor = page.getByRole("dialog", { name: "Edit event type" });
       await expect(editor.getByLabel("Duration (minutes)")).toBeEnabled();
       const saved = page.waitForResponse(r => r.request().method() === "PATCH" && r.url().includes("/api/event-types/"));
-      await editor.getByLabel("Duration (minutes)").fill("45"); expect((await saved).ok()).toBeTruthy();
+      await editor.getByLabel("Duration (minutes)").fill("45");
+      await editor.getByRole("button", { name: "Save changes", exact: true }).click();
+      expect((await saved).ok()).toBeTruthy();
       await editor.getByRole("button", { name: "Close", exact: true }).click(); await page.reload();
       await expect(page.getByTestId(`team-${slug}`).getByTestId("team-et").filter({ hasText: `Managed ${width} (copy)` })).toContainText("45 min");
     });

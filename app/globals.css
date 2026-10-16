@@ -20,10 +20,15 @@ label.f{display:block;font-weight:600;font-size:14px;margin:14px 0 6px}
 .et{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:12px;cursor:pointer;border-left-width:6px}
 .et:hover{box-shadow:0 2px 10px rgba(7,26,49,.07)}
 /* slide-in editor */
-.scrim{position:fixed;inset:0;background:rgba(7,26,49,.25);animation:fade .15s}
-.pane{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:#fff;border-left:1px solid var(--line);box-shadow:-12px 0 30px rgba(7,26,49,.12);display:flex;flex-direction:column;animation:slide .22s cubic-bezier(.2,.8,.2,1)}
+.pane{position:fixed;inset:0 0 0 auto;margin:0;padding:0;width:min(460px,100vw);height:100%;height:100dvh;max-width:none;max-height:none;color:var(--ink);background:#fff;border:0;border-left:1px solid var(--line);box-shadow:-12px 0 30px rgba(7,26,49,.12);display:flex;flex-direction:column;animation:slide .22s cubic-bezier(.2,.8,.2,1)}
+.pane:not([open]){display:none}.pane::backdrop{background:rgba(7,26,49,.25);animation:fade .15s}
 .pane header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
-.pane .body{overflow:auto;padding:4px 20px 24px}
+.pane .body{flex:1;min-height:0;overflow:auto;padding:4px 20px 24px}
+.editor-fields{border:0;padding:0;margin:0;min-width:0}.editor-fields:disabled{opacity:.65}
+.editor-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:16px 20px;border-top:1px solid var(--line)}
+.editor-actions [role=status]{width:100%;font-size:13px}.editor-actions [role=status]:empty{display:none}
+.pane header,.editor-actions{flex-shrink:0}.pane .sect>button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.pane,.pane::backdrop{animation:none}}
 .sect{border-bottom:1px solid var(--line)}.sect>button{all:unset;display:flex;width:100%;justify-content:space-between;align-items:center;padding:16px 0;cursor:pointer}
 .sect>button small{display:block;color:var(--muted);font-weight:400}
 .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:14px}
