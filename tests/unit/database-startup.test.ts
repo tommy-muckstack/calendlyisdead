@@ -21,6 +21,26 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adopts a single legacy question mapping without populating or changing contact values", async () => {
+    await setup(); await client!.exec(`DROP TABLE contact_question_automations;
+      INSERT INTO contacts (id, "userId", name, email) VALUES ('person', 'host', 'Legacy', 'legacy@example.invalid');
+      INSERT INTO contact_fields (id, "userId", name, type, "eventTypeId", "questionId") VALUES ('field', 'host', 'Answers', 'invitee_question', 'group', 'purpose');
+      INSERT INTO contact_field_values ("contactId", "fieldId", value) VALUES ('person', 'field', '{"data":"Retained"}');`);
+    await client!.exec(ddl); expect((await client!.query('SELECT "fieldId", "questionId", enabled, "legacyConflict", version FROM contact_question_automations')).rows).toEqual([{ fieldId: "field", questionId: "purpose", enabled: true, legacyConflict: false, version: 1 }]);
+    expect((await client!.query('SELECT value FROM contact_field_values')).rows).toEqual([{ value: { data: "Retained" } }]);
+    await client!.exec(`UPDATE contact_question_automations SET enabled = false, version = 2;`); await client!.exec(ddl); expect((await client!.query('SELECT enabled, version FROM contact_question_automations')).rows).toEqual([{ enabled: false, version: 2 }]);
+    await client!.exec(`UPDATE contact_question_automations SET "deletedAt" = now(), version = 3;`); await client!.exec(ddl); expect((await client!.query('SELECT enabled, version, "deletedAt" IS NOT NULL AS deleted FROM contact_question_automations')).rows).toEqual([{ enabled: false, version: 3, deleted: true }]);
+  });
+  it("pauses ambiguous legacy question mappings and retains every field", async () => {
+    await setup(); await client!.exec(`INSERT INTO contact_fields (id, "userId", name, type, "eventTypeId", "questionId") VALUES ('one', 'host', 'One', 'invitee_question', 'group', 'one'), ('two', 'host', 'Two', 'invitee_question', 'group', 'two');`);
+    await client!.exec(ddl); expect((await client!.query('SELECT "fieldId", "questionId", enabled, "legacyConflict" FROM contact_question_automations')).rows).toEqual([{ fieldId: null, questionId: null, enabled: false, legacyConflict: true }]); expect((await client!.query('SELECT id FROM contact_fields ORDER BY id')).rows).toEqual([{ id: "one" }, { id: "two" }]);
+    await client!.exec(`UPDATE contact_question_automations SET "fieldId" = 'one', "questionId" = 'one', "legacyConflict" = false, enabled = true, version = 2;`); await client!.exec(ddl); expect((await client!.query('SELECT "fieldId", enabled, version FROM contact_question_automations')).rows).toEqual([{ fieldId: "one", enabled: true, version: 2 }]);
+  });
+  it("does not adopt foreign, removed or poll sources", async () => {
+    await setup(); await client!.exec(`INSERT INTO users (id) VALUES ('foreign'); INSERT INTO event_types (id, "userId", slug, title, kind) VALUES ('poll', 'host', 'poll', 'Poll', 'poll');
+      INSERT INTO contact_fields (id, "userId", name, type, "eventTypeId", "questionId") VALUES ('foreign', 'foreign', 'Foreign', 'invitee_question', 'group', 'purpose'), ('missing', 'host', 'Missing', 'invitee_question', 'gone', 'purpose'), ('poll', 'host', 'Poll', 'invitee_question', 'poll', 'purpose');`);
+    await client!.exec(ddl); expect((await client!.query('SELECT * FROM contact_question_automations')).rows).toEqual([]); expect((await client!.query('SELECT id FROM contact_fields')).rows).toHaveLength(3);
+  });
   it("adds field automation settings without rewriting prior booking receipts", async () => {
     await setup(); await seat("meeting", 0); await client!.exec('DROP TABLE contact_field_automations;'); await client!.exec(ddl);
     expect((await client!.query('SELECT * FROM contact_field_automations')).rows).toEqual([]);
@@ -67,7 +87,7 @@ describe("database startup and booking migrations", () => {
   });
   it("adds custom fields and preserves typed values, versions and deleted definitions across replay", async () => {
     await setup(); await seat("meeting", 0);
-    await client!.exec('DROP TABLE contact_field_values; DROP TABLE contact_fields;'); await client!.exec(ddl);
+    await client!.exec('DROP TABLE contact_question_automations; DROP TABLE contact_field_values; DROP TABLE contact_fields;'); await client!.exec(ddl);
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
       INSERT INTO contact_fields (id, "userId", name, type, version) VALUES ('number', 'host', 'Amount', 'number', 2), ('deleted', 'host', 'Old', 'text', 3);
       UPDATE contact_fields SET "deletedAt" = now() WHERE id = 'deleted';

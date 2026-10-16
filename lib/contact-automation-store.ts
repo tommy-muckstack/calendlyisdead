@@ -7,7 +7,7 @@ export class ContactAutomationError extends Error { constructor(message: string,
 // an assigned event. A team administrator does not gain access to others' lists.
 export const availableAutomationEvents = (userId: string) => and(isNull(E.deletedAt), ne(E.kind, "managed"), ne(E.kind, "poll"), or(and(isNull(E.teamId), eq(E.userId, userId)), sql`EXISTS (SELECT 1 FROM ${H} WHERE ${H.eventTypeId} = ${E.id} AND ${H.userId} = ${userId})`));
 export async function contactAutomationEvent(db: ContactDB, userId: string, eventTypeId: string, lock = false) {
-  const query = db.select({ id: E.id, title: E.title }).from(E).where(and(eq(E.id, eventTypeId), availableAutomationEvents(userId)));
+  const query = db.select({ id: E.id, title: E.title, questions: E.questions }).from(E).where(and(eq(E.id, eventTypeId), availableAutomationEvents(userId)));
   const [event] = await (lock ? query.for("key share") : query);
   if (!event) throw new ContactAutomationError("Contact automations are available to this event's hosts. The event may also have been removed.", 404); return event;
 }

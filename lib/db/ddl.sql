@@ -177,3 +177,20 @@ CREATE TABLE IF NOT EXISTS contact_field_automations (
   actions jsonb NOT NULL, enabled boolean NOT NULL DEFAULT false, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz,
   PRIMARY KEY ("userId", "eventTypeId")
 );
+CREATE TABLE IF NOT EXISTS contact_question_automations (
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE,
+  "fieldId" text REFERENCES contact_fields(id) ON DELETE SET NULL, "questionId" text, enabled boolean NOT NULL DEFAULT false,
+  "legacyConflict" boolean NOT NULL DEFAULT false, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz,
+  PRIMARY KEY ("userId", "eventTypeId")
+);
+-- Adopt a single legacy mapping without changing contact values. Ambiguous
+-- legacy mappings require a deliberate choice; never silently select a field.
+-- Tombstones prevent replay of this migration from re-enabling deleted mappings.
+INSERT INTO contact_question_automations ("userId", "eventTypeId", "fieldId", "questionId", enabled, "legacyConflict")
+SELECT f."userId", f."eventTypeId", CASE WHEN count(*) = 1 THEN min(f.id) END,
+  CASE WHEN count(*) = 1 THEN min(f."questionId") END, count(*) = 1, count(*) > 1
+FROM contact_fields f JOIN event_types e ON e.id = f."eventTypeId"
+WHERE f.type = 'invitee_question' AND f."deletedAt" IS NULL AND e."deletedAt" IS NULL AND e.kind NOT IN ('managed', 'poll')
+  AND ((e."teamId" IS NULL AND e."userId" = f."userId") OR EXISTS (SELECT 1 FROM event_type_hosts h WHERE h."eventTypeId" = e.id AND h."userId" = f."userId"))
+GROUP BY f."userId", f."eventTypeId"
+ON CONFLICT ("userId", "eventTypeId") DO NOTHING;

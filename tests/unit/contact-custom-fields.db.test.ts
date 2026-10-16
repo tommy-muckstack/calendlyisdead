@@ -128,9 +128,9 @@ describe("typed custom values and concurrency", () => {
   });
 });
 describe("mapped booking answers", () => {
-  it("fills the latest existing answer, updates from later bookings and preserves values for absent answers", async () => {
+  it("leaves past answers unchanged, captures future bookings and preserves values for absent answers", async () => {
     const first = await book(10, "Old"), second = await book(11, "Recent"); await db.update(schema.bookings).set({ createdAt: new Date("2025-01-01") }).where(eq(schema.bookings.uid, first.uid)); await db.update(schema.bookings).set({ createdAt: new Date("2025-01-02") }).where(eq(schema.bookings.uid, second.uid));
-    const [person] = await db.select().from(schema.contacts), field = await (await create(linked)).json(); expect((await loadValues(person.id)).values[field.id]).toBe("Recent");
+    const [person] = await db.select().from(schema.contacts), field = await (await create(linked)).json(); expect((await loadValues(person.id)).values[field.id]).toBeUndefined();
     await book(12, "Newest"); expect((await loadValues(person.id)).values[field.id]).toBe("Newest"); await book(13); expect((await loadValues(person.id)).values[field.id]).toBe("Newest");
     await save(person.id, { [field.id]: "Manual" }); await automatic.syncHistoricalContacts("demo-user"); expect((await loadValues(person.id)).values[field.id]).toBe("Manual");
   });
@@ -139,18 +139,18 @@ describe("mapped booking answers", () => {
     const rows = await db.select().from(schema.contacts), own = rows.find(row => row.userId === "demo-user")!, foreign = rows.find(row => row.userId === "demo-mate")!;
     expect((await loadValues(own.id)).values[field.id]).toBe("Own"); expect((await service.contactCustomValues("demo-mate", foreign.id)).values).toEqual({});
   });
-  it("backfills newest answers in chronological order and retains manual values", async () => {
+  it("does not fill mapped values during historical contact import", async () => {
     const field = await (await create(linked)).json(); await book(10, "Old"); const newest = await book(11, "New"); await db.update(schema.bookings).set({ createdAt: new Date("2025-01-01") }); await db.update(schema.bookings).set({ createdAt: new Date("2025-01-02") }).where(eq(schema.bookings.uid, newest.uid));
     await db.delete(schema.contacts); await automatic.syncHistoricalContacts("demo-user"); const [person] = await db.select().from(schema.contacts);
-    expect((await loadValues(person.id)).values[field.id]).toBe("New");
+    expect((await loadValues(person.id)).values[field.id]).toBeUndefined();
   });
   it("retains values and permits renaming a mapping after its source is deleted", async () => {
-    await book(10, "Retained"); const field = await (await create(linked)).json(); await db.update(schema.eventTypes).set({ deletedAt: new Date() }).where(eq(schema.eventTypes.id, "form"));
+    const field = await (await create(linked)).json(); await book(10, "Retained"); await db.update(schema.eventTypes).set({ deletedAt: new Date() }).where(eq(schema.eventTypes.id, "form"));
     expect((await edit(field.id, 1, { ...linked, name: "Renamed" })).status).toBe(200); const [person] = await db.select().from(schema.contacts); expect((await loadValues(person.id)).values[field.id]).toBe("Retained");
   });
   it("rolls back mapped values with a failed booking transaction", async () => {
     const person = await contact(), field = await (await create(linked)).json();
-    await expect(db.transaction(async (tx: typeof db) => { await service.captureContactAnswers(tx, "demo-user", person.id, "form", { purpose: "Uncommitted" }); throw new Error("rollback"); })).rejects.toThrow("rollback");
+    await expect(db.transaction(async (tx: typeof db) => { const { applyContactQuestionAutomation } = await import("../../lib/contact-question-automations"); await applyContactQuestionAutomation(tx, { hostId: "demo-user", eventTypeId: "form", answers: { purpose: "Uncommitted" } }, person.id); throw new Error("rollback"); })).rejects.toThrow("rollback");
     expect((await loadValues(person.id)).values[field.id]).toBeUndefined(); expect(normalizeFieldValue({ ...EMPTY_FIELD, type: "number" }, "-0.000")).toBe("0");
   });
 });
