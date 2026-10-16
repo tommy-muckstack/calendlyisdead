@@ -31,6 +31,14 @@ Settings → Profile (`/app/profile`) edits your display name, scheduling-page w
 
 Photos must be at least 90 × 90 pixels and smaller than 5 MB. JPG, PNG, WebP and GIF uploads become a centered 256px square PNG with metadata removed; animated images become static. Photos are stored in the app database (local PGlite during keyless development), without a separate upload service. Language, country, date/time format and login/security settings are not implemented yet; see [the parity report](docs/PARITY_REPORT.md).
 
+## Contacts
+
+Contacts (`/app/contacts`) supports manual records with name, email, phone, job title, company, LinkedIn URL, time zone, country, city and state. Search by name, email, phone or company; sort by name or last update. Each host has their own records, with one active contact per email address. Use **Save contact** or **Save changes**; failed saves retain the draft, and conflicting edits require an explicit reload.
+
+A contact's history links to that host's meetings whose invitee email matches the contact. Links already established are retained when the contact email changes. Deleting a contact removes it from Contacts while keeping meetings; manual re-creation is supported. Contact edits do not change existing meeting invitations or workflow recipients. These records use the existing database without a new service.
+
+Automatic contact creation/settings, import/export, saved lists, merging, multiple email/phone values and contact-specific booking/email actions remain to be implemented. See [the parity report](docs/PARITY_REPORT.md) for the remaining comparisons and browser verification limits.
+
 ## Calendar sync
 - **Google**: its own OAuth client (`AUTH_GOOGLE_ID`), separate from Firebase sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
 - **Outlook / Microsoft 365**: Entra app (multi-tenant + personal accounts), redirect `{APP_URL}/api/integrations/microsoft/callback`, delegated `Calendars.ReadWrite offline_access User.Read`.
@@ -66,7 +74,7 @@ Photos must be at least 90 × 90 pixels and smaller than 5 MB. JPG, PNG, WebP an
 
 Website usage telemetry: optional PostHog integration for US project 666931. See [the shared website/subapp taxonomy](docs/ANALYTICS.md) for configuration, event meanings, redaction, environment gates and rollout to other apps. This is separate from the host-facing booking analytics.
 
-`npm run lint` (Next.js/React/TypeScript rules; existing type debt remains visible as warnings), `npm run typecheck`, `npm run build`, and `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant, profiles), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, explicit event-editor/profile saving and automatic account-limit saving).
+`npm run lint` (Next.js/React/TypeScript rules; existing type debt remains visible as warnings), `npm run typecheck`, `npm run build`, and `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant, profiles, contacts), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, explicit event-editor/profile/contact saving and automatic account-limit saving).
 
 ## Status
 M0-M9 built (see docs/PLAN.md), including meeting polls and one-off links. Launch thread draft: `docs/launch/X_THREAD_DRAFT.md` (not posted). Not deployed.

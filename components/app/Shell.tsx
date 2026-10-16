@@ -13,11 +13,13 @@ const NAV: { href: string; label: string; icon: keyof typeof I; match: (p: strin
   { href: "/app", label: "Scheduling", icon: "sched", match: p => SCHED.some(t => t.href === p) || p === "/app/availability" },
   { href: "/app/meetings", label: "Calendar", icon: "cal", match: p => p.startsWith("/app/calendars") || p.startsWith("/app/meetings") },
   { href: "/app/assistant", label: "Assistant", icon: "assist", match: p => p.startsWith("/app/assistant") },
+  { href: "/app/contacts", label: "Contacts", icon: "contacts", match: p => p.startsWith("/app/contacts") },
   { href: "/app/teams", label: "Teams", icon: "team", match: p => p.startsWith("/app/teams") },
   { href: "/app/workflows", label: "Automations", icon: "auto", match: p => p.startsWith("/app/workflows") },
   { href: "/app/analytics", label: "Analytics", icon: "chart", match: p => p.startsWith("/app/analytics") },
 ];
 const TITLES: [string, string, { href: string; label: string }[]?][] = [
+  ["/app/contacts", "Contacts"],
   ["/app/meetings", "Calendar", CALENDAR], ["/app/calendars", "Calendar", CALENDAR], ["/app/assistant", "Assistant"], ["/app/teams", "Teams"], ["/app/workflows", "Automations", [{ href: "/app/workflows", label: "My automations" }]],
   ["/app/analytics", "Analytics", [{ href: "/app/analytics", label: "Events" }]], 
 ];

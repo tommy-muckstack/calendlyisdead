@@ -94,3 +94,17 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "inviteeLimit" integer;
 UPDATE bookings b SET "inviteeLimit" = CASE WHEN e.kind = 'group' THEN GREATEST(e.seats, (SELECT count(*)::int FROM bookings s WHERE s."hostId" = b."hostId" AND s."eventTypeId" = b."eventTypeId" AND s.start = b.start AND s.status = 'confirmed'), 1) ELSE 1 END FROM event_types e WHERE b."eventTypeId" = e.id AND b."inviteeLimit" IS NULL;
 ALTER TABLE bookings ALTER COLUMN "inviteeLimit" SET DEFAULT 1;
 ALTER TABLE bookings ALTER COLUMN "inviteeLimit" SET NOT NULL;
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name text NOT NULL, email text NOT NULL, phone text NOT NULL DEFAULT '', "jobTitle" text NOT NULL DEFAULT '', company text NOT NULL DEFAULT '', "linkedIn" text NOT NULL DEFAULT '',
+  timezone text NOT NULL DEFAULT '', country text NOT NULL DEFAULT '', city text NOT NULL DEFAULT '', state text NOT NULL DEFAULT '',
+  version integer NOT NULL DEFAULT 1, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now(), "deletedAt" timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS contacts_active_owner_email ON contacts ("userId", lower(email)) WHERE "deletedAt" IS NULL;
+CREATE INDEX IF NOT EXISTS bookings_contact_lookup ON bookings ("hostId", lower(btrim("inviteeEmail")));
+CREATE TABLE IF NOT EXISTS contact_meetings (
+  "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE,
+  PRIMARY KEY ("contactId", "bookingUid")
+);
