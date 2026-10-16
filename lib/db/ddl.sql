@@ -16,6 +16,8 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerWeek" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerMonth" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS secret boolean NOT NULL DEFAULT false;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "lockedTimezone" text;
+-- Null keeps the existing rolling rangeDays value; explicit ranges are atomic.
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "dateRange" jsonb;
 -- Preserve the old duration-based spacing once, then keep spacing independent.
 -- New templates use 30 minutes even when their duration differs.
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "startIntervalMin" integer;

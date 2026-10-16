@@ -21,6 +21,16 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("retains legacy day counts and explicit ranges across migration and replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE event_types DROP COLUMN "dateRange"; UPDATE event_types SET "rangeDays" = 17;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT "dateRange", "rangeDays" FROM event_types')).rows).toEqual([{ dateRange: null, rangeDays: 17 }]);
+    await client!.exec(`UPDATE event_types SET "dateRange" = '{"kind":"indefinite"}';
+      INSERT INTO event_types (id, "userId", slug, title) VALUES ('new', 'host', 'new', 'New');`); await client!.exec(ddl);
+    expect((await client!.query('SELECT id, "dateRange", "rangeDays" FROM event_types ORDER BY id')).rows)
+      .toEqual([{ id: "group", dateRange: { kind: "indefinite" }, rangeDays: 17 }, { id: "new", dateRange: null, rangeDays: 60 }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+  });
   it("defaults to automatic booking timezones and preserves locks and historical meetings on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE event_types DROP COLUMN "lockedTimezone";'); await client!.exec(ddl);

@@ -4,13 +4,14 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventTypeEditor, type ET } from "./EventTypesBoard";
 import { setEventVisibility } from "@/lib/event-visibility-client";
+import { withDateRangeLocks } from "@/lib/booking-date-range";
 import { I } from "./app/icons";
 type Member = { userId: string; role: string; name: string; email: string };
 type TET = ET & { rrMode: string; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
 const KIND: Record<string, string> = { collective: "Collective", round_robin: "Round robin", managed: "Managed" };
-const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
-const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit", startIntervalMin: "Start time increments", lockedTimezone: "Booking time zone" };
+const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "dateRange", "maxPerDay", "maxPerWeek", "maxPerMonth"];
+const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit", startIntervalMin: "Start time increments", lockedTimezone: "Booking time zone", dateRange: "Date range" };
 
 export function TeamsPanel({ teams, me, defaultTimezone = "UTC" }: { teams: Team[]; me: string; defaultTimezone?: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
@@ -89,8 +90,8 @@ export function TeamsPanel({ teams, me, defaultTimezone = "UTC" }: { teams: Team
           {t.members.map(m => <label key={m.userId} style={{ display: "block" }}><input type="checkbox" checked={e.assigned.includes(m.userId)}
             onChange={x => call(`/api/teams/${t.id}/event-types/${e.id}/assign`, "POST", { userIds: x.target.checked ? [...e.assigned, m.userId] : e.assigned.filter(y => y !== m.userId) })} /> {m.name}</label>)}
           <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>Locked for members</div>
-          <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>{LOCKABLE.map(f => <label key={f}><input type="checkbox" checked={e.lockedFields.includes(f)}
-            onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { lockedFields: x.target.checked ? [...e.lockedFields, f] : e.lockedFields.filter(y => y !== f) })} /> {LIMIT_LABELS[f] ?? f}</label>)}</div>
+          <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>{LOCKABLE.map(f => <label key={f}><input type="checkbox" checked={withDateRangeLocks(e.lockedFields).includes(f)}
+            onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { lockedFields: x.target.checked ? [...e.lockedFields, f] : e.lockedFields.filter(y => y !== f && !(f === "dateRange" && y === "rangeDays")) })} /> {LIMIT_LABELS[f] ?? f}</label>)}</div>
           <label className="f">Template name <input className="input" aria-label={`Template name for ${e.title}`} defaultValue={e.title} onBlur={x => x.target.value !== e.title && call(`/api/event-types/${e.id}`, "PATCH", { title: x.target.value })} /></label>
           <label className="f">Duration <input className="input" type="number" aria-label={`Template duration for ${e.title}`} defaultValue={e.durationMin} onBlur={x => Number(x.target.value) !== e.durationMin && call(`/api/event-types/${e.id}`, "PATCH", { durationMin: Number(x.target.value) })} /></label>
         </>}

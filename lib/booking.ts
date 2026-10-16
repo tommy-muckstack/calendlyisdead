@@ -87,7 +87,7 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
   const sc = h.schedule;
   let slots = generateSlots({ schedule: { timezone: sc.timezone, weekly: sc.weekly, overrides: sc.overrides ?? {} },
     durationMin: et.durationMin, intervalMin: et.startIntervalMin, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin, minNoticeMin: et.minNoticeMin,
-    rangeDays: et.rangeDays, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
+    rangeDays: et.rangeDays, dateRange: et.dateRange, dateRangeTimezone: limitsTimezone, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
     limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek, perMonth: et.maxPerMonth }, limitsTimezone, existing: forLimits,
     joinableStarts: isGroup ? [...ownStarts] : [], sessionBuffers });
   const hostFull = await hostLimitCheck(db, h.user, lo, hi, exclude);
@@ -193,7 +193,8 @@ export async function createBooking(input: BookingInput) {
     await db.transaction(async (tx: any) => {
       const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
         active: eventTypes.active, deletedAt: eventTypes.deletedAt, maxPerDay: eventTypes.maxPerDay,
-        maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin, lockedTimezone: eventTypes.lockedTimezone }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
+        maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin, lockedTimezone: eventTypes.lockedTimezone,
+        rangeDays: eventTypes.rangeDays, dateRange: eventTypes.dateRange }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
       // Serialize team-wide allowances even if membership changed between two
       // preflights. Team host editors also lock the event before touching hosts.
       let currentType = et.teamId ? (await lockType())[0] : undefined;
@@ -221,7 +222,8 @@ export async function createBooking(input: BookingInput) {
         const currentHost = currentHosts.find((u: typeof users.$inferSelect) => u.id === host.user.id);
         if (!currentHost) continue;
         const fresh = await hostSlots({ ...host, user: currentHost }, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
-          maxPerMonth: currentType.maxPerMonth, startIntervalMin: currentType.startIntervalMin }, currentDay, currentDay, currentZone, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
+          maxPerMonth: currentType.maxPerMonth, startIntervalMin: currentType.startIntervalMin, rangeDays: currentType.rangeDays,
+          dateRange: currentType.dateRange }, currentDay, currentDay, currentZone, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
         if ((fresh.slots[currentDay] ?? []).includes(startIso)) eligible.push(host.user.id);
       }
       if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error("slot_unavailable");

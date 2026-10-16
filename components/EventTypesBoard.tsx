@@ -7,9 +7,11 @@ import { HostMeetingLimits } from "./HostMeetingLimits";
 import { START_INTERVAL_PRESETS, MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "@/lib/start-increments";
 import { setEventVisibility } from "@/lib/event-visibility-client";
 import { BOOKING_TIMEZONES } from "@/lib/booking-timezone";
+import { dateRangeSummary, effectiveDateRange, withDateRangeLocks, type BookingDateRange } from "@/lib/booking-date-range";
+import { BookingDateRangeFields } from "./BookingDateRangeFields";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
-  bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean; secret: boolean; lockedTimezone: string | null;
+  bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; dateRange: BookingDateRange | null; active: boolean; secret: boolean; lockedTimezone: string | null;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
   kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
@@ -18,16 +20,16 @@ type Sch = { id: string; name: string; timezone?: string; isDefault?: boolean };
 type PersonalKind = "one_on_one" | "group";
 const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
 const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
-const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
+const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "dateRange", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
 function draftBody(d: ET) {
   return Object.fromEntries(EDITABLE_KEYS.filter(key =>
-    !(d.managedParentId && d.lockedFields.includes(key)) &&
+    !(d.managedParentId && withDateRangeLocks(d.lockedFields).includes(key)) &&
     !(key === "kind" && (d.managedParentId || d.teamId)) && !(key === "scheduleId" && d.teamId)
   ).map(key => [key, key === "questions" ? d.questions.map(q => q.type === "select" ? q : { ...q, options: undefined }) : d[key]]));
 }
 const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration", startIntervalMin: "Start time increments", lockedTimezone: "Booking time zone",
   location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
-  rangeDays: "Bookable days", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
+  dateRange: "Date range", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
   kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
 export function EventTypesBoard({ initial, username, schedules, owner, defaultTimezone = "UTC" }: { initial: ET[]; username: string; schedules: Sch[]; owner?: string; defaultTimezone?: string }) {
   const [items, setItems] = useState(initial);
@@ -178,6 +180,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       if (issue.path[0] === "startIntervalMin" || issue.path[0] === "lockedTimezone") setSect("link");
+      if (issue.path[0] === "dateRange" || issue.path[0] === "minNoticeMin") setSect("avail");
       setErr(`${FIELD_NAMES[String(issue.path[0])] ?? "Event settings"}: ${issue.message}`);
       return;
     }
@@ -272,11 +275,9 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
         </> })}
         {S({ id: "description", title: "Description", summary: d.description ? d.description.slice(0, 80) + (d.description.length > 80 ? "…" : "") : "No description", children: <>
           <label className="f" htmlFor="et-desc">Description</label><textarea id="et-desc" disabled={L("description")} className="input" rows={4} value={d.description} onChange={set("description")} /></> })}
-        {S({ id: "limits", title: "Limits and buffers", summary: `${d.minNoticeMin / 60}h notice · ${d.rangeDays} days ahead · buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min${d.maxPerDay ? ` · ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · ${d.maxPerWeek}/week` : ""}${d.maxPerMonth ? ` · ${d.maxPerMonth}/month` : ""}`, children: <>
+        {S({ id: "limits", title: "Limits and buffers", summary: `Buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min${d.maxPerDay ? ` · ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · ${d.maxPerWeek}/week` : ""}${d.maxPerMonth ? ` · ${d.maxPerMonth}/month` : ""}`, children: <>
           <label className="f" htmlFor="et-bb">Buffer before (min)</label><input id="et-bb" disabled={L("bufferBeforeMin")} className="input" type="number" min={0} value={d.bufferBeforeMin} onChange={set("bufferBeforeMin")} />
           <label className="f" htmlFor="et-ba">Buffer after (min)</label><input id="et-ba" disabled={L("bufferAfterMin")} className="input" type="number" min={0} value={d.bufferAfterMin} onChange={set("bufferAfterMin")} />
-          <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
-          <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" disabled={L("rangeDays")} className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} />
           <label className="f" htmlFor="et-mpd">Max bookings per day (blank = no limit)</label>
           <input id="et-mpd" disabled={L("maxPerDay")} className="input" type="number" min={1} value={d.maxPerDay ?? ""} onChange={e => setD({ ...d, maxPerDay: e.target.value ? Number(e.target.value) : null })} />
           <label className="f" htmlFor="et-mpw">Max bookings per week (blank = no limit)</label>
@@ -285,7 +286,10 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <input id="et-mpm" disabled={L("maxPerMonth")} className="input" type="number" min={1} max={2147483647} value={d.maxPerMonth ?? ""} onChange={e => setD({ ...d, maxPerMonth: e.target.value ? Number(e.target.value) : null })} />
           <p className="muted">Meeting limits apply across this event type’s hosts. A group session counts once, even when several invitees join.</p>
           <HostMeetingLimits eventId={et.id} /></> })}
-        {S({ id: "avail", title: "Availability", summary: schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule", children: <>
+        {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"} · ${dateRangeSummary(effectiveDateRange(d))} · ${d.minNoticeMin / 60}h notice`, children: <>
+          <BookingDateRangeFields value={effectiveDateRange(d)} disabled={L("dateRange") || L("rangeDays")} onChange={dateRange => setD({ ...d, dateRange })} />
+          <p className="muted">{d.teamId ? "Dates use the event creator’s default schedule time zone." : "Dates use your selected availability schedule’s time zone."}</p>
+          <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
           {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
           <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
             <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
