@@ -52,6 +52,9 @@ Without them the login page says "Sign-in not configured" (demo button still wor
 `/app/assistant`: paste a thread; it extracts people, length, days/parts of day, explicit times and time zone, intersects that with your real availability, and drafts a reply with one-click booking links (prefilled name/email). It never sends mail. Works keyless with a built-in parser; set `LLM_API_KEY` (+ optional `LLM_BASE_URL`, `LLM_MODEL`, any OpenAI-compatible API) to use an LLM. Inbound mail: POST `{to, from, subject, text}` to `/api/inbound/email` with `Authorization: Bearer $INBOUND_SECRET`, addressed to `<username>+<event-slug>@your-domain`; it returns the proposal and draft.
 
 ## Tests
+
+Website usage telemetry: optional PostHog integration for US project 666931. See [the shared website/subapp taxonomy](docs/ANALYTICS.md) for configuration, event meanings, redaction, environment gates and rollout to other apps. This is separate from the host-facing booking analytics.
+
 `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
 
 ## Status

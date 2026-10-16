@@ -13,8 +13,8 @@ export const metadata = { title: "CalendlyIsDead: free, open-source scheduling" 
 function SignupOptions() {
   return <>
     <div className="cm-cta">
-      <Link className="cm-oauth" href="/signup?provider=google"><span className="ico"><G /></span>Sign up with Google</Link>
-      <Link className="cm-oauth" href="/signup"><span className="ico" aria-hidden="true">{ICON.at}</span>Sign up with email</Link>
+      <Link className="cm-oauth" href="/signup?provider=google" data-signup-method="google"><span className="ico"><G /></span>Sign up with Google</Link>
+      <Link className="cm-oauth" href="/signup" data-signup-method="email"><span className="ico" aria-hidden="true">{ICON.at}</span>Sign up with email</Link>
     </div>
     <p className="cm-fine">No credit card required</p>
   </>;
