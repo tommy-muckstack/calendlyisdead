@@ -1,5 +1,5 @@
 import { BP } from "./basepath";
-import { and, eq, gte, lte, inArray } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, isNull } from "drizzle-orm";
 import { DateTime } from "luxon";
 import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
@@ -161,6 +161,11 @@ export async function createBooking(input: BookingInput) {
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
       await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
+      if (et.kind === "one_off") {
+        const consumed = await tx.update(eventTypes).set({ usedAt: new Date() })
+          .where(and(eq(eventTypes.id, et.id), isNull(eventTypes.usedAt))).returning({ id: eventTypes.id });
+        if (!consumed.length) throw new Error("slot_unavailable");
+      }
       const eligible: string[] = [];
       for (const host of r.ev.hosts) {
         if (!free.includes(host.user.id)) continue;
@@ -194,7 +199,6 @@ export async function createBooking(input: BookingInput) {
   for (const o of oldGroup) await removeEvent(o.externalCalendarId, o.externalEventId);
   const paidBefore = oldGroup.find(o => o.paymentStatus === "paid");
   const price = et.priceCents ?? 0;
-  if (et.kind === "one_off") await db.update(eventTypes).set({ usedAt: new Date() }).where(eq(eventTypes.id, et.id));
   if (paidBefore) { // a paid booking keeps its payment when rescheduled
     const pay = { paymentStatus: "paid", paymentRef: paidBefore.paymentRef, amountCents: paidBefore.amountCents };
     await db.update(bookings).set(pay).where(inArray(bookings.uid, rows.map(r => r.uid))); rows.forEach(r => Object.assign(r, pay));

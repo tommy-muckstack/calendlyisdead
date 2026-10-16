@@ -30,6 +30,7 @@ beforeAll(async () => {
     { id: "race-week", userId: "demo-user", slug: "race-week", title: "Weekly limit", durationMin: 30, minNoticeMin: 0, maxPerWeek: 1 },
     { id: "race-buffer", userId: "demo-user", slug: "race-buffer", title: "Buffered", durationMin: 30, minNoticeMin: 0, bufferBeforeMin: 15, bufferAfterMin: 15 },
     { id: "race-group", userId: "demo-user", slug: "race-group", title: "Group", kind: "group", seats: 2, durationMin: 30, minNoticeMin: 0 },
+    { id: "race-once", userId: "demo-user", slug: "race-once", title: "Single use", kind: "one_off", durationMin: 30, minNoticeMin: 0 },
     { id: "race-robin", userId: "demo-user", teamId: "race-team", slug: "race-robin", title: "Round robin", kind: "round_robin", durationMin: 30, minNoticeMin: 0 },
     { id: "race-collective", userId: "demo-user", teamId: "race-team", slug: "race-collective", title: "Collective", kind: "collective", durationMin: 60, minNoticeMin: 0 },
   ]);
@@ -38,6 +39,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await db.delete(schema.bookings);
+  await db.update(schema.eventTypes).set({ usedAt: null }).where(eq(schema.eventTypes.id, "race-once"));
   provider.busy.mockImplementation(async () => ({ busy: [], errors: [] }));
 });
 afterEach(() => vi.restoreAllMocks());
@@ -130,5 +132,24 @@ describe("atomic booking reservations", () => {
     const rows = await db.select().from(schema.bookings);
     expect(rows).toHaveLength(2);
     expect(rows.find((row: any) => row.uid === original.uid).status).toBe("cancelled");
+  });
+  it("consumes a single-use link once when different times are requested together", async () => {
+    oneWinner(await race([() => book("race-once", at("11:00")), () => book("race-once", at("12:00"))]));
+    expect(await confirmed()).toHaveLength(1);
+    const [event] = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.id, "race-once"));
+    expect(event.usedAt).not.toBeNull();
+    expect(await booking.loadEvent("demo", "race-once")).toBeNull();
+  });
+  it("does not consume a single-use link when its reservation rolls back", async () => {
+    const transact = db.transaction.bind(db);
+    const spy = vi.spyOn(db, "transaction").mockImplementation((fn: any, config: any) => transact(async (tx: any) => {
+      await fn(tx); throw new Error("Simulated transaction failure after writes");
+    }, config));
+    await expect(book("race-once", at("11:00"))).rejects.toThrow("slot_unavailable");
+    spy.mockRestore();
+    expect(await confirmed()).toHaveLength(0);
+    const [event] = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.id, "race-once"));
+    expect(event.usedAt).toBeNull();
+    await expect(book("race-once", at("12:00"))).resolves.toHaveProperty("uid");
   });
 });
