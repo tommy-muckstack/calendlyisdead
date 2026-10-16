@@ -54,6 +54,7 @@ export const eventTypes = pgTable("event_types", {
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   durationMin: integer("durationMin").notNull().default(30),
+  startIntervalMin: integer("startIntervalMin").notNull().default(30),
   location: text("location").notNull().default(""),
   color: text("color").notNull().default("#0E7C66"),
   bufferBeforeMin: integer("bufferBeforeMin").notNull().default(0),

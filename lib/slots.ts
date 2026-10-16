@@ -1,4 +1,5 @@
 import { DateTime, Interval } from "luxon";
+import { DEFAULT_START_INTERVAL_MIN, validStartInterval } from "./start-increments";
 
 export type Range = { start: string; end: string }; // "HH:mm"
 export type Weekly = Record<number, Range[]>; // 1=Mon ... 7=Sun (Luxon weekday)
@@ -8,7 +9,7 @@ export type Busy = { start: string; end: string; joinableAt?: string }; // ISO i
 export type SlotInput = {
   schedule: Schedule;
   durationMin: number;
-  intervalMin?: number;
+  intervalMin?: number; // Independent of duration; new events default to 30 minutes.
   bufferBeforeMin?: number;
   bufferAfterMin?: number;
   minNoticeMin?: number;
@@ -30,7 +31,8 @@ export type SlotInput = {
 export function generateSlots(i: SlotInput): Record<string, string[]> {
   const hostTz = i.schedule.timezone;
   const now = typeof i.now === "string" ? DateTime.fromISO(i.now, { zone: "utc" }) : i.now;
-  const interval = i.intervalMin ?? i.durationMin;
+  const interval = i.intervalMin ?? DEFAULT_START_INTERVAL_MIN;
+  if (!validStartInterval(interval)) throw new RangeError("invalid_start_interval");
   const bb = i.bufferBeforeMin ?? 0, ba = i.bufferAfterMin ?? 0;
   const earliest = now.plus({ minutes: i.minNoticeMin ?? 0 });
   const latest = i.rangeDays != null ? now.setZone(hostTz).startOf("day").plus({ days: i.rangeDays + 1 }) : null;

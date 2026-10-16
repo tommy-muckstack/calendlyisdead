@@ -5,7 +5,7 @@ import { getDb, schema } from "./db";
 import { sendMail } from "./email";
 import { insertEventWithLink } from "./event-type-links";
 const { teams, teamMembers: tm, teamInvites: ti, eventTypes, eventTypeHosts: eth, users } = schema;
-export const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"] as const;
+export const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"] as const;
 const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
 export async function role(userId: string, teamId: string): Promise<string | null> {

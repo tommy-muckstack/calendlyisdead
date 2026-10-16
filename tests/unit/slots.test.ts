@@ -72,7 +72,7 @@ describe("generateSlots", () => {
   });
   it("DST spring forward: 1:00-4:00 window skips the missing hour", () => {
     const sched: Schedule = { timezone: "America/New_York", weekly: { 7: [{ start: "01:00", end: "04:00" }] }, overrides: {} };
-    const s = generateSlots({ ...base, schedule: sched, durationMin: 60, now: "2026-01-01T00:00:00Z", from: "2026-03-08", to: "2026-03-08" });
+    const s = generateSlots({ ...base, schedule: sched, durationMin: 60, intervalMin: 60, now: "2026-01-01T00:00:00Z", from: "2026-03-08", to: "2026-03-08" });
     const t = s["2026-03-08"].map(x => DateTime.fromISO(x).setZone("America/New_York").toFormat("HH:mm"));
     expect(t).toEqual(["01:00", "03:00"]); // 2 real hours exist in that window
   });
@@ -84,7 +84,7 @@ describe("generateSlots", () => {
   });
   it("keeps a group's buffer through the repeated DST hour without hiding that session's seats", () => {
     const schedule: Schedule = { ...ny, weekly: { 7: [{ start: "01:00", end: "03:00" }] } };
-    const s = generateSlots({ ...base, schedule, durationMin: 15, from: "2026-11-01", to: "2026-11-01",
+    const s = generateSlots({ ...base, schedule, durationMin: 15, intervalMin: 15, from: "2026-11-01", to: "2026-11-01",
       busy: [{ start: "2026-11-01T05:30:00Z", end: "2026-11-01T06:45:00Z", joinableAt: "2026-11-01T01:30:00-04:00" }],
       sessionBuffers: { "2026-11-01T05:30:00.000Z": { beforeMin: 0, afterMin: 60 } } });
     expect(s["2026-11-01"]).toContain("2026-11-01T05:30:00.000Z"); // Original 1:30 EDT session.
