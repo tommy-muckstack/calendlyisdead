@@ -71,7 +71,9 @@ const paths = {
 } as const;
 
 function Symbol({ name, size = 20 }: { name: keyof typeof paths; size?: number }) {
-  return <svg width={size} height={size} viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>{paths[name].map((d, i) => <path key={i} d={d} />)}</svg>;
+  // Google's auto_awesome asset uses native 24px coordinates; the others use 960 units.
+  const viewBox = name === "assist" ? "0 0 24 24" : "0 -960 960 960";
+  return <svg width={size} height={size} viewBox={viewBox} fill="currentColor" aria-hidden="true" focusable="false" style={{ flexShrink: 0 }}>{paths[name].map((d, i) => <path key={i} d={d} />)}</svg>;
 }
 export const I = {
   hidden: (s?: number) => <Symbol name="hidden" size={s} />,
