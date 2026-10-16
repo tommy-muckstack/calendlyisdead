@@ -30,23 +30,49 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params; const p = Patch.safeParse(await req.json());
   if (!p.success) return NextResponse.json({ error: "invalid", issues: p.error.issues }, { status: 400 });
   const et = await load(id, u.id); if (!et) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const data: any = { ...p.data };
-  if (et.managedParentId) {
-    // a member's copy of a managed type: locked fields must not change
-    const locked = (et.lockedFields ?? []).filter((f: string) => f in data && JSON.stringify(data[f]) !== JSON.stringify(et[f]));
-    if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
-    delete data.lockedFields;
-  }
-  if (et.teamId) delete data.kind; // team kinds are fixed at creation
-  if (!et.teamId) delete data.rrMode;
-  if (et.kind !== "managed") delete data.lockedFields;
-  if ((data.kind ?? et.kind) === "group" && (data.seats ?? et.seats) < 2) return NextResponse.json({ error: "invalid_invitee_limit" }, { status: 400 });
   const db = await getDb();
-  if (data.scheduleId) { const [sc] = await db.select().from(schema.schedules).where(and(eq(schema.schedules.id, data.scheduleId), eq(schema.schedules.userId, u.id))); if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 }); }
+  const apply = async (current: typeof schema.eventTypes.$inferSelect, connection: typeof db) => {
+    const data: Record<string, unknown> = { ...p.data };
+    if (current.managedParentId) {
+      const locked = (current.lockedFields ?? []).filter(f => f in data && JSON.stringify(data[f]) !== JSON.stringify(current[f]));
+      if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
+      delete data.lockedFields;
+    }
+    if (current.teamId) delete data.kind;
+    if (!current.teamId) delete data.rrMode;
+    if (current.kind !== "managed") delete data.lockedFields;
+    const groupSettingsLocked = current.kind === "group" && (await connection.select({ uid: schema.bookings.uid })
+      .from(schema.bookings).where(eq(schema.bookings.eventTypeId, id)).limit(1)).length > 0;
+    if (groupSettingsLocked) {
+      // Including kind prevents switching to one-on-one to bypass the field locks.
+      const fields = (["durationMin", "location", "kind"] as const).filter(f => f in data && data[f] !== current[f]);
+      if (fields.length) return NextResponse.json({ error: "group_settings_locked", fields,
+        settings: { durationMin: current.durationMin, location: current.location, kind: current.kind } }, { status: 409 });
+    }
+    if ((data.kind ?? current.kind) === "group" && Number(data.seats ?? current.seats) < 2)
+      return NextResponse.json({ error: "invalid_invitee_limit" }, { status: 400 });
+    if (typeof data.scheduleId === "string") {
+      const [sc] = await connection.select().from(schema.schedules)
+        .where(and(eq(schema.schedules.id, data.scheduleId), eq(schema.schedules.userId, u.id)));
+      if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 });
+    }
+    const [saved] = Object.keys(data).length
+      ? await connection.update(schema.eventTypes).set(data).where(eq(schema.eventTypes.id, id)).returning()
+      : [current];
+    return NextResponse.json({ ...saved, groupSettingsLocked });
+  };
   try {
-    const r = await db.update(schema.eventTypes).set(data).where(eq(schema.eventTypes.id, id)).returning();
-    if (et.kind === "managed") await propagateManaged(id);
-    return NextResponse.json(r[0]);
+    const response = et.teamId ? await apply(et, db) : await db.transaction(async (tx: typeof db) => {
+      // Same lock as reservations: either the edit commits before the first
+      // booking, or it sees that booking and rejects protected-field changes.
+      await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, u.id)).for("update");
+      const [current] = await tx.select().from(schema.eventTypes)
+        .where(and(eq(schema.eventTypes.id, id), eq(schema.eventTypes.userId, u.id)));
+      if (!current || current.teamId) return NextResponse.json({ error: "not_found" }, { status: 404 });
+      return apply(current, tx);
+    }, { isolationLevel: "read committed" });
+    if (response.ok && et.kind === "managed") await propagateManaged(id);
+    return response;
   } catch { return NextResponse.json({ error: "slug_taken" }, { status: 409 }); }
 }
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
