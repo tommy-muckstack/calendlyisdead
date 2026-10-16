@@ -22,7 +22,7 @@ export async function recordBookingContact(db: ContactDB, booking: BookingContac
     if (!preferences.bookingEnabled || contactExcluded(fields.email, preferences.exclusions)) return;
     const [deleted] = await db.select({ id: C.id }).from(C).where(and(owner, email, isNotNull(C.deletedAt))).limit(1);
     if (deleted) return;
-    [contact] = await db.insert(C).values({ ...fields, id: crypto.randomUUID(), userId: booking.hostId }).returning({ id: C.id });
+    [contact] = await db.insert(C).values({ ...fields, id: crypto.randomUUID(), userId: booking.hostId, source: "booking" }).returning({ id: C.id });
   }
   await db.insert(CM).values({ contactId: contact.id, bookingUid: booking.uid, inviteeEmail: booking.inviteeEmail }).onConflictDoNothing();
   await captureContactAnswers(db, booking.hostId, contact.id, booking.eventTypeId, booking.answers ?? {}, historical);

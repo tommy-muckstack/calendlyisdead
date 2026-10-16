@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ContactTransferError } from "./contact-transfer";
+import { ContactListError } from "./contact-query";
 export async function transferBody(request: Request, limit: number): Promise<unknown> {
   if (Number(request.headers.get("content-length")) > limit) throw new ContactTransferError("The request is too large.", 413);
   const reader = request.body?.getReader(); if (!reader) return null;
@@ -10,5 +11,6 @@ export async function transferBody(request: Request, limit: number): Promise<unk
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return null; }
 }
 export function transferFailure(error: unknown) {
-  return NextResponse.json({ error: error instanceof ContactTransferError ? error.message : "The operation could not be confirmed. Try again." }, { status: error instanceof ContactTransferError ? error.status : 500, headers: { "Cache-Control": "private, no-store" } });
+  const known = error instanceof ContactTransferError || error instanceof ContactListError;
+  return NextResponse.json({ error: known ? error.message : "The operation could not be confirmed. Try again." }, { status: known ? error.status : 500, headers: { "Cache-Control": "private, no-store" } });
 }

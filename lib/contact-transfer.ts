@@ -10,6 +10,7 @@ import { ExportRequest, ExportResult, ImportRequest, ImportResult, type ExportIn
 import { linkContactMeetings } from "./contacts";
 import { sendMail } from "./email";
 import { BP } from "./basepath";
+import { contactScopeQuery } from "./contact-query";
 const { contacts: C, contactFieldValues: V, contactImports: I, contactExports: X } = schema;
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const coreKeys = Object.keys(CONTACT_LABELS) as (keyof ContactDraft)[];
@@ -61,7 +62,7 @@ export async function importContacts(userId: string, input: ImportInput): Promis
       for (const plan of plans) {
         if (!plan.fields || plan.outcome.status === "unchanged") continue;
         const id = plan.outcome.contactId ?? randomUUID(); plan.outcome.contactId = id;
-        if (plan.outcome.status === "created") await tx.insert(C).values({ ...plan.fields, id, userId });
+        if (plan.outcome.status === "created") await tx.insert(C).values({ ...plan.fields, id, userId, source: "import" });
         else await tx.update(C).set({ ...plan.fields, version: sql`${C.version} + 1`, updatedAt: new Date() }).where(and(eq(C.id, id), eq(C.userId, userId)));
         for (const [fieldId, value] of Object.entries(plan.values)) {
           if (value === null) await tx.delete(V).where(and(eq(V.contactId, id), eq(V.fieldId, fieldId)));
@@ -88,7 +89,8 @@ export async function exportContacts(user: { id: string; email: string }, input:
       return { row: prior as typeof X.$inferSelect, created: false };
     }
     await tx.delete(X).where(and(eq(X.userId, user.id), lte(X.expiresAt, now)));
-    const rows: (typeof C.$inferSelect)[] = await tx.select().from(C).where(and(eq(C.userId, user.id), isNull(C.deletedAt), request.ids ? inArray(C.id, request.ids) : undefined)).orderBy(asc(sql`lower(${C.name})`), asc(C.id)).limit(20001);
+    const scope = request.scope ? (await contactScopeQuery(tx, user.id, request.scope, now)).where : undefined;
+    const rows: (typeof C.$inferSelect)[] = await tx.select().from(C).where(and(eq(C.userId, user.id), isNull(C.deletedAt), request.ids ? inArray(C.id, request.ids) : undefined, scope)).orderBy(asc(sql`lower(${C.name})`), asc(C.id)).limit(20001);
     if (request.ids && rows.length !== new Set(request.ids).size) throw new ContactTransferError("Some selected contacts are no longer available. Refresh your selection.", 409);
     if (!rows.length) throw new ContactTransferError("There are no contacts to export.");
     if (rows.length > 20000) throw new ContactTransferError("Export up to 20,000 contacts at a time.");
