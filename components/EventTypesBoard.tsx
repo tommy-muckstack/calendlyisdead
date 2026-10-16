@@ -4,8 +4,9 @@ import { I } from "@/components/app/icons";
 import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
 import { EventTypePatch } from "@/lib/event-type-validation";
 import { HostMeetingLimits } from "./HostMeetingLimits";
+import { START_INTERVAL_PRESETS, MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "@/lib/start-increments";
 import { useEffect, useRef, useState } from "react";
-export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
+export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
   kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
@@ -15,14 +16,14 @@ type Sch = { id: string; name: string };
 type PersonalKind = "one_on_one" | "group";
 const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
 const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
-const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
+const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
 function draftBody(d: ET) {
   return Object.fromEntries(EDITABLE_KEYS.filter(key =>
     !(d.managedParentId && d.lockedFields.includes(key)) &&
     !(key === "kind" && (d.managedParentId || d.teamId)) && !(key === "scheduleId" && d.teamId)
   ).map(key => [key, key === "questions" ? d.questions.map(q => q.type === "select" ? q : { ...q, options: undefined }) : d[key]]));
 }
-const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration",
+const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration", startIntervalMin: "Start time increments",
   location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
   rangeDays: "Bookable days", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
   kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
@@ -137,6 +138,7 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
     return () => { panel?.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
   }, []);
   const [sect, setSect] = useState<string>("basics");
+  const [customInterval, setCustomInterval] = useState(!START_INTERVAL_PRESETS.includes(et.startIntervalMin));
   const [err, setErr] = useState("");
   const [groupLocked, setGroupLocked] = useState(et.groupSettingsLocked ?? false);
   const [deleting, setDeleting] = useState(false);
@@ -165,6 +167,7 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
     const parsed = EventTypePatch.safeParse(body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
+      if (issue.path[0] === "startIntervalMin") setSect("link");
       setErr(`${FIELD_NAMES[String(issue.path[0])] ?? "Event settings"}: ${issue.message}`);
       return;
     }
@@ -235,8 +238,21 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
           <input className="input" list="locs" aria-label="Location" disabled={L("location")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
           <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
-        {S({ id: "link", title: "Link and description", summary: `/${username}/${d.slug}`, children: <>
+        {S({ id: "link", title: "Booking page options", summary: `/${username}/${d.slug} · ${Number.isFinite(d.startIntervalMin) ? `${d.startIntervalMin} min` : "Custom"} increments`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />
+          <label className="f" htmlFor="et-start-interval">Start time increments</label>
+          <select id="et-start-interval" className="input" disabled={L("startIntervalMin")} value={customInterval ? "custom" : String(d.startIntervalMin)} aria-describedby="et-start-help" onChange={event => {
+            const custom = event.target.value === "custom"; setCustomInterval(custom);
+            if (!custom) setD({ ...d, startIntervalMin: Number(event.target.value) });
+          }}>
+            {START_INTERVAL_PRESETS.map(value => <option key={value} value={value}>{value} minutes</option>)}<option value="custom">Custom</option>
+          </select>
+          {customInterval && <><label className="f" htmlFor="et-custom-interval">Custom increment (minutes)</label>
+            <input id="et-custom-interval" className="input" type="number" min={MIN_START_INTERVAL_MIN} max={MAX_START_INTERVAL_MIN} step={1} disabled={L("startIntervalMin")}
+              value={Number.isNaN(d.startIntervalMin) ? "" : d.startIntervalMin} onChange={event => setD({ ...d, startIntervalMin: event.target.value === "" ? NaN : Number(event.target.value) })} /></>}
+          <p className="muted" id="et-start-help">Choose how often available start times appear. Meeting duration stays the same.</p>
+        </> })}
+        {S({ id: "description", title: "Description", summary: d.description ? d.description.slice(0, 80) + (d.description.length > 80 ? "…" : "") : "No description", children: <>
           <label className="f" htmlFor="et-desc">Description</label><textarea id="et-desc" disabled={L("description")} className="input" rows={4} value={d.description} onChange={set("description")} /></> })}
         {S({ id: "limits", title: "Limits and buffers", summary: `${d.minNoticeMin / 60}h notice · ${d.rangeDays} days ahead · buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min${d.maxPerDay ? ` · ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · ${d.maxPerWeek}/week` : ""}${d.maxPerMonth ? ` · ${d.maxPerMonth}/month` : ""}`, children: <>
           <label className="f" htmlFor="et-bb">Buffer before (min)</label><input id="et-bb" disabled={L("bufferBeforeMin")} className="input" type="number" min={0} value={d.bufferBeforeMin} onChange={set("bufferBeforeMin")} />

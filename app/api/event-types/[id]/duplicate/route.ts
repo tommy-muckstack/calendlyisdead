@@ -5,7 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { insertEventWithLink } from "@/lib/event-type-links";
 
 export const runtime = "nodejs";
-const COPY_FIELDS = ["description", "durationMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
+const COPY_FIELDS = ["description", "durationMin", "startIntervalMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
   "minNoticeMin", "rangeDays", "active", "kind", "questions", "maxPerDay", "maxPerWeek", "maxPerMonth", "seats", "rrMode",
   "priceCents", "currency", "redirectUrl"] as const;
 

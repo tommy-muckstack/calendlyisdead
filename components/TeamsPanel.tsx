@@ -7,8 +7,8 @@ type Member = { userId: string; role: string; name: string; email: string };
 type TET = ET & { rrMode: string; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
 const KIND: Record<string, string> = { collective: "Collective", round_robin: "Round robin", managed: "Managed" };
-const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
-const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit" };
+const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
+const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit", startIntervalMin: "Start time increments" };
 
 export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
