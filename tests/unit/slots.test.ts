@@ -61,6 +61,24 @@ describe("generateSlots", () => {
 
 import { holidayDates } from "../../lib/slots";
 describe("holidays and limits", () => {
+  const groupAtLimit = { ...base, from: "2026-10-13", to: "2026-10-13",
+    existing: ["2026-10-13T15:00:00Z"], joinableStarts: ["2026-10-13T11:00:00-04:00"], limits: { perDay: 1 } };
+  it("keeps only existing group sessions open at the meeting limit", () => {
+    expect(generateSlots(groupAtLimit)).toEqual({ "2026-10-13": ["2026-10-13T15:00:00.000Z"] });
+  });
+  it.each([
+    { label: "busy intervals", change: { busy: [{ start: "2026-10-13T15:00:00Z", end: "2026-10-13T16:00:00Z" }] } },
+    { label: "minimum notice", change: { now: "2026-10-13T14:01:00Z", minNoticeMin: 60 } },
+    { label: "closed hours", change: { schedule: { ...ny, overrides: { "2026-10-13": [] } } } },
+  ])("still applies $label to joinable group sessions", ({ change }) => {
+    expect(generateSlots({ ...groupAtLimit, ...change })).toEqual({});
+  });
+  it("distinguishes the two repeated DST times when joining an existing session at the limit", () => {
+    const schedule: Schedule = { ...ny, weekly: { 7: [{ start: "01:00", end: "03:00" }] } };
+    const slots = generateSlots({ ...base, schedule, inviteeTz: "Asia/Tokyo", from: "2026-11-01", to: "2026-11-01",
+      existing: ["2026-11-01T05:30:00Z"], joinableStarts: ["2026-11-01T01:30:00-04:00"], limits: { perDay: 1 } });
+    expect(slots).toEqual({ "2026-11-01": ["2026-11-01T05:30:00.000Z"] });
+  });
   it("US holidays block the day unless an override re-opens it", () => {
     const hol = holidayDates("US", 2026, 2026);
     expect(hol).toContain("2026-11-26");
