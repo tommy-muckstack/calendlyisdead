@@ -21,6 +21,16 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds contact records and history without changing meetings, and preserves deleted contacts on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
+      INSERT INTO contact_meetings ("contactId", "bookingUid") VALUES ('contact', 'retained');
+      UPDATE contacts SET "deletedAt" = now(), version = 2;`); await client!.exec(ddl);
+    expect((await client!.query('SELECT name, version, "deletedAt" IS NOT NULL AS deleted FROM contacts')).rows).toEqual([{ name: "QA", version: 2, deleted: true }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+    expect((await client!.query('SELECT "contactId", "bookingUid" FROM contact_meetings')).rows).toEqual([{ contactId: "contact", bookingUid: "retained" }]);
+  });
   it("retains legacy day counts and explicit ranges across migration and replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE event_types DROP COLUMN "dateRange"; UPDATE event_types SET "rangeDays" = 17;'); await client!.exec(ddl);

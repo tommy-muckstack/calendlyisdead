@@ -1,0 +1,19 @@
+.contacts{max-width:1160px;min-width:0;margin-inline:auto;overflow-wrap:anywhere}
+.contacts-heading,.contacts-pagination{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-block:16px}
+.contacts-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-block:24px}
+.contacts-filters label{display:flex;flex-direction:column;gap:8px;min-width:0}.contacts-filters label:first-child{flex:1;min-width:min(100%,240px)}
+.contacts-filters .input{min-width:0;width:100%}
+.contacts-empty{border:1px solid #e4e6e9;border-radius:8px;text-align:center;padding:36px 20px;margin-top:20px}
+.contacts-table-wrap{max-width:100%;overflow:auto;margin-top:20px;border:1px solid #e4e6e9;border-radius:8px}
+.contacts-table{width:100%;min-width:780px;border-collapse:collapse;text-align:left;font-size:14px}
+.contacts-table th,.contacts-table td{padding:16px;max-width:300px;border-bottom:1px solid #e4e6e9;vertical-align:top}
+.contacts-table thead{background:#f8f9f9}.contacts-table tbody th{font-weight:500}.contacts-table .muted{display:block;font-weight:400;margin-top:6px}.contacts-table a{color:#006bff}
+.contact-properties{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;border:1px solid #e4e6e9;border-radius:8px;padding:24px;margin-block:24px}
+.contact-properties dt{font-weight:600;font-size:13px}.contact-properties dd{margin:6px 0 0}.contact-properties a{color:#006bff}
+.contact-history{list-style:none;padding:0}.contact-history a{display:grid;gap:8px;padding:20px;border:1px solid #e4e6e9;border-radius:8px;margin-block:12px}.contact-history a:hover{background:#f8f9f9}
+.contact-dialog{width:min(700px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid #e4e6e9;border-radius:12px;padding:24px;color:#071a31;background:#fff}
+.contact-dialog::backdrop{background:rgb(0 0 0 / .4)}.contact-dialog header,.contact-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.contact-dialog header h2{margin:0}
+.contact-dialog fieldset{border:0;padding:0;margin:24px 0;min-width:0}.contact-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.contact-form-grid>div{min-width:0}.contact-form-grid label{display:block;margin-bottom:6px;font-size:14px}.contact-form-grid .input{width:100%;min-width:0}.contact-form-grid select{margin-top:6px}
+.contact-dialog footer{justify-content:flex-end;margin-top:24px}.contact-delete{color:#a11d2d;margin-right:auto}.contact-error{color:#a11d2d}
+.contacts :is(a,button,input,select):focus-visible,.contacts-table-wrap:focus-visible,.contact-dialog :is(a,button,input,select):focus-visible{outline:3px solid #1a5fb4;outline-offset:3px}
+@media(max-width:600px){.contact-form-grid,.contact-properties{grid-template-columns:minmax(0,1fr)}.contact-dialog{padding:20px}.contacts-filters label{flex:1}.contact-dialog .btn{min-height:40px}}

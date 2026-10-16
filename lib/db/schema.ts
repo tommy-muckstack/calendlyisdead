@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Weekly } from "../slots";
 import type { BookingDateRange } from "../booking-date-range";
@@ -113,7 +113,7 @@ export const bookings = pgTable("bookings", {
   paymentStatus: text("paymentStatus").notNull().default("none"), // none | pending | paid
   paymentRef: text("paymentRef"),
   amountCents: integer("amountCents").notNull().default(0),
-});
+}, b => [index("bookings_contact_lookup").on(b.hostId, sql`lower(btrim(${b.inviteeEmail}))`)]);
 export const teams = pgTable("teams", { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const teamMembers = pgTable("team_members", { teamId: text("teamId").notNull(), userId: text("userId").notNull(), role: text("role").notNull().default("member") },
@@ -163,3 +163,18 @@ export const polls = pgTable("polls", { id: text("id").primaryKey(), userId: tex
   chosen: text("chosen"), bookingUid: text("bookingUid"), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const pollVotes = pgTable("poll_votes", { id: text("id").primaryKey(), pollId: text("pollId").notNull(), name: text("name").notNull(), email: text("email").notNull(),
   picks: jsonb("picks").$type<string[]>().notNull().default([]), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
+
+export const contacts = pgTable("contacts", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), email: text("email").notNull(), phone: text("phone").notNull().default(""),
+  jobTitle: text("jobTitle").notNull().default(""), company: text("company").notNull().default(""), linkedIn: text("linkedIn").notNull().default(""),
+  timezone: text("timezone").notNull().default(""), country: text("country").notNull().default(""), city: text("city").notNull().default(""), state: text("state").notNull().default(""),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, c => [uniqueIndex("contacts_active_owner_email").on(c.userId, sql`lower(${c.email})`).where(sql`${c.deletedAt} IS NULL`)]);
+export const contactMeetings = pgTable("contact_meetings", {
+  contactId: text("contactId").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  bookingUid: text("bookingUid").notNull().references(() => bookings.uid, { onDelete: "cascade" }),
+}, t => [primaryKey({ columns: [t.contactId, t.bookingUid] })]);

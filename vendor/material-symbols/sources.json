@@ -1,5 +1,10 @@
 [
   {
+    "name": "person",
+    "sha": "a3f6b246c831405f3a82700e61bc8fba14090fc4",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/person/materialsymbolsoutlined/person_24px.svg"
+  },
+  {
     "name": "visibility_off",
     "sha": "d98cf8d942c86a4b3d92284eb6d67c2be849ded0",
     "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/visibility_off/materialsymbolsoutlined/visibility_off_24px.svg"
