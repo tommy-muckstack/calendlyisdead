@@ -21,9 +21,45 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("replaces owner-wide link uniqueness with personal/team namespaces and survives repeated startup", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec(`DROP INDEX event_types_current_personal_slug; DROP INDEX event_types_current_team_slug;
+      CREATE UNIQUE INDEX event_types_current_user_slug ON event_types ("userId", slug) WHERE "deletedAt" IS NULL;
+      INSERT INTO users (id) VALUES ('other');
+      INSERT INTO teams (id, slug, name) VALUES ('a', 'a', 'A'), ('b', 'b', 'B');
+      INSERT INTO event_types (id, "userId", "teamId", slug, title) VALUES ('team-a', 'host', 'a', 'shared', 'A'), ('team-b', 'host', 'b', 'other', 'B');`);
+    await client!.exec(ddl);
+    await client!.exec(`UPDATE event_types SET slug = 'shared' WHERE id = 'team-b';
+      INSERT INTO event_types (id, "userId", slug, title) VALUES ('personal', 'host', 'shared', 'Personal');`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT uid, "eventTypeId" FROM bookings')).rows).toEqual([{ uid: "retained", eventTypeId: "group" }]);
+    expect((await client!.query("SELECT count(*)::int AS count FROM event_types WHERE slug = 'shared'")).rows).toEqual([{ count: 3 }]);
+    await expect(client!.exec(`INSERT INTO event_types (id, "userId", "teamId", slug, title) VALUES ('duplicate', 'other', 'a', 'shared', 'Duplicate');`))
+      .rejects.toMatchObject({ code: "23505" });
+    const indexes = (await client!.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename = 'event_types'")).rows.map(row => row.indexname);
+    expect(indexes).toContain("event_types_current_personal_slug"); expect(indexes).toContain("event_types_current_team_slug");
+    expect(indexes).not.toContain("event_types_current_user_slug");
+  });
+  it("refuses ambiguous legacy team links without rewriting URLs or deleting historical meetings", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec(`DROP INDEX event_types_current_personal_slug; DROP INDEX event_types_current_team_slug;
+      CREATE UNIQUE INDEX event_types_current_user_slug ON event_types ("userId", slug) WHERE "deletedAt" IS NULL;
+      INSERT INTO users (id) VALUES ('other'); INSERT INTO teams (id, slug, name) VALUES ('team', 'team', 'Team');
+      INSERT INTO event_types (id, "userId", "teamId", slug, title) VALUES ('a', 'host', 'team', 'ambiguous', 'A'), ('b', 'other', 'team', 'ambiguous', 'B');`);
+    await expect(client!.exec(ddl)).rejects.toMatchObject({ code: "23505" });
+    expect((await client!.query("SELECT id, slug FROM event_types WHERE \"teamId\" = 'team' ORDER BY id")).rows)
+      .toEqual([{ id: "a", slug: "ambiguous" }, { id: "b", slug: "ambiguous" }]);
+    expect((await client!.query('SELECT uid, "eventTypeId" FROM bookings')).rows).toEqual([{ uid: "retained", eventTypeId: "group" }]);
+    // Simulate an explicitly reviewed correction by ID, then rerun the migration.
+    await client!.exec("UPDATE event_types SET slug = 'reviewed-link' WHERE id = 'b'");
+    await client!.exec(ddl); await client!.exec(ddl);
+    expect((await client!.query("SELECT id, slug FROM event_types WHERE \"teamId\" = 'team' ORDER BY id")).rows)
+      .toEqual([{ id: "a", slug: "ambiguous" }, { id: "b", slug: "reviewed-link" }]);
+  });
   it("migrates deleted-type link reuse without losing bookings or weakening current-link uniqueness", async () => {
     await setup(); await seat("retained", 0);
-    await client!.exec(`DROP INDEX event_types_current_user_slug;
+    await client!.exec(`DROP INDEX event_types_current_personal_slug;
+      DROP INDEX event_types_current_team_slug;
       ALTER TABLE event_types DROP COLUMN "deletedAt";
       ALTER TABLE event_types ADD CONSTRAINT "event_types_userId_slug_key" UNIQUE ("userId", slug);`);
     await client!.exec(ddl);

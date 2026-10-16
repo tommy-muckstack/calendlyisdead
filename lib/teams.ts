@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
 import { sendMail } from "./email";
+import { insertEventWithLink } from "./event-type-links";
 const { teams, teamMembers: tm, teamInvites: ti, eventTypes, eventTypeHosts: eth, users } = schema;
 export const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek"] as const;
 const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
@@ -50,15 +51,12 @@ export async function assignManaged(templateId: string, userIds: string[], teamI
     const [tpl] = await tx.select().from(eventTypes).where(and(eq(eventTypes.id, templateId), isNull(eventTypes.deletedAt))).for("update");
     if (!tpl || tpl.kind !== "managed" || (teamId && tpl.teamId !== teamId)) throw new Error("not_managed");
     const members = (await tx.select().from(tm).where(eq(tm.teamId, tpl.teamId))).map((m: any) => m.userId);
-    const targets = userIds.filter(u => members.includes(u));
+    const targets = [...new Set(userIds.filter(u => members.includes(u)))].sort();
     const children = await tx.select().from(eventTypes).where(and(eq(eventTypes.managedParentId, templateId), isNull(eventTypes.deletedAt)));
     for (const uid of targets) {
       if (children.some((c: any) => c.userId === uid)) continue;
-      const mine = await tx.select().from(eventTypes).where(and(eq(eventTypes.userId, uid), isNull(eventTypes.deletedAt)));
-      let slug = tpl.slug, n = 1; while (mine.some((e: any) => e.slug === slug)) slug = `${tpl.slug}-${++n}`;
-      const copy: any = { id: crypto.randomUUID(), userId: uid, slug, kind: "one_on_one", managedParentId: templateId, lockedFields: tpl.lockedFields };
-      for (const f of LOCKABLE) copy[f] = tpl[f];
-      await tx.insert(eventTypes).values(copy);
+      await insertEventWithLink(tx, { ...Object.fromEntries(LOCKABLE.map(f => [f, tpl[f]])), id: crypto.randomUUID(),
+        userId: uid, title: tpl.title, kind: "one_on_one", managedParentId: templateId, lockedFields: tpl.lockedFields }, tpl.slug);
     }
     // unassign anyone no longer listed
     const drop = children.filter((c: any) => !targets.includes(c.userId)).map((c: any) => c.id);

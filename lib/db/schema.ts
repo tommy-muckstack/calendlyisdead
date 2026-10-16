@@ -1,4 +1,5 @@
-import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import type { Weekly } from "../slots";
 export type Question = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
@@ -70,7 +71,10 @@ export const eventTypes = pgTable("event_types", {
   currency: text("currency").notNull().default("usd"),
   redirectUrl: text("redirectUrl"),
   usedAt: timestamp("usedAt", { mode: "date", withTimezone: true }),
-});
+}, e => [
+  uniqueIndex("event_types_current_personal_slug").on(e.userId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NULL`),
+  uniqueIndex("event_types_current_team_slug").on(e.teamId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NOT NULL`),
+]);
 export const bookings = pgTable("bookings", {
   uid: text("uid").primaryKey(),
   eventTypeId: text("eventTypeId").notNull().references(() => eventTypes.id, { onDelete: "cascade" }),

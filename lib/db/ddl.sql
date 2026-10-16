@@ -48,8 +48,14 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "usedAt" timestamptz;
 -- Retain event definitions for booked meetings when a type is deleted. A new
 -- type may reuse its public link; historical bookings still reference the old ID.
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "deletedAt" timestamptz;
-CREATE UNIQUE INDEX IF NOT EXISTS event_types_current_user_slug ON event_types ("userId", slug) WHERE "deletedAt" IS NULL;
+-- Booking URLs are scoped to a personal page OR a team page, not the creator.
+-- Both constraints must be installed before removing the legacy owner-wide one.
+-- Existing ambiguous team links intentionally fail this migration: review them
+-- with docs/parity/event-link-migration.md; never silently change published URLs.
+CREATE UNIQUE INDEX IF NOT EXISTS event_types_current_personal_slug ON event_types ("userId", slug) WHERE "deletedAt" IS NULL AND "teamId" IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS event_types_current_team_slug ON event_types ("teamId", slug) WHERE "deletedAt" IS NULL AND "teamId" IS NOT NULL;
 ALTER TABLE event_types DROP CONSTRAINT IF EXISTS "event_types_userId_slug_key";
+DROP INDEX IF EXISTS event_types_current_user_slug;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentStatus" text NOT NULL DEFAULT 'none';
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentRef" text;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "amountCents" integer NOT NULL DEFAULT 0;
