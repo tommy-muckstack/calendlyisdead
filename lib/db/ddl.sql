@@ -261,3 +261,12 @@ ALTER TABLE workspace_invitations ADD COLUMN IF NOT EXISTS "reminderDelivery" te
 CREATE UNIQUE INDEX IF NOT EXISTS workspace_reminder_token ON workspace_invitations ("reminderTokenHash");
 CREATE INDEX IF NOT EXISTS workspace_due_reminder ON workspace_invitations ("createdAt", id)
   WHERE "acceptedMembershipId" IS NULL AND "revokedAt" IS NULL AND "remindedAt" IS NULL AND "expiresAt" IS NULL;
+
+-- Shared types retain their scope even after a workspace/member is removed.
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "sharedWorkspaceId" text;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "sharedVersion" integer NOT NULL DEFAULT 1;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "sharedRoundRobinResetAt" timestamptz NOT NULL DEFAULT now();
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "sharedReschedule" text NOT NULL DEFAULT 'reassign';
+ALTER TABLE event_type_hosts ADD COLUMN IF NOT EXISTS "membershipId" text;
+ALTER TABLE event_type_hosts ADD COLUMN IF NOT EXISTS "scheduleId" text;
+CREATE INDEX IF NOT EXISTS shared_workspace_events ON event_types ("sharedWorkspaceId") WHERE "deletedAt" IS NULL;

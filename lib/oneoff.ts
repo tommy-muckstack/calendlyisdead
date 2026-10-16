@@ -7,6 +7,7 @@ export async function createOneOff(userId: string, o: { title: string; durationM
   const db = await getDb();
   let base: any = null;
   if (o.fromEventTypeId) [base] = await db.select().from(eventTypes).where(and(eq(eventTypes.id, o.fromEventTypeId), eq(eventTypes.userId, userId), isNull(eventTypes.deletedAt)));
+  if (base?.sharedWorkspaceId) throw new Error("shared_single_use_unsupported");
   const [sc] = await db.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
   const id = crypto.randomUUID(), slug = `o-${shortId()}`;
   const [et] = await db.insert(eventTypes).values({ id, userId, scheduleId: base?.scheduleId ?? sc?.id, slug, kind: "one_off",

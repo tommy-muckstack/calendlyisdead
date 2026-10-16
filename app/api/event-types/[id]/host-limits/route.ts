@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 import { isAdmin } from "@/lib/teams";
+import { sharedAccess } from "@/lib/shared-events";
 import { meetingLimits } from "@/lib/meeting-limits";
 export const runtime = "nodejs";
 
@@ -10,9 +11,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const user = await requireUser(); if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const db = await getDb(); const { id } = await params;
   const [event] = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.id, id), isNull(schema.eventTypes.deletedAt)));
-  if (!event || (event.teamId ? !(await isAdmin(user.id, event.teamId)) : event.userId !== user.id))
+  if (!event || (event.sharedWorkspaceId ? !(await sharedAccess(db, event, user.id)) : event.teamId ? !(await isAdmin(user.id, event.teamId)) : event.userId !== user.id))
     return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const hostIds = !event.teamId ? [event.userId] : event.kind === "managed"
+  const hostIds = !event.teamId && !event.sharedWorkspaceId ? [event.userId] : event.kind === "managed"
     ? (await db.select({ userId: schema.eventTypes.userId }).from(schema.eventTypes).where(and(eq(schema.eventTypes.managedParentId, id), isNull(schema.eventTypes.deletedAt)))).map((row: { userId: string }) => row.userId)
     : (await db.select().from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, id))).map((row: { userId: string }) => row.userId);
   const hosts: typeof schema.users.$inferSelect[] = hostIds.length ? await db.select().from(schema.users).where(inArray(schema.users.id, hostIds)) : [];

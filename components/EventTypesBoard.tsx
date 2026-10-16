@@ -1,4 +1,6 @@
 "use client";
+import { SharedEventHosts } from "./SharedEventHosts";
+import { SharedEventSettings, type SharedHostDirectory } from "@/lib/shared-event-validation";
 import { BP } from "@/lib/basepath";
 import { I } from "@/components/app/icons";
 import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
@@ -13,15 +15,16 @@ import { BookingDateRangeFields } from "./BookingDateRangeFields";
 import { ContactCustomFieldAutomations } from "./ContactFieldAutomation";
 import { OpportunityAutomationsPanel } from "./OpportunityAutomations";
 import { ContactListAutomationPanel } from "./ContactListAutomation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; dateRange: BookingDateRange | null; active: boolean; secret: boolean; lockedTimezone: string | null;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
+  sharedWorkspaceId?: string | null; sharedVersion?: number; shared?: SharedEventSettings; bookingUsername?: string; canEdit?: boolean; canDelete?: boolean; isHost?: boolean;
   kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string; timezone?: string; isDefault?: boolean };
-type PersonalKind = "one_on_one" | "group";
+type PersonalKind = "one_on_one" | "group" | "collective" | "round_robin";
 const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
 const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
 const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "dateRange", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
@@ -35,7 +38,7 @@ const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", descr
   location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
   dateRange: "Date range", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
   kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
-export function EventTypesBoard({ initial, username, schedules, owner, defaultTimezone = "UTC" }: { initial: ET[]; username: string; schedules: Sch[]; owner?: string; defaultTimezone?: string }) {
+export function EventTypesBoard({ initial, username, schedules, owner, hostDirectory, defaultTimezone = "UTC" }: { hostDirectory?: SharedHostDirectory | null; initial: ET[]; username: string; schedules: Sch[]; owner?: string; defaultTimezone?: string }) {
   const [items, setItems] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
@@ -50,9 +53,12 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
   const create = useCallback((kind: PersonalKind) => {
     if (busyRef.current || draftOpen.current) return;
     draftOpen.current = true; setBoardError(""); setOpenId(null);
-    const fields = initialEventFields(kind, schedules.find(schedule => schedule.isDefault)?.id ?? null);
-    setDraft({ ...fields, id: crypto.randomUUID(), rangeDays: 60, secret: false, managedParentId: null, lockedFields: [], teamId: null });
-  }, [schedules]);
+    const sharedKind = kind === "collective" || kind === "round_robin";
+    const me = hostDirectory?.members.find(member => member.isMe);
+    const shared: SharedEventSettings | undefined = sharedKind && hostDirectory ? { workspaceId: hostDirectory.workspaceId, hosts: me ? [{ membershipId: me.membershipId, scheduleId: null, priority: 2 }] : [], distribution: "availability", reschedule: "reassign" } : undefined;
+    const fields = initialEventFields(kind, sharedKind ? null : schedules.find(schedule => schedule.isDefault)?.id ?? null);
+    setDraft({ ...fields, shared, sharedWorkspaceId: sharedKind ? hostDirectory?.workspaceId ?? "pending" : null, id: crypto.randomUUID(), rangeDays: 60, secret: false, managedParentId: null, lockedFields: [], teamId: null });
+  }, [schedules, hostDirectory]);
   const closeDraft = () => { draftOpen.current = false; setDraft(null); };
   async function remove(et: ET) {
     const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "DELETE" });
@@ -73,7 +79,7 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
       }
       const response = await fetch(`${BP}/api/event-types/${et.id}${action === "duplicate" ? "/duplicate" : ""}`, {
         method: action === "duplicate" ? "POST" : "PATCH", headers: { "content-type": "application/json" },
-        body: action === "toggle" ? JSON.stringify({ active: !et.active }) : undefined,
+        body: action === "toggle" ? JSON.stringify({ active: !et.active, ...(et.sharedWorkspaceId ? { sharedVersion: et.sharedVersion } : {}) }) : undefined,
       });
       if (!response.ok) throw new Error("action_failed");
       const saved = await response.json();
@@ -84,52 +90,51 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
     finally { busyRef.current = false; setBusy(null); }
   }
   useEffect(() => {
-    const f = (event: Event) => { const kind = (event as CustomEvent<PersonalKind>).detail; void create(kind === "group" ? "group" : "one_on_one"); };
+    const f = (event: Event) => { const kind = (event as CustomEvent<PersonalKind>).detail; if (["one_on_one", "group", "round_robin", "collective"].includes(kind)) void create(kind); };
     addEventListener("cid:create-event-type", f);
     const url = new URL(location.href), kind = url.searchParams.get("new");
     if (kind) {
       url.searchParams.delete("new"); history.replaceState(null, "", url.pathname + url.search + url.hash);
-      if (["1", "one_on_one", "group"].includes(kind)) void create(kind === "group" ? "group" : "one_on_one");
+      if (["1", "one_on_one", "group", "round_robin", "collective"].includes(kind)) void create(kind === "1" ? "one_on_one" : kind as PersonalKind);
     }
     return () => removeEventListener("cid:create-event-type", f);
   }, [create]);
   const [q, setQ] = useState("");
-  const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase()));
-  const sched = schedules.find(x => x.id === (shown[0]?.scheduleId ?? ""))?.name;
+  const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase())).sort((a, b) => Number(!!a.sharedWorkspaceId) - Number(!!b.sharedWorkspaceId));
   return <>
     {boardError && <p role="alert" className="cs-board-error">{boardError}</p>}
     {busy && <p role="status" className="muted">Updating event type…</p>}
     <div className="cs-search">{I.search(18)}<input ref={searchInput} placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
     <div className="cs-grp"><span className="cs-av">{(owner || username)[0]?.toUpperCase()}</span><b>{owner || username}</b>
       <a href={`${BP}/${username}`} target="_blank">View landing page {I.ext(14)}</a></div>
-    {shown.map(et => <div key={et.id} className="cs-et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
+    {shown.map((et, index) => <Fragment key={et.id}>{et.sharedWorkspaceId && !shown[index - 1]?.sharedWorkspaceId && <h2 className="shared-events-heading">Shared event types</h2>}<div className="cs-et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
       <input type="checkbox" aria-label={`Select ${et.title}`} onClick={e => e.stopPropagation()} />
       <div className="cs-et-copy">
         <h3><button className="cs-et-title" onClick={e => { e.stopPropagation(); setOpenId(et.id); }} aria-label={`Edit ${et.title}`}>{et.title}</button>{et.secret && <span className="cs-secret" role="img" aria-label="Secret event" title="Hidden from your scheduling page. Anyone with the direct link can book.">{I.hidden(16)}</span>}</h3>
-        <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-One"}{et.managedParentId ? " • Managed by your team" : ""}</p>
-        <p>{sched ? `${sched}` : "Weekdays, 9 am - 5 pm"}</p>
+        <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : KIND_LABEL[et.kind] ?? "Event type"}{et.managedParentId ? " • Managed by your team" : ""}</p>
+        <p>{et.shared ? `${et.shared.hosts.length} ${et.shared.hosts.length === 1 ? "host" : "hosts"}` : schedules.find(schedule => et.scheduleId ? schedule.id === et.scheduleId : schedule.isDefault)?.name ?? "Availability schedule"}</p>
       </div>
       <button className="cs-btn cs-outline" onClick={async e => {
         e.stopPropagation(); setBoardError("");
-        try { await navigator.clipboard.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }
+        try { await navigator.clipboard.writeText(`${location.origin}${BP}/${et.bookingUsername ?? username}/${et.slug}`); flash("Link copied"); }
         catch { setBoardError("The link could not be copied. Open the booking page and copy its address."); }
       }}>{I.link(14)}Copy link</button>
-      <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>{I.ext(16)}</a>
-      <EventTypeMenu title={et.title} active={et.active} secret={et.secret} managed={!!et.managedParentId} busy={!!busy}
-        bookingUrl={`${BP}/${username}/${et.slug}`} embedUrl={`/app/embed?event=${encodeURIComponent(et.slug)}`}
+      <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${et.bookingUsername ?? username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>{I.ext(16)}</a>
+      <EventTypeMenu title={et.title} active={et.active} secret={et.secret} managed={!!et.managedParentId} shared={!!et.sharedWorkspaceId} canDelete={et.canDelete} busy={!!busy}
+        bookingUrl={`${BP}/${et.bookingUsername ?? username}/${et.slug}`} embedUrl={`/app/embed?event=${encodeURIComponent(et.sharedWorkspaceId ? et.id : et.slug)}`}
         onAction={action => { void act(action, et); }} />
-    </div>)}
-    {draft && <EventTypeEditor key={draft.id} et={draft} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={closeDraft}
-      onCreate={(event, replayed) => { setItems(items => [...items.filter(item => item.id !== event.id), event]); setQ(""); closeDraft(); setOpenId(event.id); flash(replayed ? "Event type already created" : "Event type created"); }}
+    </div></Fragment>)}
+    {draft && <EventTypeEditor key={draft.id} et={draft} hostDirectory={hostDirectory} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={closeDraft}
+      onCreate={(event, replayed) => { setItems(items => [...items.filter(item => item.id !== event.id), event]); setQ(""); closeDraft(); setOpenId(event.canEdit === false ? null : event.id); if (event.canEdit === false) setItems(items => items.filter(item => item.id !== event.id)); flash(replayed ? "Event type already created" : "Event type created"); }}
       onChange={() => {}} onSaved={() => {}} onDelete={async () => {}} />}
-    {open && <EventTypeEditor key={open.id} et={open} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={() => setOpenId(null)}
-      onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
+    {open && <EventTypeEditor key={open.id} et={open} hostDirectory={hostDirectory} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={() => setOpenId(null)}
+      onChange={n => { setItems(x => n.canEdit === false ? x.filter(i => i.id !== n.id) : x.map(i => i.id === n.id ? n : i)); if (n.canEdit === false) setOpenId(null); }} onSaved={() => flash("Saved")}
       onDelete={() => remove(open)} />}
     {toast && <div className="toast" role="status">{toast}</div>}
   </>;
 }
 
-export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UTC", onClose, onChange, onSaved, onDelete, onCreate }: { et: ET; username: string; schedules: Sch[]; defaultTimezone?: string; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void>; onCreate?(event: ET, replayed: boolean): void }) {
+export function EventTypeEditor({ et, username, schedules, hostDirectory, defaultTimezone = "UTC", onClose, onChange, onSaved, onDelete, onCreate }: { et: ET; hostDirectory?: SharedHostDirectory | null; username: string; schedules: Sch[]; defaultTimezone?: string; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void>; onCreate?(event: ET, replayed: boolean): void }) {
   const creating = !!onCreate;
   const [slugEdited, setSlugEdited] = useState(false), [creationAttempted, setCreationAttempted] = useState(false), [creationBlocked, setCreationBlocked] = useState(false);
   const [d, setD] = useState(et);
@@ -155,7 +160,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
   const [saveCount, setSaveCount] = useState(0);
   const requestPending = useRef(false);
   const controller = useRef<AbortController | null>(null);
-  const dirty = creationAttempted || JSON.stringify(draftBody(d)) !== JSON.stringify(draftBody(baseline));
+  const dirty = creationAttempted || JSON.stringify([draftBody(d), d.shared]) !== JSON.stringify([draftBody(baseline), baseline.shared]);
   const pending = saving || deleting;
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
@@ -173,6 +178,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
   async function save() {
     if (requestPending.current || creationBlocked || (!dirty && !creating)) return;
     const body = draftBody(d);
+    if (d.sharedWorkspaceId && !SharedEventSettings.safeParse(d.shared).success) { setSect("hosts"); setErr("Choose at least one accepted workspace host and a valid schedule."); return; }
     const parsed = creating ? NewEventFields.safeParse(body) : EventTypePatch.safeParse(body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -191,7 +197,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
     const abort = new AbortController(); controller.current = abort;
     const timeout = setTimeout(() => abort.abort(), 15_000);
     try {
-      const response = await fetch(`${BP}/api/event-types${creating ? "" : `/${et.id}`}`, { method: creating ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(creating ? { draftId: et.id, autoSlug: !slugEdited, settings: parsed.data } : parsed.data), signal: abort.signal });
+      const response = await fetch(`${BP}/api/event-types${creating ? "" : `/${et.id}`}`, { method: creating ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(creating ? { draftId: et.id, autoSlug: !slugEdited, settings: parsed.data, ...(d.shared ? { shared: d.shared } : {}) } : { ...parsed.data, ...(d.shared ? { shared: d.shared, sharedVersion: d.sharedVersion } : {}) }), signal: abort.signal });
       const raw = await response.json(), result = creating && response.ok ? raw?.event : raw;
       if (!response.ok) {
         if (creating && ["creation_conflict", "created_event_deleted"].includes(result?.error)) {
@@ -208,6 +214,8 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
         } else if (result?.error === "slug_taken") { setSect("link"); setErr("That link is already used. Choose another link and save again."); }
         else if (creating && result?.error === "too_large") setErr("Event details are too long. Shorten the description or invitee questions before trying again.");
         else if (result?.error === "unauthorized") setErr("Your session expired. Your edits have not been saved. Sign in again before saving.");
+        else if (["shared_event_changed", "hosts_changed", "shared_access_changed", "workspace_required"].includes(result?.error)) setErr("The shared event or workspace membership changed. Your edits are still here. Copy them before reloading Scheduling.");
+        else if (result?.error === "bad_host_schedule") { setSect("hosts"); setErr("A host’s schedule is unavailable. Select an available schedule before saving."); }
         else if (result?.error === "locked") setErr("Your team changed the locked settings. Your edits have not been saved. Copy your changes before reloading.");
         else if (result?.error === "event_kind_locked") setErr("An event type cannot be converted to another kind. Create a new event type instead.");
         else if (result?.error === "bad_schedule") { setSect("avail"); setErr("That schedule is no longer available. Choose another schedule and save again."); }
@@ -216,6 +224,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
       }
       if (!result || result.id !== et.id || !Object.keys(body).every(key => Object.hasOwn(result, key)) ||
         !EventTypePatch.safeParse(Object.fromEntries(Object.keys(body).map(key => [key, result[key]]))).success) throw new Error("invalid_response");
+      if (d.sharedWorkspaceId && (!SharedEventSettings.safeParse(result.shared).success || !Number.isInteger(result.sharedVersion) || typeof result.bookingUsername !== "string")) throw new Error("invalid_shared_response");
       if (creating) {
         const confirmed = NewEventFields.safeParse(Object.fromEntries(Object.keys(body).map(key => [key, result[key]])));
         if (typeof raw.replayed !== "boolean" || result.kind !== d.kind || !NEW_EVENT_FIELDS.safeParse(result).success || !Array.isArray(result.lockedFields) || !confirmed.success ||
@@ -258,10 +267,11 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <p className="muted" data-testid="event-kind">{KIND_LABEL[d.kind] ?? "Event type"} · To use another kind, create a new event type.</p>
           {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting&#39;s limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
+        {d.sharedWorkspaceId && S({ id: "hosts", title: "Hosts", summary: `${d.shared?.hosts.length ?? 0} selected`, children: <SharedEventHosts kind={d.kind} value={d.shared} directory={hostDirectory} onChange={shared => setD({ ...d, shared })} /> })}
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
           <input className="input" list="locs" aria-label="Location" disabled={L("location")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
           <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
-        {S({ id: "link", title: "Booking page options", summary: `/${username}/${d.slug} · ${Number.isFinite(d.startIntervalMin) ? `${d.startIntervalMin} min` : "Custom"} increments`, children: <>
+        {S({ id: "link", title: "Booking page options", summary: `/${d.bookingUsername ?? username}/${d.slug} · ${Number.isFinite(d.startIntervalMin) ? `${d.startIntervalMin} min` : "Custom"} increments`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => { setSlugEdited(true); setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }); }} />
           <label className="f" htmlFor="et-start-interval">Start time increments</label>
           <select id="et-start-interval" className="input" disabled={L("startIntervalMin")} value={customInterval ? "custom" : String(d.startIntervalMin)} aria-describedby="et-start-help" onChange={event => {
@@ -298,9 +308,9 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           {!creating && <HostMeetingLimits eventId={et.id} />}</> })}
         {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"} · ${dateRangeSummary(effectiveDateRange(d))} · ${d.minNoticeMin / 60}h notice`, children: <>
           <BookingDateRangeFields value={effectiveDateRange(d)} disabled={L("dateRange") || L("rangeDays")} onChange={dateRange => setD({ ...d, dateRange })} />
-          <p className="muted">{d.teamId ? "Dates use the event creator’s default schedule time zone." : "Dates use your selected availability schedule’s time zone."}</p>
+          <p className="muted">{d.teamId || d.sharedWorkspaceId ? "Dates use the event creator’s default schedule time zone." : "Dates use your selected availability schedule’s time zone."}</p>
           <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
-          {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
+          {d.sharedWorkspaceId ? <p className="muted">Select each host’s schedule in Hosts.</p> : d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
           <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
             <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
         </> })}
@@ -318,7 +328,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
                 value={(q.options ?? []).join(", ")} onChange={e => up({ options: e.target.value.split(",").map(x => x.trim()) })} />}
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
-        {!creating && S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /><OpportunityAutomationsPanel eventId={et.id} /></> })}
+        {!creating && (!d.sharedWorkspaceId || d.isHost) && S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /><OpportunityAutomationsPanel eventId={et.id} /></> })}
         {S({ id: "pay", title: "Payment and confirmation", summary: `${d.priceCents ? `${(d.priceCents / 100).toFixed(2)} ${d.currency.toUpperCase()}` : "Free"}${d.redirectUrl ? " · redirects after booking" : ""}`, children: <>
           <label className="f" htmlFor="et-price">Price (0 = free)</label>
           <input id="et-price" className="input" type="number" min={0} step="0.01" value={(d.priceCents ?? 0) / 100} onChange={e => setD({ ...d, priceCents: Math.round(Number(e.target.value || 0) * 100) })} />
@@ -327,7 +337,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <p className="muted" style={{ fontSize: 13 }}>Payments go through Stripe Checkout when STRIPE_SECRET_KEY is set; otherwise a demo checkout is shown.</p>
           <label className="f" htmlFor="et-redirect">Redirect after booking (optional)</label>
           <input id="et-redirect" className="input" placeholder="https://example.com/thanks" value={d.redirectUrl ?? ""} onChange={e => setD({ ...d, redirectUrl: e.target.value.trim() || null })} /></> })}
-        {!creating && !d.managedParentId && <button className="btn danger" disabled={deleting} onClick={async () => {
+        {!creating && !d.managedParentId && d.canDelete !== false && <button className="btn danger" disabled={deleting} onClick={async () => {
           if (requestPending.current) return;
           if (!confirm("Delete this event type? Scheduled meetings will remain unchanged.")) return;
           requestPending.current = true; setDeleting(true);

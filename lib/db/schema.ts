@@ -111,6 +111,12 @@ export const eventTypes = pgTable("event_types", {
   maxPerWeek: integer("maxPerWeek"),
   maxPerMonth: integer("maxPerMonth"),
   teamId: text("teamId"),
+  // Deliberately retained after workspace deletion: a shared event must never
+  // become a personal/public event because its organization was removed.
+  sharedWorkspaceId: text("sharedWorkspaceId"),
+  sharedVersion: integer("sharedVersion").notNull().default(1),
+  sharedRoundRobinResetAt: timestamp("sharedRoundRobinResetAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  sharedReschedule: text("sharedReschedule").notNull().default("reassign"),
   seats: integer("seats").notNull().default(1),
   rrMode: text("rrMode").notNull().default("even"), // even | priority
   managedParentId: text("managedParentId"),
@@ -120,6 +126,7 @@ export const eventTypes = pgTable("event_types", {
   redirectUrl: text("redirectUrl"),
   usedAt: timestamp("usedAt", { mode: "date", withTimezone: true }),
 }, e => [
+  index("shared_workspace_events").on(e.sharedWorkspaceId).where(sql`${e.deletedAt} IS NULL`),
   uniqueIndex("event_types_current_personal_slug").on(e.userId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NULL`),
   uniqueIndex("event_types_current_team_slug").on(e.teamId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NOT NULL`),
 ]);
@@ -164,7 +171,9 @@ export const teamMembers = pgTable("team_members", { teamId: text("teamId").notN
   t => [primaryKey({ columns: [t.teamId, t.userId] })]);
 export const teamInvites = pgTable("team_invites", { token: text("token").primaryKey(), teamId: text("teamId").notNull(), email: text("email").notNull(), role: text("role").notNull().default("member"),
   invitedBy: text("invitedBy").notNull(), expires: timestamp("expires", { mode: "date", withTimezone: true }).notNull(), acceptedAt: timestamp("acceptedAt", { mode: "date", withTimezone: true }) });
-export const eventTypeHosts = pgTable("event_type_hosts", { eventTypeId: text("eventTypeId").notNull(), userId: text("userId").notNull(), priority: integer("priority").notNull().default(2) },
+export const eventTypeHosts = pgTable("event_type_hosts", { eventTypeId: text("eventTypeId").notNull(), userId: text("userId").notNull(), priority: integer("priority").notNull().default(2),
+  membershipId: text("membershipId"), scheduleId: text("scheduleId"),
+},
   t => [primaryKey({ columns: [t.eventTypeId, t.userId] })]);
 export type WorkflowTrigger = "on_booked" | "before_start" | "after_end" | "on_cancelled";
 export const workflows = pgTable("workflows", { id: text("id").primaryKey(), userId: text("userId").notNull(), name: text("name").notNull(), trigger: text("trigger").$type<WorkflowTrigger>().notNull(),

@@ -7,14 +7,17 @@ import { isAdmin, propagateManaged, LOCKABLE } from "@/lib/teams";
 import { EventTypePatch } from "@/lib/event-type-validation";
 import { isEventLinkConflict } from "@/lib/event-type-links";
 import { BookingDateRangeSchema, withDateRangeLocks } from "@/lib/booking-date-range";
+import { deleteSharedEvent, sharedAccess, updateSharedEvent } from "@/lib/shared-events";
+import { SharedEventError, SharedEventSettings } from "@/lib/shared-event-validation";
 export const runtime = "nodejs";
-const Patch = EventTypePatch.extend({ lockedFields: z.array(z.enum(LOCKABLE)).optional() });
+const Patch = EventTypePatch.extend({ lockedFields: z.array(z.enum(LOCKABLE)).optional(), shared: SharedEventSettings.optional(), sharedVersion: z.number().int().positive().optional() });
 
 /** Who may edit: the owner of a personal type, or a team owner/admin for team types. */
 async function load(id: string, userId: string) {
   const db = await getDb();
   const [et] = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.id, id), isNull(schema.eventTypes.deletedAt)));
   if (!et) return null;
+  if (et.sharedWorkspaceId) return (await sharedAccess(db, et, userId)) ? et : null;
   if (et.teamId) return (await isAdmin(userId, et.teamId)) ? et : null;
   return et.userId === userId ? et : null;
 }
@@ -26,6 +29,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "ambiguous_date_range" }, { status: 400 });
   const et = await load(id, u.id); if (!et) return NextResponse.json({ error: "not_found" }, { status: 404 });
   const db = await getDb();
+  if (et.sharedWorkspaceId) {
+    try { const { shared, sharedVersion } = p.data; const fields = EventTypePatch.parse(p.data);
+      return NextResponse.json(await updateSharedEvent(u.id, id, sharedVersion, fields, shared));
+    } catch (error) { return NextResponse.json({ error: error instanceof SharedEventError ? error.message : isEventLinkConflict(error) ? "slug_taken" : "save_failed" }, { status: error instanceof SharedEventError ? error.status : isEventLinkConflict(error) ? 409 : 500 }); }
+  }
+  if (p.data.shared || p.data.sharedVersion) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const apply = async (current: typeof schema.eventTypes.$inferSelect, connection: typeof db) => {
     const data: Record<string, unknown> = { ...p.data };
     // Older clients still set a rolling calendar count. Clear an explicit range
@@ -93,6 +102,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const u = await requireUser(); if (!u) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params; const et = await load(id, u.id); if (!et) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (et.sharedWorkspaceId) {
+    try { await deleteSharedEvent(u.id, id); return NextResponse.json({ ok: true }); }
+    catch (error) { return NextResponse.json({ error: error instanceof SharedEventError ? error.message : "delete_failed" }, { status: error instanceof SharedEventError ? error.status : 500 }); }
+  }
   if (et.managedParentId) return NextResponse.json({ error: "managed" }, { status: 403 });
   const db = await getDb();
   const removed = await db.transaction(async (tx: typeof db) => {
