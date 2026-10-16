@@ -20,7 +20,7 @@ const book = (slug: string, time: string, extra = {}) => booking.createBooking({
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   vi.stubEnv("PGLITE_DIR", path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cid-concurrency-")), "db"));
-  const module = await import("../../lib/db"); db = await module.getDb(); schema = module.schema;
+  const database = await import("../../lib/db"); db = await database.getDb(); schema = database.schema;
   booking = await import("../../lib/booking");
   await db.insert(schema.teams).values({ id: "race-team", slug: "race-team", name: "Race team" });
   await db.insert(schema.eventTypes).values([

@@ -23,8 +23,8 @@ export function BrandingPanel({ username, initial }: { username: string; initial
       <label className="f" htmlFor="br-logo">Logo (PNG, JPG, SVG or WebP, under 200 KB)</label>
       <input id="br-logo" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" onChange={e => upload(e.target.files?.[0])} />
       {b.logoUrl && <div className="row" style={{ marginTop: 10 }}><img src={b.logoUrl} alt="Your logo" style={{ maxHeight: 48 }} /><button className="btn" onClick={() => save({ logoUrl: null })}>Remove logo</button></div>}
-      <label className="f" style={{ marginTop: 16 }}><input type="checkbox" checked={b.hideBranding} onChange={e => save({ hideBranding: e.target.checked })} /> Hide "Powered by CalendlyIsDead"</label>
-      <p className="muted" style={{ fontSize: 13 }}>Calendly charges for this. Here it's a checkbox.</p>
+      <label className="f" style={{ marginTop: 16 }}><input type="checkbox" checked={b.hideBranding} onChange={e => save({ hideBranding: e.target.checked })} /> Hide &quot;Powered by CalendlyIsDead&quot;</label>
+      <p className="muted" style={{ fontSize: 13 }}>Calendly charges for this. Here it&#39;s a checkbox.</p>
       <a className="btn" href={`${BP}/${username}`} target="_blank">Preview booking page</a>
     </div>
     {msg && <div className="toast" role="status">{msg}</div>}

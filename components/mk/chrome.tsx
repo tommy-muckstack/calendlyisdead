@@ -64,7 +64,7 @@ export function Footer() {
     <div className="cm-fbar">
       <div className="r1"><div><h5>Downloads</h5>{["Web", "Embed", "Docker", "Postgres", "CalDAV", "iCal", "API"].map(x => <Sq key={x}><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#fff" strokeWidth="1.2" /><path d="M2 8h12M8 2c2 2 2 10 0 12M8 2c-2 2-2 10 0 12" stroke="#fff" strokeWidth="1" /></svg></Sq>)}</div>
         <div style={{ textAlign: "right" }}><h5>Join us on social</h5>{["X", "In", "Gh", "Yt"].map(x => <Sq key={x}><span style={{ fontSize: 11, fontWeight: 600 }}>{x}</span></Sq>)}</div></div>
-      <div className="r2"><span>English ▾</span><nav><a href="/">Privacy Policy</a><a href="/">Legal</a><a href="/">Status</a><a href="/">Cookie Settings</a></nav><span>Apache-2.0 · CalendlyIsDead 2026</span></div>
+      <div className="r2"><span>English ▾</span><nav><Link href="/">Privacy Policy</Link><Link href="/">Legal</Link><Link href="/">Status</Link><Link href="/">Cookie Settings</Link></nav><span>Apache-2.0 · CalendlyIsDead 2026</span></div>
     </div>
   </div></footer>;
 }
