@@ -115,3 +115,14 @@ CREATE TABLE IF NOT EXISTS contact_settings (
   version integer NOT NULL DEFAULT 1, "backfilledAt" timestamptz
 );
 ALTER TABLE contact_meetings ADD COLUMN IF NOT EXISTS "inviteeEmail" text;
+CREATE TABLE IF NOT EXISTS contact_fields (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name text NOT NULL, type text NOT NULL, options jsonb NOT NULL DEFAULT '[]', currency text NOT NULL DEFAULT '',
+  "eventTypeId" text, "questionId" text, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS contact_fields_owner_name ON contact_fields ("userId", lower(name)) WHERE "deletedAt" IS NULL;
+CREATE TABLE IF NOT EXISTS contact_field_values (
+  "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  "fieldId" text NOT NULL REFERENCES contact_fields(id) ON DELETE CASCADE,
+  value jsonb NOT NULL, PRIMARY KEY ("contactId", "fieldId")
+);
