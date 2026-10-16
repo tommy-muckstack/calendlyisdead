@@ -1,5 +1,6 @@
 "use client";
 import { BP } from "@/lib/basepath";
+import { loadSlotCalendar, type SlotCalendar } from "@/lib/booking-client";
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -14,7 +15,8 @@ export function BookingWidget(p: Props) {
   const [tz, setTz] = useState(q.get("tz") ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   const month = q.get("month") ?? DateTime.now().setZone(tz).toFormat("yyyy-MM");
   const date = q.get("date"), slot = q.get("slot");
-  const [slots, setSlots] = useState<Record<string, string[]> | null>(null);
+  const [availability, setAvailability] = useState<{ url: string; slots: SlotCalendar | null; error: string }>({ url: "", slots: null, error: "" });
+  const [retry, setRetry] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const nav = (o: Record<string, string | null>) => {
@@ -22,29 +24,47 @@ export function BookingWidget(p: Props) {
     router.push(`${path}?${s}`, { scroll: false });
   };
   const m = DateTime.fromFormat(month, "yyyy-MM", { zone: tz });
+  const availabilityUrl = `${BP}/api/slots?${new URLSearchParams({ user: p.username, slug: p.slug,
+    from: m.startOf("month").toISODate() ?? "", to: m.endOf("month").toISODate() ?? "", tz,
+    ...(p.reschedule ? { exclude: p.reschedule.uid } : {}) })}`;
+  const slots = availability.url === availabilityUrl ? availability.slots : null;
+  const availabilityError = availability.url === availabilityUrl ? availability.error : "";
   useEffect(() => {
-    setSlots(null);
-    const from = m.startOf("month").toISODate(), to = m.endOf("month").toISODate();
-    fetch(`${BP}/api/slots?user=${encodeURIComponent(p.username)}&slug=${p.slug}&from=${from}&to=${to}&tz=${encodeURIComponent(tz)}${p.reschedule ? `&exclude=${p.reschedule.uid}` : ""}`)
-      .then(r => r.json()).then(j => setSlots(j.slots ?? {}));
-  }, [month, tz]);
+    const controller = new AbortController();
+    let active = true;
+    const failed = () => setAvailability({ url: availabilityUrl, slots: null, error: "We couldn’t load available times. Please try again." });
+    setAvailability({ url: availabilityUrl, slots: null, error: "" });
+    setChosen(null);
+    const timeout = setTimeout(() => { if (active) failed(); controller.abort(); }, 20_000);
+    loadSlotCalendar(availabilityUrl, controller.signal).then(slots => {
+      if (active && !controller.signal.aborted) setAvailability({ url: availabilityUrl, slots, error: "" });
+    }).catch(() => { if (active && !controller.signal.aborted) failed(); }).finally(() => clearTimeout(timeout));
+    return () => { active = false; clearTimeout(timeout); controller.abort(); };
+  }, [availabilityUrl, retry]);
   const cells = useMemo(() => { const first = m.startOf("month"); const pad = first.weekday % 7; return [...Array(pad).fill(null), ...Array.from({ length: first.daysInMonth! }, (_, i) => first.plus({ days: i }))]; }, [month, tz]);
   const fmt = (iso: string, f: string) => DateTime.fromISO(iso).setZone(tz).toFormat(f);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBusy(true); setErr("");
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setErr("");
     const fd = new FormData(e.currentTarget);
     const guests = String(fd.get("guests") ?? "").split(/[,\s]+/).filter(Boolean);
-    const r = await fetch(BP + "/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-      username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid, embed: !!p.embed,
-      answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
-    const j = await r.json(); setBusy(false);
-    if (r.ok) {
-      if (j.checkoutUrl) { location.href = j.checkoutUrl; return; }
-      if (j.redirectUrl && !p.embed) { location.href = j.redirectUrl; return; }
-      router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);
-    }
-    else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
+    try {
+      const r = await fetch(BP + "/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid, embed: !!p.embed,
+        answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
+      const j = await r.json();
+      if (r.ok) {
+        if (j.checkoutUrl) { location.href = j.checkoutUrl; return; }
+        if (j.redirectUrl && !p.embed) { location.href = j.redirectUrl; return; }
+        if (typeof j.uid !== "string" || !j.uid) throw new Error("invalid_booking_response");
+        router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);
+      }
+      else if (r.status >= 500) throw new Error("booking_unconfirmed");
+      else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
+    } catch {
+      setErr("We couldn’t confirm your booking. Check for a confirmation before trying again.");
+    } finally { setBusy(false); }
   }
 
   return <div className="card bk">
@@ -71,7 +91,9 @@ export function BookingWidget(p: Props) {
           {cells.map((c, i) => { if (!c) return <div key={i} />; const k = c.toISODate()!; const open = !!slots?.[k]?.length;
             return <button key={k} className={`day ${open ? "open" : ""} ${date === k ? "sel" : ""}`} disabled={!open} aria-label={c.toFormat("cccc, LLLL d")} onClick={() => { setChosen(null); nav({ date: k }); }}>{c.day}</button>; })}
         </div>
-        {!slots && <p className="muted">Loading open times…</p>}
+        {!slots && !availabilityError && <p className="muted" role="status">Loading open times…</p>}
+        {availabilityError && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => setRetry(value => value + 1)}>Retry available times</button></div>}
+        {slots && !Object.values(slots).some(times => times.length > 0) && <p className="muted" role="status">No available times this month. Try another month.</p>}
         <label className="f" htmlFor="tz">Time zone</label>
         <select id="tz" className="input" value={tz} onChange={e => { setTz(e.target.value); nav({ tz: e.target.value }); }}>{ZONES.map(z => <option key={z}>{z}</option>)}</select>
       </div>
@@ -84,7 +106,7 @@ export function BookingWidget(p: Props) {
         {slots && !(slots[date] ?? []).length && <p className="muted">No times left on this day.</p>}
       </div>}
     </section> : <section style={{ padding: 28, maxWidth: 520 }}>
-      <button className="btn" onClick={() => nav({ slot: null })}>← Back</button>
+      <button className="btn" disabled={busy} onClick={() => { setErr(""); setRetry(value => value + 1); nav({ slot: null }); }}>← Back</button>
       <h2 style={{ fontSize: 20 }}>Your details</h2>
       <form onSubmit={submit}>
         <label className="f" htmlFor="name">Name</label><input className="input" id="name" name="name" required defaultValue={p.reschedule?.name ?? q.get("name") ?? undefined} />
@@ -97,8 +119,9 @@ export function BookingWidget(p: Props) {
             : <input className="input" id={`q_${q.id}`} name={`q_${q.id}`} type={q.type === "phone" ? "tel" : "text"} required={q.required} />}
         </div>)}
         <label className="f" htmlFor="notes">Anything to prepare?</label><textarea className="input" id="notes" name="notes" rows={4} />
-        {err && <p style={{ color: "var(--warn)" }}>{err}</p>}
-        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy}>{p.reschedule ? "Confirm new time" : p.price ? `Continue to payment (${p.price})` : "Book it"}</button>
+        {err && <p role="alert" style={{ color: "var(--warn)" }}>{err}</p>}
+        {busy && <p role="status">Submitting your details…</p>}
+        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy} aria-busy={busy}>{p.reschedule ? "Confirm new time" : p.price ? `Continue to payment (${p.price})` : "Book it"}</button>
       </form>
     </section>}
   </div>;
