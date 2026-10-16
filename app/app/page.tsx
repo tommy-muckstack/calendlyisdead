@@ -9,10 +9,10 @@ export default async function Page() {
   const u = await requireUser(); if (!u) redirect("/login"); const db = await getDb();
   const [types, scs, lockedGroups] = await Promise.all([
     db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.userId, u.id), isNull(schema.eventTypes.deletedAt))),
-    db.select({ id: schema.schedules.id, name: schema.schedules.name }).from(schema.schedules).where(eq(schema.schedules.userId, u.id)),
+    db.select({ id: schema.schedules.id, name: schema.schedules.name, timezone: schema.schedules.timezone, isDefault: schema.schedules.isDefault }).from(schema.schedules).where(eq(schema.schedules.userId, u.id)),
     getLockedGroupEventIds(u.id),
   ]);
   const ets = types.filter((e: typeof schema.eventTypes.$inferSelect) => !e.teamId && e.kind !== "one_off" && e.kind !== "poll")
     .map((e: typeof schema.eventTypes.$inferSelect) => ({ ...e, groupSettingsLocked: lockedGroups.has(e.id) }));
-  return <EventTypesBoard initial={ets} username={u.username!} schedules={scs} owner={(u as any).name || undefined} />;
+  return <EventTypesBoard initial={ets} username={u.username!} schedules={scs} owner={u.name || undefined} defaultTimezone={u.timezone} />;
 }

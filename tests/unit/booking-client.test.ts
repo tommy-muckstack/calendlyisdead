@@ -4,6 +4,15 @@ import { loadSlotCalendar } from "../../lib/booking-client";
 afterEach(() => vi.unstubAllGlobals());
 const signal = () => new AbortController().signal;
 describe("booking availability responses", () => {
+  it("requires a refresh when the event timezone changed after the page loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ slots: {}, timezone: "Asia/Tokyo" })));
+    await expect(loadSlotCalendar("/api/slots", signal(), "America/New_York")).rejects.toThrow("booking_timezone_changed");
+  });
+  it("accepts slots grouped in the expected event timezone", async () => {
+    const slots = { "2027-01-12": ["2027-01-11T20:00:00Z"] };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ slots, timezone: "Asia/Tokyo" })));
+    expect(await loadSlotCalendar("/api/slots", signal(), "Asia/Tokyo")).toEqual(slots);
+  });
   it("accepts available times and a genuinely empty calendar", async () => {
     const slots = { "2027-01-11": ["2027-01-11T14:00:00Z"] };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ slots })).mockResolvedValueOnce(Response.json({ slots: {} })));

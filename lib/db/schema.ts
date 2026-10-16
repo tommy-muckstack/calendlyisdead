@@ -63,6 +63,7 @@ export const eventTypes = pgTable("event_types", {
   rangeDays: integer("rangeDays").notNull().default(60),
   active: boolean("active").notNull().default(true),
   secret: boolean("secret").notNull().default(false),
+  lockedTimezone: text("lockedTimezone"),
   deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
   kind: text("kind").notNull().default("one_on_one"),
   questions: jsonb("questions").$type<Question[]>().notNull().default([]),

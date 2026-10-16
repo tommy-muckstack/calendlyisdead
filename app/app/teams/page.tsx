@@ -19,5 +19,5 @@ export default async function Page() {
         hosts: hosts.filter((h: any) => h.eventTypeId === e.id).map((h: any) => ({ userId: h.userId, priority: h.priority })),
         assigned: kids.filter((k: any) => k.managedParentId === e.id).map((k: any) => k.userId) })) };
   }));
-  return <TeamsPanel teams={data} me={u.id} />;
+  return <TeamsPanel teams={data} me={u.id} defaultTimezone={u.timezone} />;
 }

@@ -21,6 +21,16 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("defaults to automatic booking timezones and preserves locks and historical meetings on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE event_types DROP COLUMN "lockedTimezone";'); await client!.exec(ddl);
+    expect((await client!.query('SELECT "lockedTimezone" FROM event_types')).rows).toEqual([{ lockedTimezone: null }]);
+    await client!.exec(`UPDATE event_types SET "lockedTimezone" = 'Asia/Tokyo';
+      INSERT INTO event_types (id, "userId", slug, title) VALUES ('new', 'host', 'new', 'New');`); await client!.exec(ddl);
+    expect((await client!.query('SELECT id, "lockedTimezone" FROM event_types ORDER BY id')).rows)
+      .toEqual([{ id: "group", lockedTimezone: "Asia/Tokyo" }, { id: "new", lockedTimezone: null }]);
+    expect((await client!.query('SELECT uid, "inviteeTz", start FROM bookings')).rows).toEqual([{ uid: "retained", inviteeTz: "UTC", start: new Date("2026-11-02T15:00:00Z") }]);
+  });
   it("defaults existing and new events to public and preserves visibility, on/off status and meetings on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE event_types DROP COLUMN secret;'); await client!.exec(ddl);

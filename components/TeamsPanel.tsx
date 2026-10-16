@@ -9,10 +9,10 @@ type Member = { userId: string; role: string; name: string; email: string };
 type TET = ET & { rrMode: string; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
 const KIND: Record<string, string> = { collective: "Collective", round_robin: "Round robin", managed: "Managed" };
-const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
-const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit", startIntervalMin: "Start time increments" };
+const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
+const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit", startIntervalMin: "Start time increments", lockedTimezone: "Booking time zone" };
 
-export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
+export function TeamsPanel({ teams, me, defaultTimezone = "UTC" }: { teams: Team[]; me: string; defaultTimezone?: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<{ source: Team[]; values: Record<string, boolean> }>({ source: teams, values: {} });
@@ -99,7 +99,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
         {(["collective", "round_robin", "managed"] as const).map(k => <button key={k} className="btn" onClick={() => call(`/api/teams/${t.id}/event-types`, "POST", { kind: k, title: `${KIND[k]} meeting` })}>+ {KIND[k]}</button>)}
       </div>}
     </section>; })}
-    {editor && <EventTypeEditor key={editor.et.id} et={editor.et} username={`team/${editor.teamSlug}`} schedules={[]}
+    {editor && <EventTypeEditor key={editor.et.id} et={editor.et} username={`team/${editor.teamSlug}`} schedules={[]} defaultTimezone={defaultTimezone}
       onClose={() => setEditor(null)} onChange={et => setEditor(current => current ? { ...current, et } : null)}
       onSaved={() => { setMsg("Saved"); router.refresh(); }} onDelete={async () => {
         const response = await fetch(`${BP}/api/event-types/${editor.et.id}`, { method: "DELETE" });
