@@ -21,6 +21,16 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("defaults existing and new events to public and preserves visibility, on/off status and meetings on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE event_types DROP COLUMN secret;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT secret, active FROM event_types')).rows).toEqual([{ secret: false, active: true }]);
+    await client!.exec(`UPDATE event_types SET secret = true, active = false;
+      INSERT INTO event_types (id, "userId", slug, title) VALUES ('new', 'host', 'new', 'New');`); await client!.exec(ddl);
+    expect((await client!.query('SELECT id, secret, active FROM event_types ORDER BY id')).rows)
+      .toEqual([{ id: "group", secret: true, active: false }, { id: "new", secret: false, active: true }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+  });
   it("preserves old duration-based spacing once, defaults new events to 30 and leaves edits alone on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE event_types DROP COLUMN "startIntervalMin"; UPDATE event_types SET "durationMin" = 45;'); await client!.exec(ddl);

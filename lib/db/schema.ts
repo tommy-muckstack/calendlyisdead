@@ -62,6 +62,7 @@ export const eventTypes = pgTable("event_types", {
   minNoticeMin: integer("minNoticeMin").notNull().default(240),
   rangeDays: integer("rangeDays").notNull().default(60),
   active: boolean("active").notNull().default(true),
+  secret: boolean("secret").notNull().default(false),
   deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
   kind: text("kind").notNull().default("one_on_one"),
   questions: jsonb("questions").$type<Question[]>().notNull().default([]),

@@ -79,6 +79,7 @@
 .cs-actions .cs-create .cs-menu{top:38px}
 .cs-et-copy{min-width:0}
 .cs-et-title{all:unset;cursor:pointer;text-align:left}
+.cs-secret{display:inline-flex;vertical-align:middle;margin-left:8px;color:var(--mut)}
 @media(max-width:900px){.cs-head{gap:12px}.cs-actions{flex-wrap:wrap;gap:8px}.cs-grp{flex-wrap:wrap}.cs-grp a{font-size:12px}.cs-et h3{overflow-wrap:anywhere}}
 
 .cs-et-menu{display:grid;place-items:center}

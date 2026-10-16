@@ -1,8 +1,10 @@
 "use client";
 import { BP, withBase } from "@/lib/basepath";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventTypeEditor, type ET } from "./EventTypesBoard";
+import { setEventVisibility } from "@/lib/event-visibility-client";
+import { I } from "./app/icons";
 type Member = { userId: string; role: string; name: string; email: string };
 type TET = ET & { rrMode: string; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
@@ -13,7 +15,22 @@ const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit",
 export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<{ source: Team[]; values: Record<string, boolean> }>({ source: teams, values: {} });
+  const [visibilityPending, setVisibilityPending] = useState<string | null>(null), visibilityBusy = useRef(false);
+  const [visibilityError, setVisibilityError] = useState("");
+  // Fresh server props replace confirmed local values after router.refresh().
+  const visibleValues = visibility.source === teams ? visibility.values : {};
   const [editor, setEditor] = useState<{ et: ET; teamSlug: string } | null>(null);
+  async function changeVisibility(et: TET, secret: boolean) {
+    if (visibilityBusy.current) return;
+    visibilityBusy.current = true; setVisibilityPending(et.id); setVisibilityError(""); setMsg("");
+    try {
+      await setEventVisibility(et.id, secret);
+      setVisibility(current => ({ source: teams, values: { ...(current.source === teams ? current.values : {}), [et.id]: secret } }));
+      setMsg(secret ? "Event type made secret" : "Event type made public"); router.refresh();
+    } catch (error) { setVisibilityError(error instanceof Error ? error.message : "Visibility could not be confirmed. Try again."); }
+    finally { visibilityBusy.current = false; setVisibilityPending(null); }
+  }
   async function duplicate(et: TET, teamSlug: string) {
     if (duplicating) return;
     setDuplicating(et.id); setMsg("");
@@ -30,6 +47,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   return <>
     <h2 style={{ marginTop: 0 }}>Teams</h2>
     {msg && <p role="status" className="card" style={{ padding: 12 }}>{msg}</p>}
+    {visibilityError && <p role="alert" className="card" style={{ padding: 12 }}>{visibilityError}</p>}
     <form className="row" style={{ marginBottom: 24 }} onSubmit={async e => { e.preventDefault(); const fd = new FormData(e.currentTarget);
       const r = await call("/api/teams", "POST", { name: fd.get("name"), slug: fd.get("slug") }); setMsg(r.ok ? "Team created." : "That team link is taken or invalid."); }}>
       <input className="input" name="name" placeholder="Team name" aria-label="Team name" required style={{ maxWidth: 240 }} />
@@ -47,10 +65,12 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
         <select className="input" name="role" aria-label="Invite role" style={{ width: 120 }}><option value="member">Member</option><option value="admin">Admin</option></select>
         <button className="btn">Send invite</button></form>}
       <h3>Team event types</h3>
-      {t.eventTypes.map(e => <div key={e.id} className="card" style={{ padding: 14, marginBottom: 10 }} data-testid="team-et">
-        <div className="row" style={{ justifyContent: "space-between" }}><b>{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {KIND[e.kind]} · {e.durationMin} min</span></b>
+      {t.eventTypes.map(e => { const secret = visibleValues[e.id] ?? e.secret; return <div key={e.id} className="card" style={{ padding: 14, marginBottom: 10 }} data-testid="team-et">
+        <div className="row" style={{ justifyContent: "space-between" }}><b>{e.title}{secret && <span className="cs-secret" role="img" aria-label="Secret event" title="Hidden from your scheduling page. Anyone with the direct link can book.">{I.hidden(16)}</span>} <span className="muted" style={{ fontWeight: 400 }}>· {KIND[e.kind]} · {e.durationMin} min</span></b>
           <div className="row">{e.kind !== "managed" && <a className="btn" href={`${BP}/team/${t.slug}/${e.slug}`} target="_blank">View</a>}
             {admin && <button className="btn" onClick={() => setEditor({ et: e, teamSlug: t.slug })}>Edit</button>}
+            {admin && e.kind !== "managed" && <button className="btn" disabled={!!visibilityPending} aria-busy={visibilityPending === e.id}
+              onClick={() => { void changeVisibility(e, !secret); }}>{secret ? "Make public" : "Make secret"}</button>}
             {admin && <button className="btn" disabled={!!duplicating} onClick={() => { void duplicate(e, t.slug); }}>
               {duplicating === e.id ? "Duplicating…" : "Duplicate"}</button>}</div></div>
         {admin && e.kind !== "managed" && <>
@@ -74,7 +94,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
           <label className="f">Template name <input className="input" aria-label={`Template name for ${e.title}`} defaultValue={e.title} onBlur={x => x.target.value !== e.title && call(`/api/event-types/${e.id}`, "PATCH", { title: x.target.value })} /></label>
           <label className="f">Duration <input className="input" type="number" aria-label={`Template duration for ${e.title}`} defaultValue={e.durationMin} onBlur={x => Number(x.target.value) !== e.durationMin && call(`/api/event-types/${e.id}`, "PATCH", { durationMin: Number(x.target.value) })} /></label>
         </>}
-      </div>)}
+      </div>; })}
       {admin && <div className="row" style={{ marginTop: 8 }}>
         {(["collective", "round_robin", "managed"] as const).map(k => <button key={k} className="btn" onClick={() => call(`/api/teams/${t.id}/event-types`, "POST", { kind: k, title: `${KIND[k]} meeting` })}>+ {KIND[k]}</button>)}
       </div>}

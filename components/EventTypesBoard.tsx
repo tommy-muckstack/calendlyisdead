@@ -5,9 +5,10 @@ import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
 import { EventTypePatch } from "@/lib/event-type-validation";
 import { HostMeetingLimits } from "./HostMeetingLimits";
 import { START_INTERVAL_PRESETS, MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "@/lib/start-increments";
+import { setEventVisibility } from "@/lib/event-visibility-client";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
-  bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
+  bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean; secret: boolean;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
   kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
@@ -69,6 +70,11 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
     busyRef.current = true; setBusy(et.id); setBoardError("");
     try {
       if (action === "delete") { await remove(et); flash("Event type deleted"); return; }
+      if (action === "visibility") {
+        await setEventVisibility(et.id, !et.secret);
+        setItems(items => items.map(item => item.id === et.id ? { ...item, secret: !et.secret } : item));
+        flash(et.secret ? "Event type made public" : "Event type made secret"); return;
+      }
       const response = await fetch(`${BP}/api/event-types/${et.id}${action === "duplicate" ? "/duplicate" : ""}`, {
         method: action === "duplicate" ? "POST" : "PATCH", headers: { "content-type": "application/json" },
         body: action === "toggle" ? JSON.stringify({ active: !et.active }) : undefined,
@@ -78,7 +84,7 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
       if (!saved?.id || typeof saved.title !== "string") throw new Error("invalid_response");
       if (action === "duplicate") { setItems(x => [...x, saved]); setQ(""); setOpenId(saved.id); flash("Event type duplicated"); }
       else { setItems(x => x.map(item => item.id === saved.id ? saved : item)); flash(saved.active ? "Event type turned on" : "Event type turned off"); }
-    } catch { setBoardError("The change could not be confirmed. Reload the page before trying again."); }
+    } catch (error) { setBoardError(action === "visibility" && error instanceof Error ? error.message : "The change could not be confirmed. Reload the page before trying again."); }
     finally { busyRef.current = false; setBusy(null); }
   }
   useEffect(() => {
@@ -104,7 +110,7 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
     {shown.map(et => <div key={et.id} className="cs-et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
       <input type="checkbox" aria-label={`Select ${et.title}`} onClick={e => e.stopPropagation()} />
       <div className="cs-et-copy">
-        <h3><button className="cs-et-title" onClick={e => { e.stopPropagation(); setOpenId(et.id); }} aria-label={`Edit ${et.title}`}>{et.title}</button></h3>
+        <h3><button className="cs-et-title" onClick={e => { e.stopPropagation(); setOpenId(et.id); }} aria-label={`Edit ${et.title}`}>{et.title}</button>{et.secret && <span className="cs-secret" role="img" aria-label="Secret event" title="Hidden from your scheduling page. Anyone with the direct link can book.">{I.hidden(16)}</span>}</h3>
         <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-One"}{et.managedParentId ? " • Managed by your team" : ""}</p>
         <p>{sched ? `${sched}` : "Weekdays, 9 am - 5 pm"}</p>
       </div>
@@ -114,7 +120,7 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
         catch { setBoardError("The link could not be copied. Open the booking page and copy its address."); }
       }}>{I.link(14)}Copy link</button>
       <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>{I.ext(16)}</a>
-      <EventTypeMenu title={et.title} active={et.active} managed={!!et.managedParentId} busy={!!busy}
+      <EventTypeMenu title={et.title} active={et.active} secret={et.secret} managed={!!et.managedParentId} busy={!!busy}
         bookingUrl={`${BP}/${username}/${et.slug}`} embedUrl={`/app/embed?event=${encodeURIComponent(et.slug)}`}
         onAction={action => { void act(action, et); }} />
     </div>)}

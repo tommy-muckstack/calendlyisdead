@@ -14,6 +14,7 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS questions jsonb NOT NULL DEFAUL
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerDay" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerWeek" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerMonth" integer;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS secret boolean NOT NULL DEFAULT false;
 -- Preserve the old duration-based spacing once, then keep spacing independent.
 -- New templates use 30 minutes even when their duration differs.
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "startIntervalMin" integer;
