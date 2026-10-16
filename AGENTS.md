@@ -26,6 +26,8 @@
 
 ## Accounts, data and assets
 
+- App identity (user-confirmed 2026-10-15): use the supplied tombstone with its transparent X, in the existing Calendly-blue palette, wherever the app mark or favicon is needed. See `assets/brand/README.md`. Do not reintroduce a Calendly mark; retain the CalendlyIsDead name and independence disclaimer. Provider logos and user-uploaded logos keep their own identity.
+
 - Use disposable test accounts and addresses. Never use Google or Microsoft sign-in on the original during this audit. Stop at CAPTCHAs or other access barriers and report them.
 - Do not enter payment details, send messages to real people, or modify payment/Stripe behavior or secrets.
 - Local mail uses `.data/outbox/` without provider credentials. Verify mail transport before any booking, invitation or notification test. Use reserved test addresses locally.
@@ -38,6 +40,7 @@
 - Website analytics uses the contract in `docs/ANALYTICS.md` and `lib/telemetry/schema.ts`. Preserve website/app/platform/schema metadata, bounded properties and URL redaction. Do not add unfiltered autocapture, session replay or arbitrary payload logging. Keep production telemetry disabled in local and preview checks.
 
 - Run lint, TypeScript checking and production build before each PR, plus focused behavioral tests for changed logic. Report failed or unavailable checks honestly.
+- Do not run the standalone TypeScript check concurrently with `next build`: the build regenerates `.next/types`, which the checker includes. Run it after the build finishes to avoid transient missing-file failures.
 - Current commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e`. Lint uses the Next.js Core Web Vitals and TypeScript presets. Existing explicit `any` usage is reported as a warning during the incremental type cleanup; do not call a warning-bearing run clean or suppress new findings.
 - Existing E2E configuration deletes `.data/e2e` and `.data/outbox` and starts its own server. Use a dedicated checkout with only disposable data for it.
 - Test timezone/DST boundaries, buffers, notice, daily/weekly limits and simultaneous conflicting bookings when changing scheduling logic. Verify email/ICS artifacts locally.
