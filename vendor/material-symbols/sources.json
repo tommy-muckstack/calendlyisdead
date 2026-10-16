@@ -1,5 +1,10 @@
 [
   {
+    "name": "visibility_off",
+    "sha": "d98cf8d942c86a4b3d92284eb6d67c2be849ded0",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/visibility_off/materialsymbolsoutlined/visibility_off_24px.svg"
+  },
+  {
     "name": "hourglass_empty",
     "sha": "445c6add74b1aaf53e63f7da833a059933002f13",
     "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/hourglass_empty/materialsymbolsoutlined/hourglass_empty_24px.svg"

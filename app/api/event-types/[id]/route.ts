@@ -25,6 +25,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const db = await getDb();
   const apply = async (current: typeof schema.eventTypes.$inferSelect, connection: typeof db) => {
     const data: Record<string, unknown> = { ...p.data };
+    // Visibility belongs to each assigned event, not the managed template.
+    if (current.kind === "managed" && "secret" in data)
+      return NextResponse.json({ error: "managed_template_visibility" }, { status: 400 });
     if (current.managedParentId) {
       const locked = (current.lockedFields ?? []).filter(f => f in data && JSON.stringify(data[f]) !== JSON.stringify(current[f]));
       if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
