@@ -79,7 +79,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | B01 | Invitee event/host summary | unverified | P3 | `BookingWidget`; needs paired reference with equivalent event. | pending B2 |
 | B02 | Calendar/month/day states and mobile sizing | unverified | P2 | `.cal` has 300px minimum width plus container padding; test 390px and narrower widths for overflow. | pending B2 |
 | B03 | Time-slot selection and progression | unverified | P1 | Local time selection/Next exists; compare state changes and scroll behavior. | pending B2 |
-| B04 | Timezone picker, search, time format | differs | P2 | Native IANA select without search; list from `supportedValuesOf` omits UTC and aliases that may be selected. Source finding. | pending B2 |
+| B04 | Timezone picker, search, time format | differs | P2 | Local fix includes UTC and the current valid alias in the native select, and derives the zone from the URL so back/forward navigation restores it. Search and original picker/time-format comparison remain outstanding. | pending B2 |
 | B05 | Invitee form, guest fields and validation | unverified | P1 | Name/email/guests/questions/notes implemented; compare required/invalid/submit states. | pending B2 |
 | B06 | Availability loading, empty and failed requests | differs | P1 | Local fix validates response data, separates failures from empty results, offers retry, times out after 20 seconds, and cancels/ignores obsolete requests. Ten request-layer tests pass; twelve browser scenarios covering B06/B07 are authored but unexecuted. Original/UI comparison remains. | pending B2 |
 | B07 | Submission loading and network failures | differs | P1 | Local fix restores the button after network/JSON/server failures, preserves entered details and announces an unconfirmed result without automatic POST retries. Malformed success no longer routes to an undefined booking. Browser execution/original comparison remains. | pending B2 |
@@ -87,7 +87,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | B09 | Cancel, reasons, result and repeated cancellation | unverified | P1 | Existing E2E source covers happy path; execution blocked. | pending B2 |
 | B10 | Reschedule, preserved answers and cancellation | unverified | P1 | Existing happy-path E2E source; inspect state and notification semantics. | pending B2 |
 | B11 | Personal/team booking indexes and inactive events | unverified | P2 | Dynamic user/team pages exist; compare empty/not-found states. | pending B2 |
-| B12 | Invalid booking URL month/timezone parameters | differs | P1 | Source review: invalid month/timezone yields an invalid Luxon date, then `Array(first.weekday % 7)` receives NaN and throws. Validate incoming query parameters before calendar rendering. | pending B2 |
+| B12 | Invalid booking URL month/timezone parameters | differs | P1 | Reproduced RangeError for invalid month/zone. Local fix validates month, zone, date and offset-bearing slot before rendering, recovers to the calendar, and cleans invalid parameters on navigation. Nineteen unit cases pass; browser/original comparison remains. | pending B2 |
 | V01 | Availability schedules, defaults and weekly hours | unverified | P1 | `AvailabilityEditor`; compare all controls and persistence. | pending B2 |
 | V02 | Date overrides, holidays and overlap validation | differs | P1 | Local fix on current main rejects invalid clock times, calendar dates, weekdays and empty timezone before saving. All 13 API/database regressions pass; valid 24:00 ends, leap dates and closed days persist. Original/browser parity remains unverified. | pending B2 |
 | M01 | Meetings list, filters, search and export | differs | P1 | New authenticated Calendar → Meetings timeline with upcoming/past/cancelled/all, literal search, event/date filters, pagination and streaming CSV. Functional tests pass; organization-wide reporting, external events and paired UI comparison remain. | pending B2 |
@@ -149,7 +149,8 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Event-type default schedule | [PR #3](https://github.com/tommy-muckstack/calendlyisdead/pull/3) | 91 tests, standalone TypeScript and production build pass on current main plus PR #2. Browser evidence and lint remain blocked. |
 | Availability input validation | [PR #2](https://github.com/tommy-muckstack/calendlyisdead/pull/2) | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
 | Host meetings timeline, detail and CSV | [Draft PR #6](https://github.com/tommy-muckstack/calendlyisdead/pull/6) | 105 tests, standalone TypeScript and build pass. Historical base lacks lint tooling; browser comparison remains blocked. |
-| Booking request failure recovery | `fix/booking-request-errors` / local only | 115 unit/integration tests, TypeScript and production build pass. Twelve Playwright scenarios at 1440/390px are discoverable and separately typechecked, but execution remains blocked. Lint script still missing. |
+| Booking request failure recovery | [Draft PR #7](https://github.com/tommy-muckstack/calendlyisdead/pull/7) | 115 unit/integration tests, TypeScript and production build pass. Twelve Playwright scenarios at 1440/390px are discoverable and separately typechecked, but execution remains blocked. Lint script still missing. |
+| Booking link validation and timezone selection | `fix/booking-link-validation` / local only | 134 unit/integration tests, standalone TypeScript and production build pass. Four additional browser cases are discoverable/typechecked but unexecuted. Lint/browser evidence blocked. |
 
 ## Capturing evidence with other workers
 
@@ -190,6 +191,12 @@ Source comparison found that unavailable/malformed slot responses were shown as 
 
 Verification: all 115 unit/integration tests pass, including ten new availability response/cancellation tests. Standalone TypeScript and production build pass. Twelve Playwright cases cover HTTP failure/retry, stale month responses, timeout and network/non-JSON/malformed-success submissions at both requested widths. Test discovery and a separate E2E TypeScript check pass; **these browser cases have not executed** because B2 persists. They intercept every booking POST, so they do not send email or create real meetings. No screenshots, computed-style measurements or original behavior equivalence are claimed. Publication resumed under the October 16 QA prompt; see the publication verification below.
 
+### Booking link validation
+
+Before: malformed `month` or `tz` led to an invalid Luxon weekday and `Array(NaN)`, reproduced locally as `RangeError: Invalid array length`. Invalid dates/slots could also reach the details display. After: invalid links show a warning and a usable calendar, with a valid visitor timezone (UTC fallback), current local month and no selected slot. Navigation replaces invalid calendar parameters while retaining unrelated prefill fields. Offset-bearing timestamps preserve both instants in the repeated DST hour. UTC and valid aliases stay available in the timezone select; the URL drives selection on browser history changes. Picker search and broader timezone UI parity are still outstanding.
+
+Nineteen new unit cases cover malformed/empty inputs, real leap dates, aliases, local month boundaries and ambiguous/invalid slots. All 134 tests pass, along with standalone TypeScript, separate browser-test TypeScript checking and the production build. Four Playwright cases at 1440/390px are authored and discoverable, not executed (B2). `npm run lint` still reports the missing script (B3). No visual match is certified, and the change remains local.
+
 ### QA #40 — publication verification, October 16
 
 The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
@@ -201,3 +208,9 @@ Fresh isolated-checkout verification of the product source: 105 tests in 12 file
 Fresh isolated checkout: 115 unit/database tests in 13 files, production build and standalone TypeScript pass. npm run lint was attempted and fails because this historical base has no lint script; tooling is a later pending change. Installed dependencies were reused from the current local checkout. Twelve 1440px/390px request-recovery Playwright scenarios are authored, not executed. This fixes source-observed loading, stale-response and submission failure behavior; the QA prompt's booking layout/flow findings #30–#39 remain open.
 
 The product files are unchanged from local source commit `e38239ef8a7406c1f9174b3f8ffac3cd66a67947`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
+
+### Booking link validation — publication verification, October 16
+
+Fresh isolated checkout: 134 unit/database tests in 14 files, production build and standalone TypeScript pass. npm run lint was attempted and fails because this historical base has no lint script; tooling is a later pending change. Installed dependencies were reused from the current local checkout. Four 1440px/390px link-validation Playwright scenarios are authored, not executed. Coverage includes invalid dates/zones/months, local month boundaries and distinct repeated DST instants. Friendly/searchable timezone UI in QA #33 remains open.
+
+The product files are unchanged from local source commit `8f9800cd73e536d4997c6649818042b0dec6a892`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.

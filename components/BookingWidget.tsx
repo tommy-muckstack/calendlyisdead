@@ -1,6 +1,6 @@
 "use client";
 import { BP } from "@/lib/basepath";
-import { loadSlotCalendar, type SlotCalendar } from "@/lib/booking-client";
+import { loadSlotCalendar, readBookingQuery, type SlotCalendar } from "@/lib/booking-client";
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -12,15 +12,14 @@ const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"]
 
 export function BookingWidget(p: Props) {
   const router = useRouter(), path = usePathname(), q = useSearchParams();
-  const [tz, setTz] = useState(q.get("tz") ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const month = q.get("month") ?? DateTime.now().setZone(tz).toFormat("yyyy-MM");
-  const date = q.get("date"), slot = q.get("slot");
+  const { tz, month, date, slot, invalid } = readBookingQuery(q, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const zones = [...new Set(["UTC", tz, ...ZONES])];
   const [availability, setAvailability] = useState<{ url: string; slots: SlotCalendar | null; error: string }>({ url: "", slots: null, error: "" });
   const [retry, setRetry] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const nav = (o: Record<string, string | null>) => {
-    const s = new URLSearchParams(q.toString()); for (const [k, v] of Object.entries(o)) v === null ? s.delete(k) : s.set(k, v);
+    const s = new URLSearchParams(q.toString()); for (const [k, v] of Object.entries({ tz, month, date, slot, ...o })) v === null ? s.delete(k) : s.set(k, v);
     router.push(`${path}?${s}`, { scroll: false });
   };
   const m = DateTime.fromFormat(month, "yyyy-MM", { zone: tz });
@@ -69,6 +68,7 @@ export function BookingWidget(p: Props) {
 
   return <div className="card bk">
     <section className="info">
+      {invalid && <p role="alert">This link contains an invalid date or time zone. Check the calendar and choose a time.</p>}
       <div className="muted" style={{ fontWeight: 600 }}>{p.host}</div>
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
       <div className="muted">◷ {p.durationMin} min{p.kindLabel ? ` · ${p.kindLabel}` : ""}</div>
@@ -95,7 +95,7 @@ export function BookingWidget(p: Props) {
         {availabilityError && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => setRetry(value => value + 1)}>Retry available times</button></div>}
         {slots && !Object.values(slots).some(times => times.length > 0) && <p className="muted" role="status">No available times this month. Try another month.</p>}
         <label className="f" htmlFor="tz">Time zone</label>
-        <select id="tz" className="input" value={tz} onChange={e => { setTz(e.target.value); nav({ tz: e.target.value }); }}>{ZONES.map(z => <option key={z}>{z}</option>)}</select>
+        <select id="tz" className="input" value={tz} onChange={e => nav({ tz: e.target.value })}>{zones.map(z => <option key={z}>{z}</option>)}</select>
       </div>
       {date && <div className="times" data-testid="times">
         <b style={{ marginBottom: 4 }}>{DateTime.fromISO(date).toFormat("cccc, LLLL d")}</b>
