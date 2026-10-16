@@ -7,16 +7,17 @@ import { I } from "./icons";
 import "./appshell.css";
 
 const SCHED = [{ href: "/app", label: "Event types" }, { href: "/app/one-off", label: "Single-use links" }, { href: "/app/polls", label: "Meeting polls" }, { href: "/app/routing", label: "Routing forms" }];
+const CALENDAR = [{ href: "/app/meetings", label: "Meetings" }, { href: "/app/calendars", label: "Calendar connections" }];
 const NAV: { href: string; label: string; icon: keyof typeof I; match: (p: string) => boolean }[] = [
   { href: "/app", label: "Scheduling", icon: "sched", match: p => SCHED.some(t => t.href === p) || p === "/app/availability" },
-  { href: "/app/calendars", label: "Calendar", icon: "cal", match: p => p.startsWith("/app/calendars") },
+  { href: "/app/meetings", label: "Calendar", icon: "cal", match: p => p.startsWith("/app/calendars") || p.startsWith("/app/meetings") },
   { href: "/app/assistant", label: "Assistant", icon: "assist", match: p => p.startsWith("/app/assistant") },
   { href: "/app/teams", label: "Teams", icon: "team", match: p => p.startsWith("/app/teams") },
   { href: "/app/workflows", label: "Automations", icon: "auto", match: p => p.startsWith("/app/workflows") },
   { href: "/app/analytics", label: "Analytics", icon: "chart", match: p => p.startsWith("/app/analytics") },
 ];
 const TITLES: [string, string, { href: string; label: string }[]?][] = [
-  ["/app/calendars", "Calendar"], ["/app/assistant", "Assistant"], ["/app/teams", "Teams"], ["/app/workflows", "Automations", [{ href: "/app/workflows", label: "My automations" }]],
+  ["/app/meetings", "Calendar", CALENDAR], ["/app/calendars", "Calendar", CALENDAR], ["/app/assistant", "Assistant"], ["/app/teams", "Teams"], ["/app/workflows", "Automations", [{ href: "/app/workflows", label: "My automations" }]],
   ["/app/analytics", "Analytics", [{ href: "/app/analytics", label: "Events" }]], 
 ];
 const GET_STARTED = [
@@ -62,7 +63,10 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
           <div className="cs-title"><h1>{meta[0]}</h1><span className="cs-help" title="Help">{I.help(16)}</span></div>
           {sched && <div className="cs-actions"><Link className="cs-btn cs-outline" href="/app/availability">{I.avail(16)}Manage availability</Link>
             <div className="cs-create"><button className="cs-btn cs-dark" onClick={() => setMenu(menu === "top" ? null : "top")} aria-haspopup="menu">{I.plus(16)}Create{I.chev(14)}</button><CreateMenu id="top" /></div></div>}
-          {meta[1] && <div className="cs-tabs" role="tablist">{meta[1].map(t => <Link key={t.href + t.label} href={t.href} role="tab" className={path === t.href || (settings && t.href === "/app") ? "on" : ""} aria-selected={path === t.href}>{t.label}</Link>)}</div>}
+          {meta[1] && <div className="cs-tabs" role="tablist">{meta[1].map(t => {
+            const selected = path === t.href || (t.href === "/app/meetings" && path.startsWith("/app/meetings/")) || (settings && t.href === "/app");
+            return <Link key={t.href + t.label} href={t.href} role="tab" className={selected ? "on" : ""} aria-selected={selected}>{t.label}</Link>;
+          })}</div>}
         </header>}
         {settings ? <div className="cs-body cs-dim" aria-hidden /> : <div className="cs-body">{children}</div>}
       </main>
