@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const FIELD_TYPES = { text: "Text", number: "Number", currency: "Currency", tag: "Tag", date: "Date", multi_select: "Multi-select", invitee_question: "Invitee question" } as const;
+export const FIELD_TYPES = { text: "Text", number: "Number", currency: "Currency", tag: "Tags", date: "Date", multi_select: "Multi-select", invitee_question: "Invitee question" } as const;
 export const CURRENCIES = Intl.supportedValuesOf("currency");
 export const ContactFieldDraft = z.object({
   name: z.string().trim().min(1).max(100), type: z.enum(Object.keys(FIELD_TYPES) as [keyof typeof FIELD_TYPES, ...(keyof typeof FIELD_TYPES)[]]),
@@ -28,9 +28,12 @@ export type FieldSource = { id: string; title: string; questions: { id: string; 
 
 export function normalizeFieldValue(field: FieldDraft, input: FieldValueType): FieldValueType {
   if (input === null || input === "" || (Array.isArray(input) && !input.length)) return null;
-  if (field.type === "multi_select") {
-    if (!Array.isArray(input) || input.some(value => !field.options.includes(value))) throw new Error("Choose values from the available options.");
-    return field.options.filter(value => input.includes(value));
+  if (field.type === "tag" && typeof input === "string" && !input.trim()) return null;
+  if (field.type === "multi_select" || field.type === "tag") {
+    // Existing single-tag values remain readable; writes normalize to a set.
+    const values = field.type === "tag" && typeof input === "string" ? [input.trim()] : input;
+    if (!Array.isArray(values) || values.some(value => !field.options.includes(value))) throw new Error("Choose values from the available options.");
+    return field.options.filter(value => values.includes(value));
   }
   if (typeof input !== "string") throw new Error("Enter a single value.");
   const value = input.trim(); if (!value) return null;
@@ -44,7 +47,6 @@ export function normalizeFieldValue(field: FieldDraft, input: FieldValueType): F
     const date = new Date(`${value}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(+date) || date.toISOString().slice(0, 10) !== value) throw new Error("Enter a valid date.");
   }
-  if (field.type === "tag" && !field.options.includes(value)) throw new Error("Choose a value from the available options.");
   return value;
 }
 export function displayFieldValue(field: FieldDraft, value: FieldValueType | undefined) {

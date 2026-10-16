@@ -242,3 +242,8 @@ export const contactListAutomationRuns = pgTable("contact_list_automation_runs",
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), bookingUid: text("bookingUid").notNull().references(() => bookings.uid, { onDelete: "cascade" }),
   inviteeEmail: text("inviteeEmail").notNull(), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
 }, r => [primaryKey({ columns: [r.userId, r.bookingUid, r.inviteeEmail] })]);
+export const contactFieldAutomations = pgTable("contact_field_automations", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), eventTypeId: text("eventTypeId").notNull().references(() => eventTypes.id, { onDelete: "cascade" }),
+  actions: jsonb("actions").$type<import("../contact-field-automation-validation").ContactFieldAction[]>().notNull(), enabled: boolean("enabled").notNull().default(false), version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, a => [primaryKey({ columns: [a.userId, a.eventTypeId] })]);

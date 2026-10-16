@@ -146,6 +146,11 @@ describe("contact filter semantics", () => {
     for (const [i, operator, value] of [[0, "gt", "999999999999999"], [1, "lt", "13"], [2, "is", "Won"], [3, "contains", "Sales"], [4, "starts_with", "prefix_%"]] as const) expect((await find(rules(condition(defs[i].id, operator, value)))).rows.map(row => row.contact.id)).toEqual([personA.id]);
     expect((await find(rules(condition(defs[0].id, "is", "+999999999999999.000001")))).total).toBe(1); expect((await find(rules(condition(defs[3].id, "blank")))).rows[0].contact.id).toBe(personB.id);
   });
+  it("matches multi-tag values and legacy single tags with the existing is condition", async () => {
+    const legacy = await person(), multiple = await person(), empty = await person(), custom = await fields.createContactField(user, crypto.randomUUID(), { ...EMPTY_FIELD, name: "Tags", type: "tag", options: ["A", "B"] });
+    await db.insert(schema.contactFieldValues).values([{ contactId: legacy.id, fieldId: custom.id, value: { data: "A" } }, { contactId: multiple.id, fieldId: custom.id, value: { data: ["A", "B"] } }]);
+    expect((await find(rules(condition(custom.id, "is", "A")))).total).toBe(2); expect((await find(rules(condition(custom.id, "is", "B")))).rows.map(row => row.contact.id)).toEqual([multiple.id]); expect((await find(rules(condition(custom.id, "blank")))).rows.map(row => row.contact.id)).toEqual([empty.id]);
+  });
   it("fails closed for removed, foreign and incompatible custom fields", async () => {
     const custom = await fields.createContactField(user, crypto.randomUUID(), { ...EMPTY_FIELD, name: "Field" }), foreign = await fields.createContactField("demo-mate", crypto.randomUUID(), { ...EMPTY_FIELD, name: "Foreign" }); await person();
     const saved = await list({ kind: "view", rules: rules(condition(custom.id, "contains", "a")) });

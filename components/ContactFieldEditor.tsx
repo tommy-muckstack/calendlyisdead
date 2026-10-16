@@ -5,7 +5,7 @@ import { BP } from "@/lib/basepath";
 import { ContactFieldData, ContactFieldDraft, CURRENCIES, EMPTY_FIELD, FIELD_TYPES, type ContactField, type FieldDraft, type FieldSource } from "@/lib/contact-field-validation";
 const messages: Record<string, string> = { name_in_use: "A custom field with this name already exists.", field_limit: "You can have up to 10 custom fields. Delete a field before creating another.", changed: "This field changed elsewhere. Reload the saved field before trying again.", incompatible_values: "Existing values do not fit these changes. Keep the current type and options or update those values first.", invalid_source: "That event question is no longer available. Choose another question.", not_found: "This field is no longer available.", creation_conflict: "This field was already created. Close this editor and refresh Contacts to review it." };
 
-export function ContactFieldEditor({ initial, sources, onClose, onSaved }: { initial?: ContactField; sources: FieldSource[]; onClose(): void; onSaved(): void }) {
+export function ContactFieldEditor({ initial, sources, allowedTypes, onClose, onSaved }: { initial?: ContactField; sources: FieldSource[]; allowedTypes?: readonly FieldDraft["type"][]; onClose(): void; onSaved(field?: ContactField): void }) {
   const [id] = useState(() => initial?.id ?? crypto.randomUUID()), [baseline, setBaseline] = useState<FieldDraft>(() => initial ? ContactFieldDraft.parse(initial) : { ...EMPTY_FIELD });
   const [draft, setDraft] = useState<FieldDraft>(() => initial ? ContactFieldDraft.parse(initial) : { ...EMPTY_FIELD }), [optionsText, setOptionsText] = useState(initial?.options.join("\n") ?? ""), [version, setVersion] = useState(initial?.version ?? 1);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [conflict, setConflict] = useState(false);
@@ -33,7 +33,7 @@ export function ContactFieldEditor({ initial, sources, onClose, onSaved }: { ini
       if (action === "delete") throw new Error("unconfirmed");
       const saved = ContactFieldData.parse(body); if (saved.id !== id || (action === "save" && JSON.stringify(ContactFieldDraft.parse(saved)) !== JSON.stringify(parsed.data))) throw new Error("unconfirmed");
       if (!mounted.current) return;
-      if (action === "reload") { const data = ContactFieldDraft.parse(saved); setBaseline(data); setDraft(data); setOptionsText(data.options.join("\n")); setVersion(saved.version); setConflict(false); } else onSaved();
+      if (action === "reload") { const data = ContactFieldDraft.parse(saved); setBaseline(data); setDraft(data); setOptionsText(data.options.join("\n")); setVersion(saved.version); setConflict(false); } else onSaved(saved);
     } catch (cause) { if (mounted.current) setError(cause instanceof Error && (Object.values(messages).includes(cause.message) || cause.message.startsWith("Sign in")) ? cause.message : "The change could not be confirmed. Your draft is still here. Try again."); }
     finally { clearTimeout(timeout); inFlight.current = false; if (mounted.current) setBusy(false); }
   }
@@ -43,7 +43,7 @@ export function ContactFieldEditor({ initial, sources, onClose, onSaved }: { ini
     <fieldset disabled={busy} aria-label="Custom field details"><div className="contact-form-grid">
       <div><label htmlFor="custom-field-name">Field name</label><input ref={name} id="custom-field-name" className="input" value={draft.name} maxLength={100} onChange={event => setDraft({ ...draft, name: event.target.value })} /></div>
       <div><label htmlFor="custom-field-type">Field type</label><select id="custom-field-type" className="input" value={draft.type} onChange={event => { const type = event.target.value as FieldDraft["type"]; setDraft({ ...draft, type, options: [], currency: type === "currency" ? "USD" : "", eventTypeId: null, questionId: null }); setOptionsText(""); }}>
-        {Object.entries(FIELD_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        {Object.entries(FIELD_TYPES).filter(([value]) => !allowedTypes || allowedTypes.includes(value as FieldDraft["type"])).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></div>
       {["tag", "multi_select"].includes(draft.type) && <div><label htmlFor="custom-field-options">Options (one per line)</label><textarea id="custom-field-options" className="input" rows={5} value={optionsText} maxLength={10100} onChange={event => setOptionsText(event.target.value)} /></div>}
       {draft.type === "currency" && <div><label htmlFor="custom-field-currency">Currency</label><select id="custom-field-currency" className="input" value={draft.currency} onChange={event => setDraft({ ...draft, currency: event.target.value })}>{CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></div>}

@@ -36,7 +36,7 @@ export async function contactScopeQuery(db: ContactDB, userId: string, scope: Co
     let expression: SQL;
     if (field.custom) {
       const raw = sql`(SELECT v.value->'data' FROM contact_field_values v WHERE v."contactId" = ${C.id} AND v."fieldId" = ${field.id})`;
-      if (field.type === "multi_select") return condition.operator === "blank" ? sql`(${raw} IS NULL OR ${raw} = '[]'::jsonb)` : sql`${raw} ? ${condition.value}`;
+      if (field.type === "multi_select" || field.type === "tag") return condition.operator === "blank" ? sql`(${raw} IS NULL OR ${raw} = '[]'::jsonb OR ${raw} = 'null'::jsonb OR ${raw} = '\"\"'::jsonb)` : sql`(${raw} ? ${condition.value} OR ${raw} = to_jsonb(${condition.value}::text))`;
       expression = sql`(SELECT nullif(v.value->>'data', '') FROM contact_field_values v WHERE v."contactId" = ${C.id} AND v."fieldId" = ${field.id})`;
       if (field.type === "number" || field.type === "currency") {
         const numeric = sql`(CASE WHEN ${expression} ~ '^[+-]?[0-9]+([.][0-9]+)?$' THEN (${expression})::numeric END)`;

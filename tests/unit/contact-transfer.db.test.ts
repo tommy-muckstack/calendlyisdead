@@ -28,6 +28,14 @@ beforeEach(async () => {
 });
 afterEach(() => vi.restoreAllMocks());
 describe("CSV imports", () => {
+  it("round-trips multiple tags and accepts legacy scalar tags and bracket-prefixed option labels", async () => {
+    const custom = await fields.createContactField(user.id, crypto.randomUUID(), { ...EMPTY_FIELD, name: "Tags", type: "tag", options: ["A", "B", "[Bracket"] });
+    await importAll(payload({ csv: 'Name,Email,Tags\nQA,qa@example.invalid,"[""B"",""A""]"', mapping: ["name", "email", custom.id] }));
+    const [contact] = await db.select().from(schema.contacts); expect((await fields.contactCustomValues(user.id, contact.id)).values[custom.id]).toEqual(["A", "B"]);
+    const exported = await transfer.exportContacts(user, { id: crypto.randomUUID(), ids: [contact.id] }); expect(parseContactCSV(await transfer.downloadContactExport(user.id, exported.id))[1].at(-1)).toBe('["A","B"]');
+    await importAll(payload({ csv: 'Name,Email,Tags\nQA,qa@example.invalid,[Bracket', mapping: ["name", "email", custom.id], policy: "overwrite" })); expect((await fields.contactCustomValues(user.id, contact.id)).values[custom.id]).toEqual(["[Bracket"]);
+    await importAll(payload({ csv: 'Name,Email,Tags\nQA,qa@example.invalid,B', mapping: ["name", "email", custom.id], policy: "overwrite" })); expect((await fields.contactCustomValues(user.id, contact.id)).values[custom.id]).toEqual(["B"]);
+  });
   it("previews without writes and confirms once despite concurrent retries and later edits", async () => {
     const input = payload(), preview = await transfer.importContacts(user.id, input); expect(preview.committed).toBe(false); expect(await db.select().from(schema.contacts)).toEqual([]);
     const [a, b] = await Promise.all([transfer.importContacts(user.id, { ...input, preview: preview.preview }), transfer.importContacts(user.id, { ...input, preview: preview.preview })]); expect(a).toEqual(b); expect(a.committed).toBe(true);

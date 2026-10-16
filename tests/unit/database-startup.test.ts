@@ -21,6 +21,14 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds field automation settings without rewriting prior booking receipts", async () => {
+    await setup(); await seat("meeting", 0); await client!.exec('DROP TABLE contact_field_automations;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT * FROM contact_field_automations')).rows).toEqual([]);
+    await client!.exec(`INSERT INTO contact_field_automations ("userId", "eventTypeId", actions, enabled, version, "deletedAt") VALUES ('host', 'group', '[]', false, 3, now());
+      INSERT INTO contact_list_automation_runs ("userId", "bookingUid", "inviteeEmail") VALUES ('host', 'meeting', 'test@example.invalid');`); await client!.exec(ddl);
+    expect((await client!.query('SELECT enabled, version, "deletedAt" IS NOT NULL AS deleted FROM contact_field_automations')).rows).toEqual([{ enabled: false, version: 3, deleted: true }]);
+    expect((await client!.query('SELECT "bookingUid" FROM contact_list_automation_runs')).rows).toEqual([{ bookingUid: "meeting" }]);
+  });
   it("adds contact automation state and preserves pauses, tombstones and booking receipts on replay", async () => {
     await setup(); await seat("meeting", 0); await client!.exec('DROP TABLE contact_list_automation_runs; DROP TABLE contact_list_automations;'); await client!.exec(ddl);
     expect((await client!.query('SELECT * FROM contact_list_automations')).rows).toEqual([]);
