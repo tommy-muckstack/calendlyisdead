@@ -46,10 +46,16 @@ export const workspaceInvitations = pgTable("workspace_invitations", {
   id: text("id").primaryKey(), workspaceId: text("workspaceId").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
   email: text("email").notNull(), role: text("role").$type<"admin" | "user">().notNull(),
   invitedBy: text("invitedBy").notNull().references(() => users.id), tokenHash: text("tokenHash").notNull().unique(),
-  requestHash: text("requestHash").notNull(), expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+  requestHash: text("requestHash").notNull(), expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  reminderTokenHash: text("reminderTokenHash"), remindedAt: timestamp("remindedAt", { mode: "date", withTimezone: true }),
+  reminderDelivery: text("reminderDelivery").$type<"pending" | "sent" | "undelivered">(),
   acceptedMembershipId: text("acceptedMembershipId"), revokedAt: timestamp("revokedAt", { mode: "date", withTimezone: true }),
   delivery: text("delivery").$type<"pending" | "sent" | "undelivered">().notNull().default("pending"),
-}, i => [uniqueIndex("workspace_pending_email").on(i.workspaceId, i.email).where(sql`${i.acceptedMembershipId} IS NULL AND ${i.revokedAt} IS NULL`), check("workspace_invitation_role", sql`${i.role} IN ('admin', 'user')`)]);
+}, i => [uniqueIndex("workspace_pending_email").on(i.workspaceId, i.email).where(sql`${i.acceptedMembershipId} IS NULL AND ${i.revokedAt} IS NULL`),
+  uniqueIndex("workspace_reminder_token").on(i.reminderTokenHash),
+  index("workspace_due_reminder").on(i.createdAt, i.id).where(sql`${i.acceptedMembershipId} IS NULL AND ${i.revokedAt} IS NULL AND ${i.remindedAt} IS NULL AND ${i.expiresAt} IS NULL`),
+  check("workspace_invitation_role", sql`${i.role} IN ('admin', 'user')`)]);
 // Receipts survive workspace deletion so an uncertain retry cannot recreate it.
 export const workspaceCreations = pgTable("workspace_creations", {
   id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), requestHash: text("requestHash").notNull(),

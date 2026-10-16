@@ -17,5 +17,5 @@ export type WorkspaceRole = "owner" | "admin" | "user";
 export type WorkspaceData = {
   id: string; name: string; version: number; role: WorkspaceRole;
   members: { id: string; userId: string; name: string | null; email: string | null; role: WorkspaceRole }[];
-  invitations: { id: string; email: string; role: "admin" | "user"; expiresAt: string; delivery: "pending" | "sent" | "undelivered" }[];
+  invitations: { id: string; email: string; role: "admin" | "user"; expiresAt: string | null; delivery: "pending" | "sent" | "undelivered"; reminderDelivery: "pending" | "sent" | "undelivered" | null }[];
 };

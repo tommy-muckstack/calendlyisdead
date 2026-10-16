@@ -250,3 +250,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS workspace_pending_email ON workspace_invitatio
 CREATE TABLE IF NOT EXISTS workspace_creations (
   id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "requestHash" text NOT NULL
 );
+
+-- New organization invitations do not expire. Preserve legacy expiry dates:
+-- only an explicit resend may replace an old/expired bearer link.
+ALTER TABLE workspace_invitations ALTER COLUMN "expiresAt" DROP NOT NULL;
+ALTER TABLE workspace_invitations ADD COLUMN IF NOT EXISTS "createdAt" timestamptz NOT NULL DEFAULT now();
+ALTER TABLE workspace_invitations ADD COLUMN IF NOT EXISTS "reminderTokenHash" text;
+ALTER TABLE workspace_invitations ADD COLUMN IF NOT EXISTS "remindedAt" timestamptz;
+ALTER TABLE workspace_invitations ADD COLUMN IF NOT EXISTS "reminderDelivery" text;
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_reminder_token ON workspace_invitations ("reminderTokenHash");
+CREATE INDEX IF NOT EXISTS workspace_due_reminder ON workspace_invitations ("createdAt", id)
+  WHERE "acceptedMembershipId" IS NULL AND "revokedAt" IS NULL AND "remindedAt" IS NULL AND "expiresAt" IS NULL;
