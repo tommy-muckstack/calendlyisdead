@@ -14,5 +14,5 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const et = ev.eventType;
   return <BrandFrame user={brandUser} embed={embed === "1"} primary={primary}><BookingWidget embed={embed === "1"} price={ev.eventType.priceCents > 0 ? formatMoney(ev.eventType.priceCents, ev.eventType.currency) : undefined} username={`team:${team}`} slug={slug} host={ev.ownerName} title={et.title} durationMin={et.durationMin} location={et.location} description={et.description}
     color={et.color} questions={et.questions ?? []} lockedTimezone={et.lockedTimezone} kindLabel={et.kind === "collective" ? `With ${ev.hosts.map(h => h.user.name).join(", ")}` : "With the next available teammate"}
-    reschedule={prior && prior.booking.status === "confirmed" ? { uid: prior.booking.uid, name: prior.booking.inviteeName, email: prior.booking.inviteeEmail, start: prior.booking.start.toISOString() } : undefined} /></BrandFrame>;
+    reschedule={prior && prior.booking.eventTypeId === ev.eventType.id && prior.booking.status === "confirmed" ? { uid: prior.booking.uid, name: prior.booking.inviteeName, email: prior.booking.inviteeEmail, start: prior.booking.start.toISOString() } : undefined} /></BrandFrame>;
 }
