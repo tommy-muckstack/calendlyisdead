@@ -85,6 +85,12 @@ export async function teamMembers(teamId: string) {
 }
 export async function setHosts(eventTypeId: string, hosts: { userId: string; priority: number }[]) {
   const db = await getDb();
-  await db.delete(eth).where(eq(eth.eventTypeId, eventTypeId));
-  if (hosts.length) await db.insert(eth).values(hosts.map(h => ({ eventTypeId, userId: h.userId, priority: h.priority })));
+  await db.transaction(async (tx: typeof db) => {
+    // A duplicate must observe either the old or new full host set, never the
+    // temporary empty list between delete and insert. Also serialize deletion.
+    const [event] = await tx.select().from(eventTypes).where(and(eq(eventTypes.id, eventTypeId), isNull(eventTypes.deletedAt))).for("update");
+    if (!event) throw new Error("not_found");
+    await tx.delete(eth).where(eq(eth.eventTypeId, eventTypeId));
+    if (hosts.length) await tx.insert(eth).values(hosts.map(h => ({ eventTypeId, userId: h.userId, priority: h.priority })));
+  }, { isolationLevel: "read committed" });
 }

@@ -1,9 +1,9 @@
 "use client";
 import { BP } from "@/lib/basepath";
 import { useState } from "react";
-export function EmbedBuilder({ base, username, types }: { base: string; username: string; types: { slug: string; title: string }[] }) {
+export function EmbedBuilder({ base, username, types, initialSlug }: { base: string; username: string; types: { slug: string; title: string; active: boolean }[]; initialSlug?: string }) {
   const [kind, setKind] = useState<"inline" | "widget" | "text">("inline");
-  const [slug, setSlug] = useState(types[0]?.slug ?? ""), [color, setColor] = useState("#0E7C66"), [text, setText] = useState("Schedule time with me");
+  const [slug, setSlug] = useState(initialSlug ?? types[0]?.slug ?? ""), [color, setColor] = useState("#0E7C66"), [text, setText] = useState("Schedule time with me");
   const url = `${base}/${username}${slug ? `/${slug}` : ""}`;
   const script = `<script src="${base}/embed.js" async></script>`;
   const code = kind === "inline" ? `<div class="cid-inline" data-url="${url}" data-color="${color}" style="min-width:320px;height:700px"></div>\n${script}`
@@ -18,7 +18,8 @@ export function EmbedBuilder({ base, username, types }: { base: string; username
     </div>
     <div className="card" style={{ padding: 18 }}>
       <label className="f" htmlFor="emb-et">Event type</label>
-      <select id="emb-et" className="input" value={slug} onChange={e => setSlug(e.target.value)}><option value="">All event types (profile page)</option>{types.map(t => <option key={t.slug} value={t.slug}>{t.title}</option>)}</select>
+      <select id="emb-et" className="input" value={slug} onChange={e => setSlug(e.target.value)}><option value="">All event types (profile page)</option>{types.map(t => <option key={t.slug} value={t.slug}>{t.title}{t.active ? "" : " (off)"}</option>)}</select>
+      {types.find(t => t.slug === slug)?.active === false && <p role="status" className="muted">This event type is turned off. Turn it on to accept bookings through this embed.</p>}
       <label className="f" htmlFor="emb-color">Button and accent color</label><input id="emb-color" type="color" value={color} onChange={e => setColor(e.target.value)} />
       {kind !== "inline" && <><label className="f" htmlFor="emb-text">Text</label><input id="emb-text" className="input" value={text} onChange={e => setText(e.target.value)} /></>}
       <label className="f">Code</label>

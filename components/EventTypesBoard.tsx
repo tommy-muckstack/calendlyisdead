@@ -1,11 +1,12 @@
 "use client";
 import { BP } from "@/lib/basepath";
 import { I } from "@/components/app/icons";
+import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
 import { useEffect, useRef, useState } from "react";
-type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
+export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[];
-  kind: string; seats: number; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
+  kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
@@ -13,18 +14,48 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
   const [items, setItems] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [boardError, setBoardError] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const busyRef = useRef(false);
+  const searchInput = useRef<HTMLInputElement>(null);
   const open = items.find(i => i.id === openId) ?? null;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
   async function create() {
     const r = await fetch(BP + "/api/event-types", { method: "POST" }); const et = await r.json();
     setItems(x => [...x, et]); setOpenId(et.id);
   }
+  async function remove(et: ET) {
+    const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "DELETE" });
+    if (!response.ok) throw new Error("delete_failed");
+    setItems(x => x.filter(i => i.id !== et.id)); setOpenId(null); searchInput.current?.focus();
+  }
+  async function act(action: EventTypeAction, et: ET) {
+    if (action === "edit") { setOpenId(et.id); return; }
+    if (busyRef.current) return;
+    if (action === "delete" && !confirm("Delete this event type? Scheduled meetings will remain unchanged.")) return;
+    busyRef.current = true; setBusy(et.id); setBoardError("");
+    try {
+      if (action === "delete") { await remove(et); flash("Event type deleted"); return; }
+      const response = await fetch(`${BP}/api/event-types/${et.id}${action === "duplicate" ? "/duplicate" : ""}`, {
+        method: action === "duplicate" ? "POST" : "PATCH", headers: { "content-type": "application/json" },
+        body: action === "toggle" ? JSON.stringify({ active: !et.active }) : undefined,
+      });
+      if (!response.ok) throw new Error("action_failed");
+      const saved = await response.json();
+      if (!saved?.id || typeof saved.title !== "string") throw new Error("invalid_response");
+      if (action === "duplicate") { setItems(x => [...x, saved]); setQ(""); setOpenId(saved.id); flash("Event type duplicated"); }
+      else { setItems(x => x.map(item => item.id === saved.id ? saved : item)); flash(saved.active ? "Event type turned on" : "Event type turned off"); }
+    } catch { setBoardError("The change could not be confirmed. Reload the page before trying again."); }
+    finally { busyRef.current = false; setBusy(null); }
+  }
   useEffect(() => { const f = () => create(); addEventListener("cid:create-event-type", f); if (new URLSearchParams(location.search).get("new")) { history.replaceState(null, "", location.pathname); create(); } return () => removeEventListener("cid:create-event-type", f); }, []);
   const [q, setQ] = useState("");
   const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase()));
   const sched = schedules.find(x => x.id === (shown[0]?.scheduleId ?? ""))?.name;
   return <>
-    <div className="cs-search">{I.search(18)}<input placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
+    {boardError && <p role="alert" className="cs-board-error">{boardError}</p>}
+    {busy && <p role="status" className="muted">Updating event type…</p>}
+    <div className="cs-search">{I.search(18)}<input ref={searchInput} placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
     <div className="cs-grp"><span className="cs-av">{(owner || username)[0]?.toUpperCase()}</span><b>{owner || username}</b>
       <a href={`${BP}/${username}`} target="_blank">View landing page {I.ext(14)}</a></div>
     {shown.map(et => <div key={et.id} className="cs-et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
@@ -34,22 +65,31 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
         <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-One"}{et.managedParentId ? " • Managed by your team" : ""}</p>
         <p>{sched ? `${sched}` : "Weekdays, 9 am - 5 pm"}</p>
       </div>
-      <button className="cs-btn cs-outline" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }}>{I.link(14)}Copy link</button>
+      <button className="cs-btn cs-outline" onClick={async e => {
+        e.stopPropagation(); setBoardError("");
+        try { await navigator.clipboard.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }
+        catch { setBoardError("The link could not be copied. Open the booking page and copy its address."); }
+      }}>{I.link(14)}Copy link</button>
       <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>{I.ext(16)}</a>
+      <EventTypeMenu title={et.title} active={et.active} managed={!!et.managedParentId} busy={!!busy}
+        bookingUrl={`${BP}/${username}/${et.slug}`} embedUrl={`/app/embed?event=${encodeURIComponent(et.slug)}`}
+        onAction={action => { void act(action, et); }} />
     </div>)}
-    {open && <Editor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
+    {open && <EventTypeEditor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
-      onDelete={async () => {
-        const response = await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" });
-        if (!response.ok) throw new Error("delete_failed");
-        setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null);
-      }} />}
+      onDelete={() => remove(open)} />}
     {toast && <div className="toast" role="status">{toast}</div>}
   </>;
 }
 
-function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void> }) {
+export function EventTypeEditor({ et, username, schedules, onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void> }) {
   const [d, setD] = useState(et);
+  const nameInput = useRef<HTMLInputElement>(null), closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    (nameInput.current?.disabled ? closeButton.current : nameInput.current)?.focus();
+    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+  }, []);
   const [sect, setSect] = useState<string>("basics");
   const [err, setErr] = useState("");
   const [groupLocked, setGroupLocked] = useState(et.groupSettingsLocked ?? false);
@@ -60,8 +100,9 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"];
-      const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.lockedFields ?? []).includes(k)).map(k => [k, (d as any)[k]]));
-      if (d.managedParentId) delete body.kind;
+      const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.managedParentId && (d.lockedFields ?? []).includes(k))).map(k => [k, (d as any)[k]]));
+      if (d.managedParentId || d.teamId) delete body.kind;
+      if (d.teamId) delete body.scheduleId;
       if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
       const r = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (r.ok) {
@@ -92,16 +133,16 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
   return <>
     <div className="scrim" onClick={onClose} />
     <aside className="pane" role="dialog" aria-label="Edit event type">
-      <header><b>Edit event type</b><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
+      <header><b>Edit event type</b><button ref={closeButton} className="btn" onClick={onClose} aria-label="Close">✕</button></header>
       <div className="body">
         {err && <p role="alert" style={{ color: "var(--warn)" }}>{err}</p>}
         {groupLocked && <p id="group-settings-lock" className="muted" role="status">This group event has bookings. Duration, location and event type are locked. Create a new event type to use different settings.</p>}
         {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
-          <label className="f" htmlFor="et-title">Name</label><input id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
+          <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
           <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
           <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
-          {!d.managedParentId && <><label className="f" htmlFor="et-kind">Type</label>
+          {!d.managedParentId && !d.teamId && <><label className="f" htmlFor="et-kind">Type</label>
           <select id="et-kind" className="input" disabled={L("kind")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.kind} onChange={e => setD({ ...d, kind: e.target.value, seats: e.target.value === "group" ? Math.max(2, d.seats) : d.seats })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
           {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting&#39;s limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
@@ -117,9 +158,9 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
           <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
           <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" disabled={L("rangeDays")} className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} /></> })}
         {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"}${d.maxPerDay ? ` · max ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · max ${d.maxPerWeek}/week` : ""}`, children: <>
-          <label className="f" htmlFor="et-sched">Schedule</label>
+          {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
           <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
-            <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+            <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
           <label className="f" htmlFor="et-mpd">Max bookings per day (blank = no limit)</label>
           <input id="et-mpd" disabled={L("maxPerDay")} className="input" type="number" min={1} value={d.maxPerDay ?? ""} onChange={e => setD({ ...d, maxPerDay: e.target.value ? Number(e.target.value) : null })} />
           <label className="f" htmlFor="et-mpw">Max bookings per week (blank = no limit)</label>
