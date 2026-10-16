@@ -10,19 +10,26 @@ import hm from "@/components/mk/m/home390.json";
 // Structure mirrors calendly.com's 2026 homepage: banner, nav, cream hero card with OAuth buttons, icon intro, scroll-driven
 // "Scheduling" story, three accordion stories, gradient "why" section, integrations, final CTA, dark footer. Copy and art are original.
 export const metadata = { title: "CalendlyIsDead: free, open-source scheduling" };
+function SignupOptions() {
+  return <>
+    <div className="cm-cta">
+      <Link className="cm-oauth" href="/signup?provider=google"><span className="ico"><G /></span>Sign up with Google</Link>
+      <Link className="cm-oauth" href="/signup"><span className="ico" aria-hidden="true">{ICON.at}</span>Sign up with email</Link>
+    </div>
+    <p className="cm-fine">No credit card required</p>
+  </>;
+}
 export default function Home() {
   return <div className={`cm ${cmSans.variable} ${cmSerif.variable}`}>
     <Banner /><Nav />
-    <div className="cm-mwrap"><MeasuredPage data={hm as never} display={/Wulkan/} img={(it) => it.alt === "Microsoft Logo" ? <MsMark s={20} /> : it.w === 20 && it.y > 420 && it.y < 480 ? <G s={20} /> : null} /></div>
+    <div className="cm-mwrap"><MeasuredPage data={hm as never} display={/Wulkan/}>
+      <div className="cm-mobile-signup"><SignupOptions /></div>
+    </MeasuredPage></div>
     <div className="mp-desk">
     <section className="cm-sec"><div className="cm-hero">
       <h1 className="cm-h1 cm-sans">Easy scheduling ahead.</h1>
       <p className="cm-lead">Join the people who book meetings for free with the open-source scheduling tool.</p>
-      <div className="cm-cta">
-        <Link className="cm-oauth" href="/signup?provider=google"><span className="ico"><G /></span>Sign up with Google</Link>
-        <Link className="cm-oauth" href="/signup?provider=microsoft"><span className="ico"><MsMark /></span>Sign up with Microsoft</Link>
-      </div>
-      <p className="cm-fine"><Link href="/signup">Sign up with email</Link> • No credit card required</p>
+      <SignupOptions />
       <HeroArt /><MobileHero />
     </div></section>
     <section className="cm-intro" id="product">

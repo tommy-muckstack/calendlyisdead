@@ -17,10 +17,10 @@ const plans = [
     { t: "Notetaker", c: NT, ic: ICON.doc, note: "Not built yet", l: ["Recordings & transcripts", "Shareable meeting recaps", "Joins Zoom, Google Meet, Teams"], dim: true },
     { t: "AI assistant", c: CL, ic: ICON.spark, tag: "Beta", l: ["Replies to email threads with your times", "Bring your own AI provider"] }] },
   { n: "Teams", addon: true, badge: "Save 100%", amt: "$0", per: "/seat/mo", was: "Calendly charges $16 per seat", btn: "Get started", fill: true, pop: true, inc: "Everything in Standard, and:", groups: [
-    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Round-robin & team scheduling", "Qualify, route, & schedule leads", "Centrally managed event types", "Analytics for every event type", "Teams and roles", "Bring your own SSO"] },
+    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Round-robin & team scheduling", "Qualify, route, & schedule leads", "Centrally managed event types", "Analytics for every event type", "Teams and roles", "Email and Google sign-in"] },
     { t: "Notetaker", c: NT, ic: ICON.doc, note: "Not built yet", l: ["Advanced admin controls"], dim: true }] },
   { n: "Enterprise", amt: "$0", per: "license", was: "Calendly starts at $15k/yr", btn: "Self-host it", inc: "Everything in Teams, and:", groups: [
-    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Run it on your own servers", "Bring your own SSO provider", "Domain control: you own the host", "Audit-friendly Postgres data", "Delete any data with plain SQL", "Export all data any time", "Community support on GitHub", "Fork it, change it, ship it"] },
+    { t: "Scheduling", c: SC, ic: ICON.cal, l: ["Run it on your own servers", "Email and Google sign-in", "Domain control: you own the host", "Audit-friendly Postgres data", "Delete any data with plain SQL", "Export all data any time", "Community support on GitHub", "Fork it, change it, ship it"] },
     { t: "Notetaker", c: NT, ic: ICON.doc, note: "Open", l: ["Help build Notetaker on GitHub"], dim: true },
     { t: "AI assistant", c: CL, ic: ICON.spark, tag: "Beta", l: ["Point it at your own AI model"] }] },
 ];

@@ -8,13 +8,15 @@ process.env.PGLITE_DIR = path.join(tmp, "db");
 const tokens: Record<string, any> = {
   "tok-new": { uid: "fb-new", email: "new@example.com", email_verified: false, name: "New Person", auth_time: 0, firebase: { sign_in_provider: "password" } },
   "tok-demo": { uid: "fb-demo", email: "demo@calendlyisdead.local", email_verified: true, name: "Demo", auth_time: 0, firebase: { sign_in_provider: "google.com" } },
-  "tok-unverified": { uid: "fb-x", email: "sam@calendlyisdead.local", email_verified: false, auth_time: 0, firebase: {} },
+  "tok-unverified": { uid: "fb-x", email: "sam@calendlyisdead.local", email_verified: false, auth_time: 0, firebase: { sign_in_provider: "password" } },
 };
 const revoke = vi.fn();
+const createCookie = vi.fn(async (t: string) => `sess:${t}`);
+const unsupportedProviders = ["microsoft.com", "saml.company", "oidc.company", "anonymous", "custom", undefined];
 vi.mock("firebase-admin/app", () => ({ initializeApp: () => ({ name: "isdead" }), getApps: () => [], cert: (x: any) => x }));
 vi.mock("firebase-admin/auth", () => ({ getAuth: () => ({
   verifyIdToken: async (t: string) => { if (!tokens[t]) throw new Error("bad"); return { ...tokens[t], auth_time: Math.floor(Date.now() / 1000) }; },
-  createSessionCookie: async (t: string) => `sess:${t}`,
+  createSessionCookie: createCookie,
   verifySessionCookie: async (c: string) => { const t = c.replace(/^sess:/, ""); if (!tokens[t]) throw new Error("bad"); return tokens[t]; },
   revokeRefreshTokens: revoke,
 }) }));
@@ -32,7 +34,7 @@ beforeAll(async () => {
   await (await import("../../lib/db")).getDb();
   A = await import("../../auth"); R = await import("../../app/api/session/route"); D = await import("../../app/api/session/demo/route"); S = await import("../../lib/isdead-auth/server");
 });
-beforeEach(() => { jar.clear(); setFb(true); });
+beforeEach(() => { jar.clear(); createCookie.mockClear(); setFb(true); });
 
 describe("shared Firebase session", () => {
   it("without Firebase env: not configured, 503, no crash", async () => {
@@ -66,6 +68,23 @@ describe("shared Firebase session", () => {
     expect((await R.POST(post({ idToken: "nope" }))).status).toBe(401);
     expect((await R.POST(post({}))).status).toBe(400);
     jar.set("isdead_session", "garbage"); expect(await A.auth()).toBeNull();
+  });
+  it.each(unsupportedProviders)("rejects %s sign-in before creating a session or app user", async provider => {
+    const uid = `fb-unsupported-${provider ?? "missing"}`;
+    tokens["tok-unsupported"] = { ...tokens["tok-new"], uid, email: `${uid}@example.test`, firebase: { sign_in_provider: provider, identities: { "google.com": [uid] } } };
+    const res = await R.POST(post({ idToken: "tok-unsupported" }));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(createCookie).not.toHaveBeenCalled();
+    const { getDb, schema } = await import("../../lib/db"); const { eq } = await import("drizzle-orm");
+    expect(await (await getDb()).select().from(schema.users).where(eq(schema.users.firebaseUid, uid))).toEqual([]);
+  });
+  it.each(unsupportedProviders)("rejects a shared %s session even for an existing Google user", async provider => {
+    tokens["tok-unsupported-session"] = { ...tokens["tok-demo"], firebase: { sign_in_provider: provider, identities: { "google.com": ["fb-demo"] } } };
+    jar.set("isdead_session", "sess:tok-unsupported-session");
+    expect(await S.verifySessionCookie("sess:tok-unsupported-session")).toBeNull();
+    expect(await A.auth()).toBeNull();
+    expect(await A.requireUser()).toBeNull();
   });
   it("demo cookie is HMAC-signed; tampering fails; mate is reachable for tests", async () => {
     const res = await D.POST(new NextRequest("http://localhost/calendlyisdead/api/session/demo?who=mate", { method: "POST" }));

@@ -2,6 +2,8 @@
 
 Shared sign-in for every IsDead app on yourappisdead.com: Firebase Authentication (email/password + Google).
 
+CalendlyIsDead accepts only verified Firebase tokens whose `firebase.sign_in_provider` is `password` or `google.com`. This check applies before issuing a new session and when reading an existing shared session. Microsoft, SAML/OIDC enterprise SSO, custom and anonymous providers are not accepted, even if the account also has a linked Google identity. Keep this app-specific restriction when updating the vendored auth code. This does not change any Firebase project's provider configuration or other apps' implementations.
+
 - `config.ts`: env → Firebase web config; cookie name/options (`isdead_session`, path `/`).
 - `server.ts`: firebase-admin; `createSessionFromIdToken`, `verifySessionCookie`, demo cookie signing.
 - `client.ts`: browser helpers (sign up, sign in, reset password, Google popup) that POST the ID token to the app's session endpoint.
