@@ -65,7 +65,7 @@ export async function bookPoll(userId: string, pollId: string, option: string) {
       await tx.insert(eventTypes).values({ id: etId, userId, scheduleId: sc?.id, slug: etId, title: p.title, durationMin: p.durationMin, location: p.location, kind: "poll", active: false }).onConflictDoNothing();
       const [et] = await tx.select().from(eventTypes).where(eq(eventTypes.id, etId));
       const row = { uid: shortId() + "pl", eventTypeId: etId, hostId: userId, start, end, inviteeName: attendees[0].name, inviteeEmail: attendees[0].email,
-        bufferBeforeMin: 0, bufferAfterMin: 0,
+        location: p.location, bufferBeforeMin: 0, bufferAfterMin: 0,
         inviteeTz: host.timezone, notes: `Booked from meeting poll "${p.title}"`, guests: attendees.slice(1).map((a: any) => a.email), answers: {}, seat: 0, groupUid: null };
       await tx.insert(bookings).values(row);
       for (const attendee of attendees) await recordBookingContact(tx, { ...row, inviteeName: attendee.name, inviteeEmail: attendee.email });

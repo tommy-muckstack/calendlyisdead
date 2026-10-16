@@ -143,6 +143,7 @@ export const bookings = pgTable("bookings", {
   start: timestamp("start", { mode: "date", withTimezone: true }).notNull(),
   end: timestamp("end", { mode: "date", withTimezone: true }).notNull(),
   // Snapshots: changes to an event type must not change existing reservations.
+  location: text("location").notNull().default(""),
   bufferBeforeMin: integer("bufferBeforeMin").notNull().default(0),
   bufferAfterMin: integer("bufferAfterMin").notNull().default(0),
   inviteeName: text("inviteeName").notNull(),

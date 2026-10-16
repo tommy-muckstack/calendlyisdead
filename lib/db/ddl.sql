@@ -100,6 +100,12 @@ ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET DEFAULT 0;
 ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET DEFAULT 0;
 ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET NOT NULL;
 ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET NOT NULL;
+-- Legacy bookings did not retain their location. Freeze the currently available
+-- value once; an earlier address cannot be recovered from these records.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS location text;
+UPDATE bookings b SET location = e.location FROM event_types e WHERE b."eventTypeId" = e.id AND b.location IS NULL;
+ALTER TABLE bookings ALTER COLUMN location SET DEFAULT '';
+ALTER TABLE bookings ALTER COLUMN location SET NOT NULL;
 -- Original group limits were not stored. Preserve current defaults, at least
 -- the number already attending, and never overwrite a saved session limit.
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "inviteeLimit" integer;

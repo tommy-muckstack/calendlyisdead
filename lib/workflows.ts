@@ -16,7 +16,7 @@ export function render(tpl: string, ctx: { booking: any; eventType: any; host: a
   const vars: Record<string, string> = {
     "invitee.name": b.inviteeName, "invitee.first_name": String(b.inviteeName).split(/\s+/)[0], "invitee.email": b.inviteeEmail, "invitee.timezone": b.inviteeTz,
     "event.name": et.title, "event.date": s.toFormat("cccc, LLLL d"), "event.time": s.toFormat("h:mm a ZZZZ"), "event.duration": `${et.durationMin} min`,
-    "event.location": b.meetingUrl || et.location || "", "meeting_url": b.meetingUrl || "", "host.name": host?.name ?? "", "host.email": host?.email ?? "",
+    "event.location": b.meetingUrl || b.location || "", "meeting_url": b.meetingUrl || "", "host.name": host?.name ?? "", "host.email": host?.email ?? "",
     "reschedule_url": `${appUrl()}/booking/${b.uid}/reschedule`, "cancel_url": `${appUrl()}/booking/${b.uid}/cancel`,
   };
   return tpl.replace(/\{\{\s*([a-z_.0-9-]+)\s*\}\}/gi, (m, k: string) => k.startsWith("answers.") ? (b.answers?.[k.slice(8)] ?? "") : (vars[k] ?? m));
