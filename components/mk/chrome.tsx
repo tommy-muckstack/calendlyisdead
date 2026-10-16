@@ -18,7 +18,7 @@ export function Banner() {
 }
 const MENUS: { label: string; items: [string, string, string][] }[] = [
   { label: "Product", items: [["Scheduling", "/#scheduling", "Booking pages, availability, round robin"], ["AI assistant", "/#assistant", "Paste a thread, get a reply with times"], ["Insights", "/#recaps", "Bookings, cancellations, busy hours"], ["Payments", "/#payments", "Collect payment with your own Stripe"]] },
-  { label: "Solutions", items: [["For individuals", "/#scheduling", "Coaches, consultants, freelancers"], ["For teams", "/#assistant", "Round robin and collective events"], ["For large companies", "/pricing", "Self-host with SSO-ready auth"]] },
+  { label: "Solutions", items: [["For individuals", "/#scheduling", "Coaches, consultants, freelancers"], ["For teams", "/#assistant", "Round robin and collective events"], ["For large companies", "/pricing", "Self-host with email and Google sign-in"]] },
   { label: "Resources", items: [["Source code", "https://github.com/tommy-muckstack/calendlyisdead", "Apache-2.0 on GitHub"], ["Embed docs", "/embed-demo.html", "Inline, popup widget and popup text"], ["Contributing", "https://github.com/tommy-muckstack/calendlyisdead/blob/main/CONTRIBUTING.md", "Help build the next feature"]] },
 ];
 const href = (h: string) => (h.startsWith("http") || h.endsWith(".html") ? h : h);

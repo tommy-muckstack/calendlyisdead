@@ -10,6 +10,8 @@ The user explicitly confirmed that paid capabilities themselves must be built an
 
 User clarification, 2026-10-15: marketing parity is limited to **homepage and login**. Pricing and other marketing pages are excluded (EX2). All logged-in functionality remains in scope, including capabilities sold on paid original plans. Core invitee booking/confirmation/cancel/reschedule flows remain in the end-to-end scheduling audit. Standalone signup-page styling is excluded; account creation/onboarding behavior needed to reach the app is retained.
 
+Authentication clarification, 2026-10-15: signup and login support **email/password and Google only** (EX3). Microsoft sign-in and enterprise SSO are excluded by the user. Microsoft/Outlook calendar connections remain in scope.
+
 ## Baseline and evidence quality
 
 - Canonical repository: <https://github.com/tommy-muckstack/calendlyisdead>, main `d3a85d227027ba069fb04a60b1c8607279bf883e`, verified through the connected GitHub app on 2026-10-15.
@@ -47,7 +49,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | ID | Screen / feature / states | Status | Severity | Evidence / outstanding comparison | Screenshots |
 | --- | --- | --- | --- | --- | --- |
 | L01 | Landing navigation, mega-menus, mobile menu | unverified | P2 | `components/mk/chrome.tsx` now has Product/Solutions/Resources/Pricing and mobile navigation; compare menu content, focus, hover and dismissal. | pending B2 |
-| L02 | Landing hero, copy, CTAs | unverified | P3 | Current desktop hero and mobile measured layout need fresh paired captures; old green/cream snapshot findings are superseded. | pending B2 |
+| L02 | Landing hero, copy, CTAs | unverified | P3 | Desktop/mobile hero now share real Google/email signup links under EX3. The flattened mobile auth items were replaced with keyboard-focusable links. Paired captures and focus checks remain pending. | pending B2 |
 | L03 | Landing sections and product stories | differs | P2 | Mobile `MeasuredPage` renders flattened absolute-position items; generic link routing sends CTAs to login and other links home, losing actual section/action destinations. | pending B2 |
 | L04 | Landing fonts, colors, spacing, images and icons | unverified | P3 | Current local Geist/Instrument Sans/Newsreader fonts and refreshed styling; computed-style measurements still needed. | pending B2 |
 | L05 | Landing hover/focus, animation and reduced motion | unverified | P3 | Check every interactive control and animated section. | pending B2 |
@@ -61,7 +63,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | A02 | Signup and onboarding | unverified | P1 | Dedicated signup exists. Marketing styling excluded by EX2; test disposable account creation and functional onboarding into the app. | pending B2 |
 | A03 | Forgot password | unverified | P2 | Login form reset mode invokes Firebase resetPassword; compare navigation, validation and error/recovery states. | pending B2 |
 | A04 | Google button/logo/interaction | unverified | P2 | Google control now uses shared Google artwork; verify rendered size, spacing, accessible name and current official guidelines. | pending B2 |
-| A05 | Microsoft and enterprise SSO controls | differs | P2 | Microsoft button only sets an unavailable error. Enterprise SSO capability absent; paid scope requires working free equivalents. | pending B2 |
+| A05 | Microsoft and enterprise SSO controls | differs | P2 | EX3: user explicitly limited authentication to email/password and Google. Removed the nonfunctional Microsoft button from shared login/signup and its desktop/mobile homepage promotion, plus unsupported SSO claims. Microsoft calendar connections remain supported. | visual confirmation pending B2 |
 | A06 | Validation, provider errors, expired links | unverified | P1 | Firebase error mapping and busy handling exist; expired/reset/provider failure states need account/browser tests. | pending B2 |
 | S01 | App shell, home/scheduling and desktop navigation | differs | P2 | New AppShell has scheduling tabs and onboarding panel; Collapse sidebar button has no handler and onboarding task rows have no actions. | pending B2 |
 | S02 | Mobile app navigation | unverified | P1 | Current AppShell has horizontally scrolling mobile navigation; old hidden-sidebar-only finding superseded. Test reachability and overflow at 390px. | pending B2 |
@@ -132,10 +134,11 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 - **EX2 — Marketing scope (user-confirmed 2026-10-15):** Only homepage and login require marketing parity. Pricing, calculator, separate signup styling and other marketing pages are excluded. This does not remove logged-in features or their paid-plan equivalents from scope.
 
 - **EX1 — Free replica economics (user-confirmed 2026-10-15):** All replica features are free. Original subscription prices, paid tiers/add-ons, upgrades and time-limited trials must not be recreated. The free equivalent is full access with truthful pricing/access copy. This exception covers economic restrictions only; it does not excuse missing features, visual discrepancies, broken behavior or fake integrations. Existing host booking-payment/Stripe behavior is outside the authorized modification scope.
+- **EX3 — Email and Google authentication only (user-confirmed 2026-10-15):** Microsoft signup/sign-in and enterprise SSO are intentionally excluded. Email/password and Google are the supported account methods. Microsoft/Outlook calendar OAuth is a separate integration and remains available. Firebase project/provider configuration and secrets were not changed.
 - Preserve the independent name/logo and disclaimer. Recreate visual assets and use licensed fonts. This is a user-required boundary; exact trademark/asset equivalence is not a target.
 - Payment/Stripe and secrets are excluded from modification by the user. Pricing presentation may be compared without altering payment behavior.
 - Free-equivalent limitations must be verified individually. No unavailable feature has yet been excused just because the reference charges for it.
-- Beyond EX1, EX2 and the explicit asset/payment boundaries, no product limitation is approved as a completion exception. Live behavior and screenshots are still required before certifying matches.
+- Beyond EX1, EX2, EX3 and the explicit asset/payment boundaries, no product limitation is approved as a completion exception. Live behavior and screenshots are still required before certifying matches.
 
 ## Verification log
 
@@ -167,7 +170,8 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Poll reservations, closure and vote replacement | [Draft PR #11](https://github.com/tommy-muckstack/calendlyisdead/pull/11) | Six new assertions failed before the fix. All 157 tests, TypeScript and build pass, including eleven poll regressions. Lint/browser/PostgreSQL contention checks remain blocked. |
 | Group session meeting limits | [Draft PR #12](https://github.com/tommy-muckstack/calendlyisdead/pull/12) | Six pre-change failures reproduced. All 168 tests, TypeScript and production build pass, including eleven new database/slot regressions. Original behavior, browser evidence, PostgreSQL contention and lint remain unverified/blocked. |
 | Database startup with group attendees | [Draft PR #13](https://github.com/tommy-muckstack/calendlyisdead/pull/13) | Persisted-database restart failure reproduced and fixed. All 171 tests, TypeScript and production build pass, including three migration/constraint cases. Lint and deployed PostgreSQL/browser verification remain pending. |
-| Saved booking buffers and cross-event protection | `fix/booking-buffer-protection` / local only | Eleven pre-change failures reproduced. All 187 tests, TypeScript and production build pass, with sixteen new regressions. No production migration or publication. Lint/browser/PostgreSQL verification remains pending. |
+| Saved booking buffers and cross-event protection | [Draft PR #14](https://github.com/tommy-muckstack/calendlyisdead/pull/14) | Eleven pre-change failures reproduced. All 187 tests, TypeScript and production build pass, with sixteen new regressions. No production migration or publication. Lint/browser/PostgreSQL verification remains pending. |
+| Email and Google authentication only | `fix/email-google-auth` / local only | Microsoft signup/login removed per EX3; the server accepts only password/Google tokens and shared cookies. Twelve pre-change failures reproduced; all 199 tests, TypeScript and production build pass. Browser evidence and lint remain blocked. |
 
 ## Capturing evidence with other workers
 
@@ -268,6 +272,14 @@ Migration limitation: legacy rows have no historical buffer values. The idempote
 
 All 187 tests in 19 files pass, including thirteen booking/database regressions, two migration cases and a repeated-DST-hour case. They cover cancellation/rescheduling, exact boundaries, stacked buffers, midnight, group settings, round robin/collective, polls and concurrent reservations. An older one-off fixture attempted to book inside an earlier meeting's buffer; it now verifies that rejection and books the next valid slot. Standalone TypeScript and production build pass. Lint remains unavailable. Browser screenshots/styles and multi-connection PostgreSQL checks remain pending; no parity match is certified. New provider effects are stubbed, and the existing suite uses the local outbox. Changes remain local and unpublished.
 
+### Email and Google authentication only
+
+The user explicitly restricted login and signup to email/password and Google (EX3). Removed the Microsoft placeholder from the shared auth form, replaced the desktop/mobile homepage signup choices with shared real links, and removed unsupported enterprise SSO claims. Microsoft/Outlook calendar integrations remain separate and unchanged. AGENTS.md records the scope for later work.
+
+The server previously accepted any Firebase provider. Twelve regression cases demonstrated successful Microsoft, SAML/OIDC, anonymous, custom and missing-provider token exchanges, plus acceptance of shared cookies for those providers. Session creation now checks the verified sign-in provider before issuing a cookie or provisioning an app user; shared-cookie verification applies the same rule even for an account with a linked Google identity. Existing email and Google account creation, verified-email linking and sign-out tests continue to pass. No Firebase project/provider settings or secrets changed.
+
+All 199 unit/integration tests, standalone TypeScript and the production build pass. Mobile data comparison confirms only the replaced auth items and unsupported SSO claim changed. Lint remains unavailable (missing script); browser screenshots, focus behavior and live-provider sign-in remain blocked by B2. This is a locally verified implementation of the user's exception, not a visual parity certification. No push, PR or deployment was performed.
+
 ### QA #40 — publication verification, October 16
 
 The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
@@ -321,3 +333,9 @@ The product files are unchanged from local source commit `53842ee162c86f3bc92692
 Fresh isolated checkout: 187 unit/database tests in 19 files, production build and standalone TypeScript pass. Sixteen new regression/migration/DST cases cover saved before/after buffers, stacked boundaries, midnight, group seats, cancellation/rescheduling, polls and concurrent reservations. Legacy rows can only freeze current event buffers once; lost historical values cannot be reconstructed. No production migration was run. npm run lint was attempted but the historical base lacks its script; tooling is a later pending change. Dependencies were reused locally. Multi-connection PostgreSQL, original/browser comparison and ambiguous external-calendar group matching remain open.
 
 The product files are unchanged from local source commit `73b9ca6461a0b02da8382bee0fb9fb8be5060f4b`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
+
+### Email and Google authentication scope — publication verification, October 16
+
+Fresh isolated checkout: 199 unit/database tests in 19 files, production build and standalone TypeScript pass. Twelve provider-policy regressions verify rejecting unsupported token exchanges and shared cookies before user/session creation, including linked-Google accounts. Existing supported authentication and account-linking tests pass. npm run lint was attempted but the historical base lacks its script; tooling is a later pending change. Dependencies were reused locally. Live Firebase/Google sign-in, native focus and homepage/auth screenshots remain unverified. Microsoft calendar integration remains supported; no Firebase settings, credentials or payment behavior changed.
+
+The product files are unchanged from local source commit `144bae3208c6b48de4a3897b4f73f561dc3b4c3f`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.

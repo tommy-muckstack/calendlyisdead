@@ -13,6 +13,8 @@
 
 - Current scope (user-confirmed 2026-10-15): marketing comparison covers the **homepage and login page only**. Pricing and other marketing pages are excluded. All logged-in functionality remains in scope, including original paid capabilities. Keep end-to-end invitee booking, confirmation, cancellation and rescheduling checks as core scheduling verification.
 
+- Authentication scope (user-confirmed 2026-10-15): support **email/password and Google only** for signup and login. Do not add Microsoft sign-in or enterprise SSO. This does not remove Microsoft/Outlook calendar integrations.
+
 - The replica is **completely free**. All replica features must remain available without subscriptions, paid tiers, upgrade prompts or trial limits. Original prices and feature gates are intentional economic differences, not behavior to reproduce. Do not introduce fake checkout or sales flows.
 - Paid capabilities on the original are explicitly **in scope**: implement their functionality and make access free. A paid label is never grounds to omit a feature. For an unavoidable paid-service dependency, build the closest working free equivalent and document its precise limitation; do not substitute a disabled control or promotional placeholder.
 - Compare the live original and clone in a real Playwright browser at **1440px** and **390px** widths. Record date, viewport height, browser version, URL, state and source commit.

@@ -14,7 +14,7 @@ export type Measured = { H: number; bg?: string; items: Item[] };
 const CHECK = '<svg viewBox="0 0 20 20" width="100%" height="100%" fill="none" stroke="#121317" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M6.8 10.2l2.2 2.2 4.2-4.6"/></svg>';
 const CTA = /get|buy|log ?in|sign|start|subscribe|download|try|contact/i;
 
-export function MeasuredPage({ data, className = "", skip, img, display, bgFallback = "linear-gradient(180deg,#dbe8ff,#f5f8ff 60%,#fff)" }: { data: Measured; className?: string; skip?: (i: Item) => boolean; img?: (i: Item, style: React.CSSProperties) => React.ReactNode; display?: RegExp; bgFallback?: string | ((i: Item) => string) }) {
+export function MeasuredPage({ data, className = "", skip, img, display, children, bgFallback = "linear-gradient(180deg,#dbe8ff,#f5f8ff 60%,#fff)" }: { data: Measured; className?: string; skip?: (i: Item) => boolean; img?: (i: Item, style: React.CSSProperties) => React.ReactNode; display?: RegExp; children?: React.ReactNode; bgFallback?: string | ((i: Item) => string) }) {
   const items = data.items.filter(i => !(skip && skip(i)));
   return <div className={`mp ${className}`} style={{ height: data.H, background: data.bg && !/0, 0, 0, 0\)/.test(data.bg) ? data.bg : "#fff" }}>
     <MeasuredFit />
@@ -27,5 +27,6 @@ export function MeasuredPage({ data, className = "", skip, img, display, bgFallb
       const style = { left: it.x, top: it.y, minWidth: it.w, height: it.h, zIndex: it.z ?? 3, fontSize: it.fs, lineHeight: it.lh, fontWeight: it.fw, color: it.c, letterSpacing: it.ls, textDecoration: it.td, fontStyle: it.fi ? "italic" : undefined, fontFamily: display && it.ff && display.test(it.ff) ? "var(--serif)" : it.ff === "Calendly Sans" ? "var(--sans)" : undefined } as React.CSSProperties;
       return it.href ? <Link key={i} href={CTA.test(it.t || "") ? "/login" : "/"} className="mp-t" data-w={it.w} style={style}>{it.t}</Link> : <span key={i} className="mp-t" data-w={it.w} style={style}>{it.t}</span>;
     })}
+    {children}
   </div>;
 }

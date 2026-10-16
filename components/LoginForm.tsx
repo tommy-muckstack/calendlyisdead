@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { FirebaseClientConfig } from "@/lib/isdead-auth/config";
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, authErrorMessage } from "@/lib/isdead-auth/client";
 import { BP } from "@/lib/basepath";
-import { G, MsMark, Check } from "@/components/mk/icons";
+import { G, Check } from "@/components/mk/icons";
 import { Arrow } from "@/components/mk/chrome";
 type Props = { config: FirebaseClientConfig | null; demo: boolean; demoAs?: "mate"; to: string; mode?: "login" | "signup"; autoProvider?: string };
 // Calendly auth layout: email first, then password; Google below. Login = narrow card; signup = wide card with a perks column.
@@ -42,7 +42,6 @@ export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }:
       {mode !== "reset" && <>
         <div className="cm-or">or</div>
         <button className="cm-social" disabled={busy} onClick={() => run(async () => { await signInWithGoogle(config, session); done(); })}><G s={20} />Continue with Google</button>
-        <button className="cm-social" disabled={busy} onClick={() => setErr("Microsoft sign-in isn’t available yet. Use email or Google.")}><MsMark s={20} />Continue with Microsoft</button>
       </>}</>}
     {signup && <p className="cm-aft">Continue with Google to connect your calendar.</p>}
     <p className="cm-aft" style={{ marginTop: signup ? 28 : 28 }}>

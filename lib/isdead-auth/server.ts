@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { DecodedIdToken } from "firebase-admin/auth";
 import { firebaseConfigured, SESSION_MAX_AGE_S } from "./config";
 export * from "./config";
 
@@ -19,12 +20,15 @@ export function getAdminAuth() {
   return adminAuth;
 }
 
-const toIdentity = (t: any): FirebaseIdentity => ({ uid: t.uid, email: t.email ?? null, emailVerified: !!t.email_verified, name: t.name ?? null, picture: t.picture ?? null, provider: t.firebase?.sign_in_provider ?? null });
+const toIdentity = (t: DecodedIdToken): FirebaseIdentity => ({ uid: t.uid, email: t.email ?? null, emailVerified: !!t.email_verified, name: t.name ?? null, picture: t.picture ?? null, provider: t.firebase?.sign_in_provider ?? null });
+// CalendlyIsDead's provider policy also applies to cookies issued by another IsDead app.
+const supportedProvider = (t: DecodedIdToken) => t.firebase?.sign_in_provider === "password" || t.firebase?.sign_in_provider === "google.com";
 
 /** Exchange a fresh client ID token for a session cookie value. Rejects tokens older than 5 minutes. */
 export async function createSessionFromIdToken(idToken: string) {
   const auth = await getAdminAuth();
   const decoded = await auth.verifyIdToken(idToken, true);
+  if (!supportedProvider(decoded)) throw new Error("Only email and Google sign-in are supported");
   if (Date.now() / 1000 - decoded.auth_time > 5 * 60) throw new Error("recent sign-in required");
   const cookie = await auth.createSessionCookie(idToken, { expiresIn: SESSION_MAX_AGE_S * 1000 });
   return { cookie, identity: toIdentity(decoded) };
@@ -33,7 +37,10 @@ export async function createSessionFromIdToken(idToken: string) {
 /** Verify a session cookie value. Returns null (never throws) when missing, invalid or not configured. */
 export async function verifySessionCookie(cookie: string | undefined, checkRevoked = false): Promise<FirebaseIdentity | null> {
   if (!cookie || !firebaseConfigured()) return null;
-  try { return toIdentity(await (await getAdminAuth()).verifySessionCookie(cookie, checkRevoked)); } catch { return null; }
+  try {
+    const decoded = await (await getAdminAuth()).verifySessionCookie(cookie, checkRevoked);
+    return supportedProvider(decoded) ? toIdentity(decoded) : null;
+  } catch { return null; }
 }
 
 export async function revokeSessions(uid: string) { try { await (await getAdminAuth()).revokeRefreshTokens(uid); } catch { /* best effort */ } }
