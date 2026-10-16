@@ -21,11 +21,11 @@ const TITLES: [string, string, { href: string; label: string }[]?][] = [
   ["/app/analytics", "Analytics", [{ href: "/app/analytics", label: "Events" }]], 
 ];
 const GET_STARTED = [
-  { t: "Create your first event type", n: "2 tasks", a: <><rect x="8" y="10" width="32" height="28" rx="4" fill="#dbeafe" stroke="#2563eb" strokeWidth="2" /><path d="M8 18h32" stroke="#2563eb" strokeWidth="2" /><path d="M17 26h6M17 31h14" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" /></> },
-  { t: "Connect your calendar", n: "2 tasks", a: <><rect x="6" y="12" width="36" height="26" rx="4" fill="#fde68a" stroke="#d97706" strokeWidth="2" /><path d="M6 20h36M16 8v8M32 8v8" stroke="#d97706" strokeWidth="2" strokeLinecap="round" /></> },
-  { t: "Automate reminders and follow-ups", n: "2 tasks", a: <><rect x="6" y="14" width="30" height="22" rx="3" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2" /><path d="M6 17l15 10 15-10" stroke="#6366f1" strokeWidth="2" fill="none" /><circle cx="38" cy="14" r="6" fill="#bbf7d0" stroke="#16a34a" strokeWidth="2" /></> },
-  { t: "Using CalendlyIsDead with a team", n: "2 tasks", a: <><circle cx="17" cy="19" r="6" fill="#fbcfe8" stroke="#db2777" strokeWidth="2" /><circle cx="32" cy="22" r="5" fill="#bae6fd" stroke="#0284c7" strokeWidth="2" /><path d="M6 38c1-7 6-10 11-10s10 3 11 10M28 37c.8-4 3-6 6-6s5 2 6 6" stroke="#475569" strokeWidth="2" fill="none" strokeLinecap="round" /></> },
-];
+  { t: "Create your first event type", n: "2 tasks", icon: "bulb" },
+  { t: "Connect your calendar", n: "2 tasks", icon: "cal" },
+  { t: "Automate reminders and follow-ups", n: "2 tasks", icon: "mail" },
+  { t: "Using CalendlyIsDead with a team", n: "2 tasks", icon: "groups" },
+] as const;
 
 export function AppShell({ user, signOut, children }: { user: { name: string; email: string; username: string }; signOut: ReactNode; children: ReactNode }) {
   const path = (usePathname() || "").replace(BP, "") || "/app";
@@ -51,7 +51,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
         {signOut}</div>}</div>
     <aside className="cs-side">
       <div className="cs-create"><button className="cs-btn cs-outline cs-wide" onClick={() => setMenu(menu === "side" ? null : "side")} aria-haspopup="menu">{I.plus(16)}Create{I.chev(14)}</button><CreateMenu id="side" /></div>
-      <nav>{NAV.map(n => { const on = n.match(path); return <Link key={n.href} href={n.href} className={"cs-nav" + (on ? " on" : "")} aria-current={on ? "page" : undefined}>{I[n.icon](22)}{n.label}</Link>; })}</nav>
+      <nav>{NAV.map(n => { const on = n.match(path); return <Link key={n.href} href={n.href} className={"cs-nav" + (on ? " on" : "")} aria-current={on ? "page" : undefined}>{I[n.icon](24)}{n.label}</Link>; })}</nav>
       <div className="cs-grow" />
       <div className="cs-promo"><div className="cs-promo-art" /><b>Free and open source</b><span>No seats, no gates. Read the code, fork it, self-host it.</span><a href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">View the source →</a></div>
       <a className="cs-btn cs-outline cs-wide" href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">{I.star(18)}Star on GitHub</a>
@@ -71,7 +71,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
         {settings ? <div className="cs-body cs-dim" aria-hidden /> : <div className="cs-body">{children}</div>}
       </main>
       {gs && path === "/app" && <aside className="cs-gs"><div className="cs-gs-h"><h2>Get started</h2><button className="cs-ico" onClick={() => setGs(false)} aria-label="Close">{I.close(22)}</button></div>
-        {GET_STARTED.map(g => <div key={g.t} className="cs-gs-i"><svg width="48" height="48" viewBox="0 0 48 48" aria-hidden>{g.a}</svg><div><b>{g.t}</b><span>{g.n}</span></div></div>)}
+        {GET_STARTED.map(g => <div key={g.t} className="cs-gs-i"><span className="cs-gs-art">{I[g.icon](48)}</span><div><b>{g.t}</b><span>{g.n}</span></div></div>)}
         <button className="cs-btn cs-outline cs-sm" onClick={() => { setGs(false); try { localStorage.setItem("cid-gs", "off"); } catch { } }}>Don’t show again</button></aside>}
     </div>
     {settings && <div className="cs-scrim"><section className="cs-modal" role="dialog" aria-modal="true" aria-label="Settings">
