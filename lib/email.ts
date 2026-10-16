@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-export type Mail = { to: string; subject: string; text: string; html?: string; ics?: string };
+export type Mail = { to: string; subject: string; text: string; html?: string; ics?: string; idempotencyKey?: string };
 export const emailConfigured = () => !!process.env.RESEND_API_KEY;
 // Never throws: a missing or failing mail provider must not break booking, cancelling or sign-up flows.
 export async function sendMail(m: Mail): Promise<boolean> {
@@ -10,7 +10,7 @@ export async function sendMail(m: Mail): Promise<boolean> {
       const { Resend } = await import("resend");
       const r = new Resend(process.env.RESEND_API_KEY);
       const res: any = await r.emails.send({ from, to: m.to, subject: m.subject, text: m.text, html: m.html,
-        attachments: m.ics ? [{ filename: "invite.ics", content: Buffer.from(m.ics).toString("base64"), contentType: "text/calendar; method=REQUEST" } as any] : undefined });
+        attachments: m.ics ? [{ filename: "invite.ics", content: Buffer.from(m.ics).toString("base64"), contentType: "text/calendar; method=REQUEST" } as any] : undefined }, { idempotencyKey: m.idempotencyKey });
       if (res?.error) { console.error(`[mail] resend error to=${m.to}:`, res.error); return false; }
       return true;
     } catch (e) { console.error(`[mail] send failed to=${m.to}:`, e); return false; }

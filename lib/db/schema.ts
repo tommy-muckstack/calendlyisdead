@@ -209,3 +209,16 @@ export const contactExports = pgTable("contact_exports", {
   requestHash: text("requestHash").notNull(), csv: text("csv").notNull(), count: integer("count").notNull(),
   email: text("email").notNull().default("pending"), expiresAt: timestamp("expiresAt", { withTimezone: true, mode: "date" }).notNull(),
 }, t => [primaryKey({ columns: [t.userId, t.id] })]);
+export const contactNotes = pgTable("contact_notes", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  contactId: text("contactId").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  title: text("title").notNull().default(""), body: text("body").notNull().default(""), reminderDate: text("reminderDate"),
+  completedAt: timestamp("completedAt", { withTimezone: true, mode: "date" }), version: integer("version").notNull().default(1),
+  createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" }).notNull().defaultNow(), updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  deletedAt: timestamp("deletedAt", { withTimezone: true, mode: "date" }),
+}, n => [index("contact_notes_timeline").on(n.userId, n.contactId, n.updatedAt), index("contact_notes_reminders").on(n.userId, n.reminderDate).where(sql`${n.deletedAt} IS NULL AND ${n.completedAt} IS NULL`)]);
+export const contactReminderDigests = pgTable("contact_reminder_digests", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), day: text("day").notNull(), timezone: text("timezone").notNull(),
+  to: text("to").notNull(), subject: text("subject").notNull(), body: text("body").notNull(), status: text("status").notNull(), attempts: integer("attempts").notNull().default(1),
+  createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" }).notNull(), attemptedAt: timestamp("attemptedAt", { withTimezone: true, mode: "date" }).notNull(),
+}, d => [uniqueIndex("contact_reminder_daily").on(d.userId, d.day)]);
