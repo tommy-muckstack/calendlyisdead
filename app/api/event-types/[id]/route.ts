@@ -1,3 +1,4 @@
+import { normalizeLocationPatch, validLocationsForKind, withLocationLocks, canonicalLocations } from "@/lib/event-locations";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
@@ -36,20 +37,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (p.data.shared || p.data.sharedVersion) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const apply = async (current: typeof schema.eventTypes.$inferSelect, connection: typeof db) => {
-    const data: Record<string, unknown> = { ...p.data };
+    const data: Record<string, unknown> = normalizeLocationPatch(current, p.data);
+    if (!validLocationsForKind(data.locations === undefined ? current.locations : data.locations as typeof current.locations, String(data.kind ?? current.kind)))
+      return NextResponse.json({ error: "invalid_locations" }, { status: 400 });
     // Older clients still set a rolling calendar count. Clear an explicit range
     // only for an intentional legacy range edit, never for unrelated saves.
     if (p.data.rangeDays !== undefined) data.dateRange = null;
-    if (p.data.lockedFields) data.lockedFields = withDateRangeLocks(p.data.lockedFields);
+    if (p.data.lockedFields) data.lockedFields = withLocationLocks(withDateRangeLocks(p.data.lockedFields));
     // Visibility belongs to each assigned event, not the managed template.
     if (current.kind === "managed" && "secret" in data)
       return NextResponse.json({ error: "managed_template_visibility" }, { status: 400 });
     if (current.managedParentId) {
-      const locked = withDateRangeLocks(current.lockedFields ?? []).filter(f => {
+      const locked = withLocationLocks(withDateRangeLocks(current.lockedFields ?? [])).filter(f => {
         if (!(f in data)) return false;
         // jsonb may reorder keys; compare the validated range representation.
         const value = f === "dateRange" && current.dateRange ? BookingDateRangeSchema.parse(current.dateRange) : current[f as keyof typeof current];
-        return JSON.stringify(data[f]) !== JSON.stringify(value);
+        return f === "locations" ? canonicalLocations(data.locations as typeof current.locations) !== canonicalLocations(current.locations) : JSON.stringify(data[f]) !== JSON.stringify(value);
       });
       if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
       delete data.lockedFields;
@@ -60,9 +63,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       .from(schema.bookings).where(eq(schema.bookings.eventTypeId, id)).limit(1)).length > 0;
     if (groupSettingsLocked) {
       // Including kind prevents switching to one-on-one to bypass the field locks.
-      const fields = (["durationMin", "location", "kind"] as const).filter(f => f in data && data[f] !== current[f]);
+      const fields = (["durationMin", "location", "locations", "kind"] as const).filter(f => f in data && (f === "locations" ? canonicalLocations(data.locations as typeof current.locations) !== canonicalLocations(current.locations) : data[f] !== current[f]));
       if (fields.length) return NextResponse.json({ error: "group_settings_locked", fields,
-        settings: { durationMin: current.durationMin, location: current.location, kind: current.kind } }, { status: 409 });
+        settings: { durationMin: current.durationMin, location: current.location, locations: current.locations, kind: current.kind } }, { status: 409 });
     }
     // The chosen kind defines the booking model; editing must never convert it.
     if (data.kind !== undefined && data.kind !== current.kind)

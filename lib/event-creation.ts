@@ -1,3 +1,4 @@
+import { normalizeLocationPatch } from "./event-locations";
 import { createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "./db";
@@ -11,7 +12,8 @@ export class EventCreationError extends Error {
 }
 export async function createEventDraft(userId: string, raw: EventCreation) {
   const input = EventCreation.parse(raw), db = await getDb(), E = schema.eventTypes, R = schema.eventTypeCreations;
-  const requestHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  const { locations, ...legacySettings } = input.settings;
+  const requestHash = createHash("sha256").update(JSON.stringify({ ...input, settings: locations === null ? legacySettings : { ...legacySettings, locations } })).digest("hex");
   try {
     return await db.transaction(async (tx: DB) => {
       if (input.shared) {
@@ -42,7 +44,7 @@ export async function createEventDraft(userId: string, raw: EventCreation) {
       }
       const [inserted] = await tx.insert(R).values({ id: input.draftId, userId, requestHash }).onConflictDoNothing().returning({ id: R.id });
       if (!inserted) throw new EventCreationError(409, "creation_conflict");
-      const values = { ...input.settings, id: input.draftId, userId, ...(input.shared ? {
+      const values = { ...normalizeLocationPatch({ location: "" }, input.settings), id: input.draftId, userId, ...(input.shared ? {
         sharedWorkspaceId: input.shared.workspaceId, secret: true, rrMode: input.shared.distribution === "equal" ? "even" : "priority", sharedReschedule: input.shared.reschedule,
       } : {}) };
       const event = input.autoSlug ? await insertEventWithLink(tx, values, input.settings.slug)

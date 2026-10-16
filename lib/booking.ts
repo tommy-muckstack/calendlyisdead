@@ -1,3 +1,4 @@
+import { canonicalLocations, resolveLocation, type LocationSelection } from "./event-locations";
 import { randomInt } from "node:crypto";
 import { loadSharedHosts } from "./shared-events";
 import { BP } from "./basepath";
@@ -194,7 +195,7 @@ export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b:
   }
 }
 
-export type BookingInput = { username: string; slug: string; start: string; name: string; email: string; tz: string; notes?: string; guests?: string[]; rescheduleUid?: string; answers?: Record<string, string> };
+export type BookingInput = { username: string; slug: string; start: string; name: string; email: string; tz: string; notes?: string; guests?: string[]; rescheduleUid?: string; answers?: Record<string, string>; locationSelection?: LocationSelection };
 
 export async function createBooking(input: BookingInput) {
   const db = await getDb();
@@ -214,11 +215,12 @@ export async function createBooking(input: BookingInput) {
   // A deleted event's slug may now belong to a different template. A reschedule
   // token must never silently move its booking to that replacement event.
   if (old && old.eventTypeId !== et.id) throw new Error("not_found");
+  const resolvedLocation = resolveLocation(et, input.locationSelection);
   const answers = validateAnswers(et.questions ?? [], input.answers ?? {});
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
-    location: et.location, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
+    ...resolvedLocation, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeLimit: et.kind === "group" ? et.seats : 1,
     inviteeTz: r.timezone, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
@@ -228,7 +230,7 @@ export async function createBooking(input: BookingInput) {
         const [workspace] = await tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, et.sharedWorkspaceId)).for("update");
         if (!workspace) throw new Error("slot_unavailable");
       }
-      const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
+      const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location, locations: eventTypes.locations,
         active: eventTypes.active, deletedAt: eventTypes.deletedAt, maxPerDay: eventTypes.maxPerDay,
         maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin, lockedTimezone: eventTypes.lockedTimezone,
         rangeDays: eventTypes.rangeDays, dateRange: eventTypes.dateRange, sharedVersion: eventTypes.sharedVersion }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId || et.sharedWorkspaceId ? "update" : "share");
@@ -242,7 +244,7 @@ export async function createBooking(input: BookingInput) {
       if (!et.teamId && !et.sharedWorkspaceId) currentType = (await lockType())[0];
       // Never reserve a location that changed during the availability preflight.
       // Group reservations also require a consistent session definition.
-      if (!currentType || !currentType.active || currentType.deletedAt || currentType.location !== et.location || ((et.kind === "group" || currentType.kind === "group") &&
+      if (!currentType || !currentType.active || currentType.deletedAt || currentType.location !== et.location || canonicalLocations(currentType.locations) !== canonicalLocations(et.locations) || ((et.kind === "group" || currentType.kind === "group") &&
         (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin))) {
         throw new Error("slot_unavailable");
       }
@@ -288,7 +290,7 @@ export async function createBooking(input: BookingInput) {
       }
       if (et.kind === "group") {
         // New seats share the session's original location and buffers.
-        const attendees = await tx.select({ location: bookings.location, bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
+        const attendees = await tx.select({ location: bookings.location, locationChoice: bookings.locationChoice, bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
           .where(and(eq(bookings.hostId, rows[0].hostId), eq(bookings.eventTypeId, et.id), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")))
           .orderBy(bookings.createdAt, bookings.uid);
         if (attendees.length) {
@@ -334,7 +336,7 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
     const host = hostUsers.find(u => u.id === row.hostId);
     const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: row.location, start: row.start, end: row.end,
       organizer: { name: host.name ?? "", email: host.email ?? "" }, attendees: [{ name: row.inviteeName, email: row.inviteeEmail }, ...row.guests.map((g: string) => ({ name: g, email: g }))],
-      wantsMeet: confFor(row.location) === "meet" });
+      wantsMeet: !row.locationChoice && confFor(row.location) === "meet" });
     if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null });
       await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId }).where(eq(bookings.uid, row.uid)); }
   }
@@ -342,7 +344,7 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
   const fromCal = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
   // a group seat reuses the session's existing link
   const [sibling] = et.kind === "group" ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.start, main.start), eq(bookings.status, "confirmed")))).filter((b: any) => b.meetingUrl && b.uid !== main.uid) : [];
-  main.meetingUrl = sibling?.meetingUrl ?? await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal);
+  main.meetingUrl = sibling?.meetingUrl ?? (main.locationChoice ? main.locationChoice.meetingUrl : await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal));
   if (main.meetingUrl) await db.update(bookings).set({ meetingUrl: main.meetingUrl }).where(inArray(bookings.uid, rows.map(r => r.uid)));
   await notify(rescheduled ? "rescheduled" : "confirmed", main, et, hostUsers);
   await onBooked(main.uid);

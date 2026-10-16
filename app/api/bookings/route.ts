@@ -1,3 +1,4 @@
+import { LocationSelectionSchema } from "@/lib/event-locations";
 import { BP } from "@/lib/basepath";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -6,7 +7,7 @@ import { createCheckout, stripeConfigured } from "@/lib/payments";
 export const runtime = "nodejs";
 const Body = z.object({ username: z.string(), slug: z.string(), start: z.string(), name: z.string().min(1).max(200), email: z.string().email(), tz: z.string(),
   notes: z.string().max(5000).optional(), guests: z.array(z.string().email()).max(10).optional(), rescheduleUid: z.string().optional(), answers: z.record(z.string(), z.string()).optional(),
-  embed: z.boolean().optional() });
+  locationSelection: LocationSelectionSchema.optional(), embed: z.boolean().optional() });
 export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: "invalid", issues: parsed.error.issues }, { status: 400 });
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ uid: b.uid, checkoutUrl, redirectUrl });
   } catch (e: any) {
-    const status = e.message === "not_found" ? 404 : e.message.startsWith("answer_") ? 400 : e.message.startsWith("stripe") ? 502 : 409;
+    const status = e.message === "not_found" ? 404 : (e.message.startsWith("answer_") || e.message.startsWith("location_")) ? 400 : e.message.startsWith("stripe") ? 502 : 409;
     return NextResponse.json({ error: e.message }, { status });
   }
 }

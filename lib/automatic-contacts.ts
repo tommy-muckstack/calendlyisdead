@@ -1,3 +1,4 @@
+import type { BookedLocationChoice } from "./event-locations";
 import { and, desc, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { ContactFields, EMPTY_CONTACT } from "./contact-validation";
@@ -8,13 +9,13 @@ import type { Question } from "./db/schema";
 import { runContactAutomations } from "./contact-automations";
 import { relinkOpportunityBookings } from "./opportunity-bookings";
 const { contacts: C, contactMeetings: CM, bookings: B, contactSettings: S } = schema;
-export type BookingContact = { hostId: string; uid: string; eventTypeId: string; inviteeName: string; inviteeEmail: string; answers?: Record<string, string>; rescheduledFrom?: string | null };
+export type BookingContact = { hostId: string; uid: string; eventTypeId: string; inviteeName: string; inviteeEmail: string; answers?: Record<string, string>; rescheduledFrom?: string | null; locationChoice?: BookedLocationChoice | null };
 
 // Called inside the reservation transaction after its host locks. Existing
 // standard details stay unchanged; explicitly mapped answers can update below.
 export async function recordBookingContact(db: ContactDB, booking: BookingContact, questions: Question[] = [], historical = false) {
   if (!historical && booking.rescheduledFrom) await relinkOpportunityBookings(db, booking);
-  const phone = questions.filter(question => question.type === "phone").map(question => booking.answers?.[question.id]?.trim()).find(Boolean) ?? "";
+  const phone = booking.locationChoice?.phone || (questions.filter(question => question.type === "phone").map(question => booking.answers?.[question.id]?.trim()).find(Boolean) ?? "");
   const parsed = ContactFields.safeParse({ ...EMPTY_CONTACT, name: booking.inviteeName, email: booking.inviteeEmail, phone });
   if (!parsed.success) return; // Invalid legacy data must not break a reservation.
   const fields = parsed.data, owner = eq(C.userId, booking.hostId), email = sql`lower(${C.email}) = ${fields.email}`;

@@ -1,4 +1,6 @@
 "use client";
+import { LocationEditor } from "./LocationEditor";
+import { withLocationLocks, locationSummary, type LocationOption } from "@/lib/event-locations";
 import { SharedEventHosts } from "./SharedEventHosts";
 import { SharedEventSettings, type SharedHostDirectory } from "@/lib/shared-event-validation";
 import { BP } from "@/lib/basepath";
@@ -16,7 +18,7 @@ import { ContactCustomFieldAutomations } from "./ContactFieldAutomation";
 import { OpportunityAutomationsPanel } from "./OpportunityAutomations";
 import { ContactListAutomationPanel } from "./ContactListAutomation";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
+export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; locations?: LocationOption[] | null; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; dateRange: BookingDateRange | null; active: boolean; secret: boolean; lockedTimezone: string | null;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
   sharedWorkspaceId?: string | null; sharedVersion?: number; shared?: SharedEventSettings; bookingUsername?: string; canEdit?: boolean; canDelete?: boolean; isHost?: boolean;
@@ -27,15 +29,15 @@ type Sch = { id: string; name: string; timezone?: string; isDefault?: boolean };
 type PersonalKind = "one_on_one" | "group" | "collective" | "round_robin";
 const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
 const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
-const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "dateRange", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
+const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "locations", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "dateRange", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
 function draftBody(d: ET) {
   return Object.fromEntries(EDITABLE_KEYS.filter(key =>
-    !(d.managedParentId && withDateRangeLocks(d.lockedFields).includes(key)) &&
+    !(d.managedParentId && withLocationLocks(withDateRangeLocks(d.lockedFields)).includes(key)) &&
     !(key === "kind" && (d.managedParentId || d.teamId)) && !(key === "scheduleId" && d.teamId)
-  ).map(key => [key, key === "questions" ? d.questions.map(q => q.type === "select" ? q : { ...q, options: undefined }) : d[key]]));
+  ).map(key => [key, key === "questions" ? d.questions.map(q => q.type === "select" ? q : { ...q, options: undefined }) : key === "locations" ? d.locations ?? null : d[key]]));
 }
 const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration", startIntervalMin: "Start time increments", lockedTimezone: "Booking time zone",
-  location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
+  location: "Location", locations: "Locations", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
   dateRange: "Date range", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
   kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
 export function EventTypesBoard({ initial, username, schedules, owner, hostDirectory, defaultTimezone = "UTC" }: { hostDirectory?: SharedHostDirectory | null; initial: ET[]; username: string; schedules: Sch[]; owner?: string; defaultTimezone?: string }) {
@@ -184,6 +186,7 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
       const issue = parsed.error.issues[0];
       if (["slug", "startIntervalMin", "lockedTimezone"].includes(String(issue.path[0]))) setSect("link");
       if (["title", "durationMin", "seats", "color"].includes(String(issue.path[0]))) setSect("basics");
+      if (issue.path[0] === "locations" || issue.path[0] === "location") setSect("where");
       if (issue.path[0] === "questions") setSect("questions");
       if (issue.path[0] === "dateRange" || issue.path[0] === "minNoticeMin") setSect("avail");
       setErr(`${FIELD_NAMES[String(issue.path[0])] ?? "Event settings"}: ${issue.message}`);
@@ -205,7 +208,7 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
           setErr(result.error === "created_event_deleted" ? "This event was already created and then deleted. Close this draft and start a new event type." : "An earlier Create request used this draft. Reload event types to review the saved event before creating another.");
         } else if (result?.error === "group_settings_locked" && result.settings?.kind === "group" &&
           typeof result.settings.durationMin === "number" && typeof result.settings.location === "string") {
-          const settings = { kind: "group", durationMin: result.settings.durationMin, location: result.settings.location };
+          const settings = { kind: "group", durationMin: result.settings.durationMin, location: result.settings.location, locations: result.settings.locations ?? null };
           setGroupLocked(true);
           // Refresh protected values without discarding unrelated draft edits.
           setD(current => ({ ...current, ...settings }));
@@ -240,8 +243,8 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
       clearTimeout(timeout); controller.current = null; requestPending.current = false; setSaving(false);
     }
   }
-  const L = (k: string) => ((d.lockedFields ?? []).includes(k) && !!d.managedParentId) ||
-    (groupLocked && ["durationMin", "location", "kind"].includes(k));
+  const L = (k: string) => (withLocationLocks(d.lockedFields ?? []).includes(k) && !!d.managedParentId) ||
+    (groupLocked && ["durationMin", "location", "locations", "kind"].includes(k));
   const set = (k: keyof ET) => (e: any) => setD({ ...d, [k]: e.target.type === "number" ? Number(e.target.value) : e.target.type === "checkbox" ? e.target.checked : e.target.value });
   const S = ({ id, title, summary, children }: any) => <div className="sect">
     <button onClick={() => setSect(sect === id ? "" : id)} aria-expanded={sect === id}><span><b>{title}</b><small>{summary}</small></span><span>{sect === id ? "–" : "+"}</span></button>
@@ -258,7 +261,7 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
         {err && <p ref={errorMessage} role="alert" tabIndex={-1} style={{ color: "var(--warn)" }}>{err}</p>}
         {creationBlocked && <button className="btn" onClick={() => location.reload()}>Reload event types</button>}
         {groupLocked && <p id="group-settings-lock" className="muted" role="status">This group event has bookings. Duration, location and event type are locked. Create a new event type to use different settings.</p>}
-        {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
+        {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).filter(field => field !== "locations").map(field => FIELD_NAMES[field] ?? field).join(", ") || "nothing"}.</p>}
         <fieldset className="editor-fields" disabled={pending} aria-label="Event settings">
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
           <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={event => setD({ ...d, title: event.target.value, ...(creating && !slugEdited ? { slug: eventSlug(event.target.value) } : {}) })} />
@@ -268,9 +271,8 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
           {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting&#39;s limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
         {d.sharedWorkspaceId && S({ id: "hosts", title: "Hosts", summary: `${d.shared?.hosts.length ?? 0} selected`, children: <SharedEventHosts kind={d.kind} value={d.shared} directory={hostDirectory} onChange={shared => setD({ ...d, shared })} /> })}
-        {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
-          <input className="input" list="locs" aria-label="Location" disabled={L("location")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
-          <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
+        {S({ id: "where", title: "Location", summary: d.location || "Not set", children:
+          <LocationEditor value={d.locations ?? null} legacy={d.location} kind={d.kind} disabled={L("location")} onChange={locations => setD({ ...d, locations, location: locationSummary(locations) })} /> })}
         {S({ id: "link", title: "Booking page options", summary: `/${d.bookingUsername ?? username}/${d.slug} · ${Number.isFinite(d.startIntervalMin) ? `${d.startIntervalMin} min` : "Custom"} increments`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => { setSlugEdited(true); setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }); }} />
           <label className="f" htmlFor="et-start-interval">Start time increments</label>

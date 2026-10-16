@@ -24,6 +24,7 @@ export function render(tpl: string, ctx: { booking: any; eventType: any; host: a
 
 /** Phone for SMS to invitees: the first phone-type answer. */
 function inviteePhone(b: any, et: any) {
+  if (b.locationChoice?.phone) return b.locationChoice.phone;
   const q = (et.questions ?? []).find((x: any) => x.type === "phone");
   return q ? b.answers?.[q.id] : undefined;
 }

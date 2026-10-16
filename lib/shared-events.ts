@@ -1,3 +1,4 @@
+import { normalizeLocationPatch, validLocationsForKind } from "./event-locations";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { SharedEventError, SharedEventSettings, type SharedHostDirectory } from "./shared-event-validation";
@@ -74,9 +75,11 @@ export async function listSharedEvents(userId: string) {
   }, { isolationLevel: "read committed" });
 }
 export async function updateSharedEvent(userId: string, id: string, version: number | undefined, patch: unknown, rawShared?: SharedEventSettings) {
-  const db = await getDb(), fields = EventTypePatch.parse(patch);
+  const db = await getDb(), parsedFields = EventTypePatch.parse(patch);
   return db.transaction(async (tx: DB) => {
     const { event } = await lockSharedEvent(tx, id, userId);
+    const fields = normalizeLocationPatch(event, parsedFields);
+    if (!validLocationsForKind(fields.locations ?? event.locations, event.kind)) throw new SharedEventError(400, "invalid_locations");
     if (version !== event.sharedVersion) throw new SharedEventError(409, "shared_event_changed");
     if (fields.kind !== undefined && fields.kind !== event.kind) throw new SharedEventError(409, "event_kind_locked");
     if (fields.scheduleId || fields.secret === false || fields.rrMode || (fields.seats !== undefined && fields.seats !== 1)) throw new SharedEventError(400, "shared_settings_required");
