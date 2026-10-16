@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[];
-  kind: string; seats: number; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null };
+  kind: string; seats: number; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
@@ -48,6 +48,7 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
   const [d, setD] = useState(et);
   const [sect, setSect] = useState<string>("basics");
   const [err, setErr] = useState("");
+  const [groupLocked, setGroupLocked] = useState(et.groupSettingsLocked ?? false);
   const timer = useRef<any>(null), first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -58,12 +59,26 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
       if (d.managedParentId) delete body.kind;
       if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
       const r = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (r.ok) { setErr(""); onChange(await r.json()); onSaved(); } else { const j = await r.json(); setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values"); }
+      if (r.ok) {
+        const saved = await r.json();
+        if (saved.groupSettingsLocked) setGroupLocked(true);
+        setErr(""); onChange(saved); onSaved();
+      } else {
+        const j = await r.json();
+        if (j.error === "group_settings_locked" && j.settings) {
+          setGroupLocked(true);
+          // Another invitee may have booked while this editor was open. Restore
+          // only the locked values; the next save retains the user's other edits.
+          setD(current => ({ ...current, ...j.settings }));
+          setErr("This group event was booked. Its duration and location can no longer change.");
+        } else setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values");
+      }
     }, 600);
     return () => clearTimeout(timer.current);
   }, [d]);
   useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, []);
-  const L = (k: string) => (d.lockedFields ?? []).includes(k) && !!d.managedParentId;
+  const L = (k: string) => ((d.lockedFields ?? []).includes(k) && !!d.managedParentId) ||
+    (groupLocked && ["durationMin", "location", "kind"].includes(k));
   const set = (k: keyof ET) => (e: any) => setD({ ...d, [k]: e.target.type === "number" ? Number(e.target.value) : e.target.type === "checkbox" ? e.target.checked : e.target.value });
   const S = ({ id, title, summary, children }: any) => <div className="sect">
     <button onClick={() => setSect(sect === id ? "" : id)} aria-expanded={sect === id}><span><b>{title}</b><small>{summary}</small></span><span>{sect === id ? "–" : "+"}</span></button>
@@ -74,18 +89,19 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
     <aside className="pane" role="dialog" aria-label="Edit event type">
       <header><b>Edit event type</b><button className="btn" onClick={onClose} aria-label="Close">✕</button></header>
       <div className="body">
-        {err && <p style={{ color: "var(--warn)" }}>{err}</p>}
+        {err && <p role="alert" style={{ color: "var(--warn)" }}>{err}</p>}
+        {groupLocked && <p id="group-settings-lock" className="muted" role="status">This group event has bookings. Duration, location and event type are locked. Create a new event type to use different settings.</p>}
         {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
           <label className="f" htmlFor="et-title">Name</label><input id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
-          <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
+          <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
           <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
           {!d.managedParentId && <><label className="f" htmlFor="et-kind">Type</label>
-          <select id="et-kind" className="input" value={d.kind} onChange={e => setD({ ...d, kind: e.target.value, seats: e.target.value === "group" ? Math.max(2, d.seats) : d.seats })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
+          <select id="et-kind" className="input" disabled={L("kind")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.kind} onChange={e => setD({ ...d, kind: e.target.value, seats: e.target.value === "group" ? Math.max(2, d.seats) : d.seats })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
           {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting&#39;s limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
-          <input className="input" list="locs" aria-label="Location" disabled={L("location")} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
+          <input className="input" list="locs" aria-label="Location" disabled={L("location")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
           <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
         {S({ id: "link", title: "Link and description", summary: `/${username}/${d.slug}`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />

@@ -170,6 +170,14 @@ export async function createBooking(input: BookingInput) {
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
       await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
+      const [currentType] = await tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location })
+        .from(eventTypes).where(eq(eventTypes.id, et.id));
+      // A group template may have changed after the availability preflight but
+      // before its first reservation. Never commit that stale session definition.
+      if (!currentType || ((et.kind === "group" || currentType.kind === "group") &&
+        (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin || currentType.location !== et.location))) {
+        throw new Error("slot_unavailable");
+      }
       if (et.kind === "one_off") {
         const consumed = await tx.update(eventTypes).set({ usedAt: new Date() })
           .where(and(eq(eventTypes.id, et.id), isNull(eventTypes.usedAt))).returning({ id: eventTypes.id });

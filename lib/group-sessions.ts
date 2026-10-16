@@ -5,6 +5,14 @@ import { getDb, schema } from "./db";
 export const InviteeLimit = z.number().int().min(2).max(9999);
 const { bookings: B, eventTypes: E, users } = schema;
 
+/** Past and cancelled bookings still lock a group template's core settings. */
+export async function getLockedGroupEventIds(userId: string): Promise<Set<string>> {
+  const db = await getDb();
+  const rows = await db.selectDistinct({ id: E.id }).from(E).innerJoin(B, eq(B.eventTypeId, E.id))
+    .where(and(eq(E.userId, userId), eq(E.kind, "group")));
+  return new Set(rows.map((row: { id: string }) => row.id));
+}
+
 async function session(db: any, hostId: string, uid: string) {
   const [meeting] = await db.select({ eventTypeId: B.eventTypeId, start: B.start }).from(B).innerJoin(E, eq(B.eventTypeId, E.id))
     .where(and(eq(B.uid, uid), eq(B.hostId, hostId), eq(B.status, "confirmed"), eq(E.kind, "group")));
