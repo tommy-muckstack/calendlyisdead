@@ -28,8 +28,7 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   } else {
     [ownerUser] = await db.select().from(users).where(eq(users.username, owner));
     if (!ownerUser) return null;
-    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.userId, ownerUser.id), eq(eventTypes.slug, slug), isNull(eventTypes.deletedAt)));
-    if (et?.teamId) et = null; // team types are only bookable under the team URL
+    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.userId, ownerUser.id), isNull(eventTypes.teamId), eq(eventTypes.slug, slug), isNull(eventTypes.deletedAt)));
   }
   if (!et || !et.active || et.kind === "managed" || et.kind === "poll" || (et.kind === "one_off" && et.usedAt)) return null;
   const defaultSchedule = async (uid: string) => (await db.select().from(schedules).where(and(eq(schedules.userId, uid), eq(schedules.isDefault, true))))[0];

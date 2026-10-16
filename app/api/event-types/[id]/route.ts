@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 import { isAdmin, propagateManaged, LOCKABLE } from "@/lib/teams";
+import { isEventLinkConflict } from "@/lib/event-type-links";
 export const runtime = "nodejs";
 const Patch = z.object({ title: z.string().min(1).max(120), slug: z.string().regex(/^[a-z0-9-]{1,60}$/), description: z.string().max(5000),
   durationMin: z.number().int().min(5).max(720), location: z.string().max(300), color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
@@ -74,7 +75,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }, { isolationLevel: "read committed" });
     if (response.ok && et.kind === "managed") await propagateManaged(id);
     return response;
-  } catch { return NextResponse.json({ error: "slug_taken" }, { status: 409 }); }
+  } catch (error) {
+    return isEventLinkConflict(error)
+      ? NextResponse.json({ error: "slug_taken" }, { status: 409 })
+      : NextResponse.json({ error: "save_failed" }, { status: 500 });
+  }
 }
 export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const u = await requireUser(); if (!u) return NextResponse.json({ error: "unauthorized" }, { status: 401 });

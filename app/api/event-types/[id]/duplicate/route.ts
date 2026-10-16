@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
+import { insertEventWithLink } from "@/lib/event-type-links";
 
 export const runtime = "nodejs";
 const COPY_FIELDS = ["description", "durationMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
@@ -29,27 +30,16 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       if (!source) return NextResponse.json({ error: "not_found" }, { status: 404 });
       if (!["one_on_one", "group", "collective", "round_robin", "managed"].includes(source.kind))
         return NextResponse.json({ error: "unsupported_event_type" }, { status: 400 });
-      const rows = await tx.select({ slug: E.slug }).from(E).where(and(isNull(E.deletedAt), source.teamId
-        ? or(eq(E.userId, source.userId), eq(E.teamId, source.teamId)) : eq(E.userId, source.userId)));
-      const taken = new Set(rows.map((row: { slug: string }) => row.slug));
-      let n = 1;
-      while (true) {
-        const suffix = n === 1 ? "-copy" : `-copy-${n}`;
-        const slug = source.slug.slice(0, 60 - suffix.length).replace(/-+$/, "") + suffix;
-        n++;
-        if (taken.has(slug)) continue;
-        const [copy] = await tx.insert(E).values({ ...Object.fromEntries(COPY_FIELDS.map(key => [key, source[key]])),
-          id: crypto.randomUUID(), userId: source.userId, teamId: source.teamId, slug,
-          title: `${source.title.slice(0, 113)} (copy)`, lockedFields: source.kind === "managed" ? source.lockedFields : [],
-        }).onConflictDoNothing().returning();
-        if (!copy) { taken.add(slug); continue; }
-        if (source.teamId && source.kind !== "managed") {
-          const hosts = await tx.select().from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, id));
-          if (hosts.length) await tx.insert(schema.eventTypeHosts).values(hosts.map((host: typeof schema.eventTypeHosts.$inferSelect) =>
-            ({ eventTypeId: copy.id, userId: host.userId, priority: host.priority })));
-        }
-        return NextResponse.json({ ...copy, groupSettingsLocked: false }, { status: 201 });
+      const copy = await insertEventWithLink(tx, { ...Object.fromEntries(COPY_FIELDS.map(key => [key, source[key]])),
+        id: crypto.randomUUID(), userId: source.userId, teamId: source.teamId,
+        title: `${source.title.slice(0, 113)} (copy)`, lockedFields: source.kind === "managed" ? source.lockedFields : [],
+      }, source.slug, "-copy");
+      if (source.teamId && source.kind !== "managed") {
+        const hosts = await tx.select().from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, id));
+        if (hosts.length) await tx.insert(schema.eventTypeHosts).values(hosts.map((host: typeof schema.eventTypeHosts.$inferSelect) =>
+          ({ eventTypeId: copy.id, userId: host.userId, priority: host.priority })));
       }
+      return NextResponse.json({ ...copy, groupSettingsLocked: false }, { status: 201 });
     }, { isolationLevel: "read committed" });
   } catch { return NextResponse.json({ error: "duplicate_failed" }, { status: 500 }); }
 }
