@@ -35,6 +35,8 @@
 
 ## Verification
 
+- Website analytics uses the contract in `docs/ANALYTICS.md` and `lib/telemetry/schema.ts`. Preserve website/app/platform/schema metadata, bounded properties and URL redaction. Do not add unfiltered autocapture, session replay or arbitrary payload logging. Keep production telemetry disabled in local and preview checks.
+
 - Run lint, TypeScript checking and production build before each PR, plus focused behavioral tests for changed logic. Report failed or unavailable checks honestly.
 - Current commands: `npm test`, `npx tsc --noEmit --incremental false`, `npm run build`, `npm run e2e`. This snapshot has **no lint script/configuration**; that is an open tooling gap, not a passing lint check.
 - Existing E2E configuration deletes `.data/e2e` and `.data/outbox` and starts its own server. Use a dedicated checkout with only disposable data for it.
