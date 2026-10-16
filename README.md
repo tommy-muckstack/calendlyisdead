@@ -41,6 +41,10 @@ Bookings automatically create contacts for their actual hosts, including each co
 
 The first Contacts visit imports pre-feature booking history created from 2024 onward, respecting the saved opt-out, exclusions and deleted records. Later preference changes apply to new bookings; they do not rerun that historical import. Notetaker-based contact creation, import/export, saved lists, merging, multiple email/phone values and contact-specific booking/email actions remain to be implemented. See [the parity report](docs/PARITY_REPORT.md) for remaining comparisons and browser verification limits.
 
+Use **Columns → + Create a custom field** to add up to ten text, number, currency, tag, date, multi-select or invitee-question fields. Each custom column has an **Edit custom field** menu; compatible edits retain values, while deletion removes that field's contact values without deleting contacts or meetings. Contact details includes **Edit custom field values** with explicit saving and conflict recovery. Decimal values keep their precision; dates use `YYYY-MM-DD`.
+
+Invitee-question fields link to a question on an owned or assigned event type. Creation pulls the latest available answer from linked meeting history, and future bookings update that host's contact. Existing answers remain if the question is later removed. Historical contact import fills missing mapped values without replacing existing captured or manual values. CSV import/export still needs its own implementation; custom fields provide the data model required by its mapping flow.
+
 ## Calendar sync
 - **Google**: its own OAuth client (`AUTH_GOOGLE_ID`), separate from Firebase sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
 - **Outlook / Microsoft 365**: Entra app (multi-tenant + personal accounts), redirect `{APP_URL}/api/integrations/microsoft/callback`, delegated `Calendars.ReadWrite offline_access User.Read`.

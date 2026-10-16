@@ -7,10 +7,13 @@ import { ContactEditorButton } from "@/components/ContactEditor";
 import { CONTACT_LABELS, type ContactDraft } from "@/lib/contact-validation";
 import { contactHistory, getContact } from "@/lib/contacts";
 import { meetingZone } from "@/lib/meetings";
+import { contactCustomValues } from "@/lib/contact-custom-fields";
+import { ContactCustomValues } from "@/components/ContactCustomValues";
 
 export default async function ContactDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ page?: string }> }) {
   const user = await requireUser(); if (!user) redirect("/login");
   const { id } = await params, contact = await getContact(user.id, id); if (!contact) notFound();
+  const custom = await contactCustomValues(user.id, id);
   const parsed = z.coerce.number().int().min(1).max(100000).safeParse((await searchParams).page ?? 1), page = parsed.success ? parsed.data : 1;
   const history = parsed.success ? await contactHistory(user.id, id, page) : { rows: [], total: 0 }, zone = meetingZone(user.timezone);
   const pages = Math.max(1, Math.ceil(history.total / 25));
@@ -20,6 +23,7 @@ export default async function ContactDetail({ params, searchParams }: { params: 
     <dl className="contact-properties">{(Object.keys(CONTACT_LABELS) as (keyof ContactDraft)[]).filter(field => field !== "name" && field !== "email").map(field => <div key={field}>
       <dt>{CONTACT_LABELS[field]}</dt><dd>{field === "linkedIn" && contact.linkedIn ? <a href={contact.linkedIn} target="_blank" rel="noopener noreferrer">{contact.linkedIn}</a> : contact[field] || "Not set"}</dd>
     </div>)}</dl>
+    <ContactCustomValues key={`${custom.version}:${custom.fields.map(field => `${field.id}-${field.version}`).join()}`} contactId={id} initial={custom} />
     <h3>Meeting history</h3><p className="muted">{history.total} {history.total === 1 ? "meeting" : "meetings"} · Times shown in {zone}</p>
     {!parsed.success && <p role="alert">Choose a valid meeting-history page.</p>}
     {parsed.success && history.rows.length === 0 && <p>{history.total ? "No meetings on this page." : "No meetings with this contact yet."}</p>}

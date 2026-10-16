@@ -187,3 +187,15 @@ export const contactSettings = pgTable("contact_settings", {
   version: integer("version").notNull().default(1),
   backfilledAt: timestamp("backfilledAt", { mode: "date", withTimezone: true }),
 });
+export const contactFields = pgTable("contact_fields", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), type: text("type").notNull(), options: jsonb("options").$type<string[]>().notNull().default([]),
+  currency: text("currency").notNull().default(""), eventTypeId: text("eventTypeId"), questionId: text("questionId"),
+  version: integer("version").notNull().default(1), deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, f => [uniqueIndex("contact_fields_owner_name").on(f.userId, sql`lower(${f.name})`).where(sql`${f.deletedAt} IS NULL`)]);
+export const contactFieldValues = pgTable("contact_field_values", {
+  contactId: text("contactId").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  fieldId: text("fieldId").notNull().references(() => contactFields.id, { onDelete: "cascade" }),
+  // An object prevents drivers from parsing a JSON string such as "1.2" twice.
+  value: jsonb("value").$type<{ data: string | string[] }>().notNull(),
+}, v => [primaryKey({ columns: [v.contactId, v.fieldId] })]);

@@ -21,6 +21,18 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds custom fields and preserves typed values, versions and deleted definitions across replay", async () => {
+    await setup(); await seat("meeting", 0);
+    await client!.exec('DROP TABLE contact_field_values; DROP TABLE contact_fields;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
+      INSERT INTO contact_fields (id, "userId", name, type, version) VALUES ('number', 'host', 'Amount', 'number', 2), ('deleted', 'host', 'Old', 'text', 3);
+      UPDATE contact_fields SET "deletedAt" = now() WHERE id = 'deleted';
+      INSERT INTO contact_field_values ("contactId", "fieldId", value) VALUES ('contact', 'number', '{"data":"123456789012345.123456"}');`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT value FROM contact_field_values')).rows).toEqual([{ value: { data: "123456789012345.123456" } }]);
+    expect((await client!.query('SELECT id, version, "deletedAt" IS NOT NULL AS deleted FROM contact_fields ORDER BY id')).rows).toEqual([{ id: "deleted", version: 3, deleted: true }, { id: "number", version: 2, deleted: false }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "meeting" }]);
+  });
   it("adds contact preferences without modifying records and retains opt-out, exclusions and backfill progress on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('DROP TABLE contact_settings;'); await client!.exec(ddl);
@@ -41,7 +53,7 @@ describe("database startup and booking migrations", () => {
   });
   it("adds contact records and history without changing meetings, and preserves deleted contacts on replay", async () => {
     await setup(); await seat("retained", 0);
-    await client!.exec('DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
+    await client!.exec('DROP TABLE contact_field_values; DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
       INSERT INTO contact_meetings ("contactId", "bookingUid") VALUES ('contact', 'retained');
       UPDATE contacts SET "deletedAt" = now(), version = 2;`); await client!.exec(ddl);
