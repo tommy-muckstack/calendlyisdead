@@ -2,6 +2,7 @@
 import { BP, withBase } from "@/lib/basepath";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { EventTypeEditor, type ET } from "./EventTypesBoard";
 type Member = { userId: string; role: string; name: string; email: string };
 type TET = { id: string; title: string; slug: string; kind: string; durationMin: number; rrMode: string; lockedFields: string[]; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
@@ -10,6 +11,20 @@ const LOCKABLE = ["title", "description", "durationMin", "location", "color", "q
 
 export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
+  const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [copyEditor, setCopyEditor] = useState<{ et: ET; teamSlug: string } | null>(null);
+  async function duplicate(et: TET, teamSlug: string) {
+    if (duplicating) return;
+    setDuplicating(et.id); setMsg("");
+    try {
+      const response = await fetch(`${BP}/api/event-types/${et.id}/duplicate`, { method: "POST" });
+      if (!response.ok) throw new Error("duplicate_failed");
+      const created = await response.json();
+      if (!created?.id || typeof created.title !== "string") throw new Error("invalid_response");
+      setCopyEditor({ et: created, teamSlug }); router.refresh();
+    } catch { setMsg("Duplication could not be confirmed. Reload the page before trying again."); }
+    finally { setDuplicating(null); }
+  }
   const call = async (url: string, method: string, body?: unknown) => { const r = await fetch(withBase(url), { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }); router.refresh(); return r; };
   return <>
     <h2 style={{ marginTop: 0 }}>Teams</h2>
@@ -33,7 +48,9 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
       <h3>Team event types</h3>
       {t.eventTypes.map(e => <div key={e.id} className="card" style={{ padding: 14, marginBottom: 10 }} data-testid="team-et">
         <div className="row" style={{ justifyContent: "space-between" }}><b>{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {KIND[e.kind]} · {e.durationMin} min</span></b>
-          {e.kind !== "managed" && <a className="btn" href={`${BP}/team/${t.slug}/${e.slug}`} target="_blank">View</a>}</div>
+          <div className="row">{e.kind !== "managed" && <a className="btn" href={`${BP}/team/${t.slug}/${e.slug}`} target="_blank">View</a>}
+            {admin && <button className="btn" disabled={!!duplicating} onClick={() => { void duplicate(e, t.slug); }}>
+              {duplicating === e.id ? "Duplicating…" : "Duplicate"}</button>}</div></div>
         {admin && e.kind !== "managed" && <>
           {e.kind === "round_robin" && <label className="f">Distribution <select className="input" aria-label={`Distribution for ${e.title}`} style={{ width: 260 }} value={e.rrMode}
             onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { rrMode: x.target.value })}><option value="even">Spread evenly</option><option value="priority">By priority, then evenly</option></select></label>}
@@ -60,5 +77,12 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
         {(["collective", "round_robin", "managed"] as const).map(k => <button key={k} className="btn" onClick={() => call(`/api/teams/${t.id}/event-types`, "POST", { kind: k, title: `${KIND[k]} meeting` })}>+ {KIND[k]}</button>)}
       </div>}
     </section>; })}
+    {copyEditor && <EventTypeEditor key={copyEditor.et.id} et={copyEditor.et} username={`team/${copyEditor.teamSlug}`} schedules={[]}
+      onClose={() => setCopyEditor(null)} onChange={et => setCopyEditor(current => current ? { ...current, et } : null)}
+      onSaved={() => { setMsg("Saved"); router.refresh(); }} onDelete={async () => {
+        const response = await fetch(`${BP}/api/event-types/${copyEditor.et.id}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("delete_failed");
+        setCopyEditor(null); router.refresh();
+      }} />}
   </>;
 }
