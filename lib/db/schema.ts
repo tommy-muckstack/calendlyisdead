@@ -173,8 +173,17 @@ export const contacts = pgTable("contacts", {
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
-}, c => [uniqueIndex("contacts_active_owner_email").on(c.userId, sql`lower(${c.email})`).where(sql`${c.deletedAt} IS NULL`)]);
+}, c => [uniqueIndex("contacts_active_owner_email").on(c.userId, sql`lower(${c.email})`).where(sql`${c.deletedAt} IS NULL`),
+  index("contacts_owner_email_history").on(c.userId, sql`lower(${c.email})`)]);
 export const contactMeetings = pgTable("contact_meetings", {
   contactId: text("contactId").notNull().references(() => contacts.id, { onDelete: "cascade" }),
   bookingUid: text("bookingUid").notNull().references(() => bookings.uid, { onDelete: "cascade" }),
+  inviteeEmail: text("inviteeEmail"),
 }, t => [primaryKey({ columns: [t.contactId, t.bookingUid] })]);
+export const contactSettings = pgTable("contact_settings", {
+  userId: text("userId").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  bookingEnabled: boolean("bookingEnabled").notNull().default(true),
+  exclusions: jsonb("exclusions").$type<string[]>().notNull().default([]),
+  version: integer("version").notNull().default(1),
+  backfilledAt: timestamp("backfilledAt", { mode: "date", withTimezone: true }),
+});

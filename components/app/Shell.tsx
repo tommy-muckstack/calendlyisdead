@@ -72,7 +72,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; im
   }, [menu]);
   useEffect(() => { try { if (localStorage.getItem("cid-gs") === "off") setGs(false); } catch { } }, []);
   useEffect(() => { const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(null); }; addEventListener("mousedown", f); return () => removeEventListener("mousedown", f); }, []);
-  const settings = ["/app/profile", "/app/availability", "/app/branding", "/app/embed"].some(x => path.startsWith(x));
+  const settings = ["/app/profile", "/app/availability", "/app/branding", "/app/embed", "/app/contact-settings"].some(x => path.startsWith(x));
   const sched = SCHED.find(t => t.href === path) || (settings ? SCHED[0] : undefined);
   const meta = sched ? ["Scheduling", SCHED] as const : (() => { const t = TITLES.find(x => path.startsWith(x[0])); return t ? [t[1], t[2]] as const : ["", undefined] as const; })();
   const create = (kind: "one_on_one" | "group") => {
@@ -117,12 +117,13 @@ export function AppShell({ user, signOut, children }: { user: { name: string; im
         <Link href="/app/branding" className={path.startsWith("/app/branding") ? "on" : ""}>{I.star(18)}Branding</Link>
         <a href={`${BP}/${user.username}`} target="_blank" rel="noreferrer">{I.link(18)}My link</a>
         <h4>Features</h4>
+        <Link href="/app/contact-settings" className={path === "/app/contact-settings" ? "on" : ""}>{I.contacts(18)}Contacts settings</Link>
         <Link href="/app/embed" className={path.startsWith("/app/embed") ? "on" : ""}>{I.ext(18)}Embed</Link>
         <Link href="/app/assistant">{I.assist(18)}Assistant</Link>
         <h4>Admin</h4>
         <Link href="/app/teams">{I.team(18)}Teams</Link>
         <Link href="/app/analytics">{I.chart(18)}Analytics</Link></nav>
-      <div className="cs-mbody"><div className="cs-mh"><h2>{path.startsWith("/app/profile") ? "Profile" : path.startsWith("/app/availability") ? "Scheduling settings" : path.startsWith("/app/branding") ? "Branding" : "Embed"}</h2><Link href="/app" className="cs-ico" aria-label="Close settings">{I.close(22)}</Link></div>
+      <div className="cs-mbody"><div className="cs-mh"><h2>{path.startsWith("/app/profile") ? "Profile" : path.startsWith("/app/availability") ? "Scheduling settings" : path === "/app/contact-settings" ? "Contacts settings" : path.startsWith("/app/branding") ? "Branding" : "Embed"}</h2><Link href="/app" className="cs-ico" aria-label="Close settings">{I.close(22)}</Link></div>
         <div className="cs-mc">{children}</div></div>
     </section></div>}
   </div>;
