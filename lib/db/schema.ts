@@ -95,6 +95,12 @@ export const eventTypes = pgTable("event_types", {
   uniqueIndex("event_types_current_personal_slug").on(e.userId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NULL`),
   uniqueIndex("event_types_current_team_slug").on(e.teamId, e.slug).where(sql`${e.deletedAt} IS NULL AND ${e.teamId} IS NOT NULL`),
 ]);
+// A creation receipt survives deleting the event; retrying cannot resurrect it.
+export const eventTypeCreations = pgTable("event_type_creations", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  requestHash: text("requestHash").notNull(),
+});
 export const bookings = pgTable("bookings", {
   uid: text("uid").primaryKey(),
   eventTypeId: text("eventTypeId").notNull().references(() => eventTypes.id, { onDelete: "cascade" }),

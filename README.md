@@ -33,6 +33,14 @@ Existing accounts, demo accounts and verified-email links to legacy accounts ret
 
 For isolated onboarding browser scenarios, run `npx playwright test --config playwright.onboarding.config.ts`. The config seeds only synthetic accounts in a fresh `.data/onboarding-e2e/` database, disables external mail and analytics, and avoids deleting the normal demo database/outbox. Fixtures use demo sessions; real Firebase signup and provider consent must be checked separately. These scenarios have been authored but cannot execute in the current browser environment.
 
+## Creating event types
+
+Scheduling → Create → One-on-one or Group opens an unsaved draft. Enter a name and configure the event, then choose **Create** to publish it. **Cancel** leaves no event behind; edited drafts ask before discarding. No event record or public booking link exists until Create succeeds. The link follows the name until you edit it yourself. Generated links receive a suffix when needed; custom links must be available.
+
+Failed requests retain the draft. An unchanged retry checks the same creation request and cannot create a duplicate. If that request already completed and you changed the draft afterward, reload event types to review the saved event. Deleted events cannot be recreated by retrying their old request. Once created, the normal editor provides **Save changes**, host limits and contact automations.
+
+The API persists settings and a minimal creation receipt atomically in the existing database. The older kind-only creation request remains compatible with existing callers. Shared Round robin/Collective creation, the rich four-kind menu, location tiles and original pane styling remain separate parity work; see [the parity report](docs/PARITY_REPORT.md).
+
 ## Profile
 
 Settings → Profile (`/app/profile`) edits your display name, scheduling-page welcome message, photo and account time zone. Use **Save changes** to persist the draft; a failed save retains your edits for retry. Changing the account time zone updates meeting filters and account-limit boundaries without changing existing availability schedules or booking instants.
