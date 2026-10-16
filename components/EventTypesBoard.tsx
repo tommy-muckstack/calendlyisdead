@@ -11,6 +11,9 @@ export type ET = { id: string; slug: string; title: string; description: string;
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
+type PersonalKind = "one_on_one" | "group";
+const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
+const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
 const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
 function draftBody(d: ET) {
   return Object.fromEntries(EDITABLE_KEYS.filter(key =>
@@ -29,12 +32,28 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
   const [boardError, setBoardError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const busyRef = useRef(false);
+  const [creationUncertain, setCreationUncertain] = useState(false);
+  const creationUncertainRef = useRef(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const open = items.find(i => i.id === openId) ?? null;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
-  async function create() {
-    const r = await fetch(BP + "/api/event-types", { method: "POST" }); const et = await r.json();
-    setItems(x => [...x, et]); setOpenId(et.id);
+  async function create(kind: PersonalKind) {
+    if (busyRef.current) return;
+    if (creationUncertainRef.current) { setBoardError("Creation could not be confirmed. Reload to check your event types before creating another."); return; }
+    busyRef.current = true; setBusy("create"); setBoardError("");
+    const abort = new AbortController(); const timeout = setTimeout(() => abort.abort(), 15_000);
+    try {
+      const response = await fetch(BP + "/api/event-types", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }), signal: abort.signal });
+      if (response.status === 401) { setBoardError("Sign in again to create an event type."); return; }
+      if (!response.ok) throw new Error("create_failed");
+      const et = await response.json();
+      if (typeof et?.id !== "string" || !et.id || et.kind !== kind || !NEW_EVENT_FIELDS.safeParse(et).success ||
+        (kind === "group" && et.seats < 2) || !Array.isArray(et.lockedFields)) throw new Error("invalid_response");
+      setItems(x => [...x, et]); setQ(""); setOpenId(et.id);
+    } catch {
+      creationUncertainRef.current = true; setCreationUncertain(true);
+      setBoardError("Creation could not be confirmed. Reload to check your event types before creating another.");
+    } finally { clearTimeout(timeout); busyRef.current = false; setBusy(null); }
   }
   async function remove(et: ET) {
     const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "DELETE" });
@@ -60,13 +79,23 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
     } catch { setBoardError("The change could not be confirmed. Reload the page before trying again."); }
     finally { busyRef.current = false; setBusy(null); }
   }
-  useEffect(() => { const f = () => create(); addEventListener("cid:create-event-type", f); if (new URLSearchParams(location.search).get("new")) { history.replaceState(null, "", location.pathname); create(); } return () => removeEventListener("cid:create-event-type", f); }, []);
+  useEffect(() => {
+    const f = (event: Event) => { const kind = (event as CustomEvent<PersonalKind>).detail; void create(kind === "group" ? "group" : "one_on_one"); };
+    addEventListener("cid:create-event-type", f);
+    const url = new URL(location.href), kind = url.searchParams.get("new");
+    if (kind) {
+      url.searchParams.delete("new"); history.replaceState(null, "", url.pathname + url.search + url.hash);
+      if (["1", "one_on_one", "group"].includes(kind)) void create(kind === "group" ? "group" : "one_on_one");
+    }
+    return () => removeEventListener("cid:create-event-type", f);
+  }, []);
   const [q, setQ] = useState("");
   const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase()));
   const sched = schedules.find(x => x.id === (shown[0]?.scheduleId ?? ""))?.name;
   return <>
     {boardError && <p role="alert" className="cs-board-error">{boardError}</p>}
-    {busy && <p role="status" className="muted">Updating event type…</p>}
+    {creationUncertain && <button className="cs-btn cs-outline" onClick={() => location.reload()}>Reload event types</button>}
+    {busy && <p role="status" className="muted">{busy === "create" ? "Creating event type…" : "Updating event type…"}</p>}
     <div className="cs-search">{I.search(18)}<input ref={searchInput} placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
     <div className="cs-grp"><span className="cs-av">{(owner || username)[0]?.toUpperCase()}</span><b>{owner || username}</b>
       <a href={`${BP}/${username}`} target="_blank">View landing page {I.ext(14)}</a></div>
@@ -160,6 +189,7 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
         } else if (result?.error === "slug_taken") { setSect("link"); setErr("That link is already used. Choose another link and save again."); }
         else if (result?.error === "unauthorized") setErr("Your session expired. Your edits have not been saved. Sign in again before saving.");
         else if (result?.error === "locked") setErr("Your team changed the locked settings. Your edits have not been saved. Copy your changes before reloading.");
+        else if (result?.error === "event_kind_locked") setErr("An event type cannot be converted to another kind. Create a new event type instead.");
         else if (result?.error === "bad_schedule") { setSect("avail"); setErr("That schedule is no longer available. Choose another schedule and save again."); }
         else throw new Error("save_failed");
         return;
@@ -198,8 +228,7 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
           <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
           <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
           <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
-          {!d.managedParentId && !d.teamId && <><label className="f" htmlFor="et-kind">Type</label>
-          <select id="et-kind" className="input" disabled={L("kind")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.kind} onChange={e => setD({ ...d, kind: e.target.value, seats: e.target.value === "group" ? Math.max(2, d.seats) : d.seats })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
+          <p className="muted" data-testid="event-kind">{KIND_LABEL[d.kind] ?? "Event type"} · To use another kind, create a new event type.</p>
           {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting&#39;s limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>

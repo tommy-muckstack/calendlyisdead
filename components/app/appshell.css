@@ -34,6 +34,7 @@
 .cs-side .cs-menu{left:0;right:auto;width:100%}
 .cs-menu>a,.cs-menu button,.cs-menu form button{all:unset;box-sizing:border-box;display:block;width:100%;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:14px}
 .cs-menu>a:hover,.cs-menu button:hover{background:#f1f4f7}
+.cs-menu [role=menuitem]:focus-visible{background:#f1f4f7;outline:2px solid #006bff;outline-offset:-2px}
 .cs-menu-user{left:16px;right:auto;top:52px;width:240px}.cs-em{padding:8px 12px;color:var(--mut);font-size:13px;border-bottom:1px solid var(--bd);margin-bottom:4px}
 .cs-gs{width:448px;flex:none;background:#fff;border-radius:12px;padding:16px 4px 24px;display:flex;flex-direction:column;align-items:center;overflow:auto;box-shadow:0 0 0 1px #eef0f2}
 .cs-gs-h{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 16px 14px}.cs-gs-h h2{margin:0;font-size:26px;line-height:32px;font-weight:600;letter-spacing:0}

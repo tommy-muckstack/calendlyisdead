@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { BP } from "@/lib/basepath";
 import { I } from "./icons";
 import "./appshell.css";
@@ -27,30 +27,64 @@ const GET_STARTED = [
   { t: "Using CalendlyIsDead with a team", n: "2 tasks", icon: "groups" },
 ] as const;
 
+function CreateMenu({ id, trigger, onCreate, onClose }: {
+  id: string; trigger: RefObject<HTMLButtonElement | null>;
+  onCreate(kind: "one_on_one" | "group"): void; onClose(restoreFocus: boolean): void;
+}) {
+  const menu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const outside = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) onClose(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [onClose, trigger]);
+  return <div ref={menu} id={id} className="cs-menu" role="menu" aria-label="Create" onKeyDown={event => {
+    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(true); return; }
+    if (event.key === "Tab") { onClose(true); return; }
+    const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (index + 1) % items.length : event.key === "ArrowUp" ? (index - 1 + items.length) % items.length : -1;
+    if (next >= 0) { event.preventDefault(); items[next]?.focus(); }
+  }}>
+    <button role="menuitem" onClick={() => onCreate("one_on_one")}>One-on-one</button>
+    <button role="menuitem" onClick={() => onCreate("group")}>Group</button>
+    <Link role="menuitem" href="/app/teams" onClick={() => onClose(false)}>Team event types</Link>
+    <Link role="menuitem" href="/app/one-off" onClick={() => onClose(false)}>Single-use link</Link>
+    <Link role="menuitem" href="/app/polls" onClick={() => onClose(false)}>Meeting poll</Link>
+    <Link role="menuitem" href="/app/routing" onClick={() => onClose(false)}>Routing form</Link>
+  </div>;
+}
+
 export function AppShell({ user, signOut, children }: { user: { name: string; email: string; username: string }; signOut: ReactNode; children: ReactNode }) {
   const path = (usePathname() || "").replace(BP, "") || "/app";
   const [menu, setMenu] = useState<null | "side" | "top" | "user">(null);
   const [gs, setGs] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
+  const sideCreate = useRef<HTMLButtonElement>(null), topCreate = useRef<HTMLButtonElement>(null);
+  const closeCreate = useCallback((restoreFocus: boolean) => {
+    setMenu(null);
+    if (restoreFocus) (menu === "side" ? sideCreate : topCreate).current?.focus();
+  }, [menu]);
   useEffect(() => { try { if (localStorage.getItem("cid-gs") === "off") setGs(false); } catch { } }, []);
   useEffect(() => { const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(null); }; addEventListener("mousedown", f); return () => removeEventListener("mousedown", f); }, []);
   const settings = ["/app/availability", "/app/branding", "/app/embed"].some(x => path.startsWith(x));
   const sched = SCHED.find(t => t.href === path) || (settings ? SCHED[0] : undefined);
   const meta = sched ? ["Scheduling", SCHED] as const : (() => { const t = TITLES.find(x => path.startsWith(x[0])); return t ? [t[1], t[2]] as const : ["", undefined] as const; })();
   const initial = (user.name || user.email || "?").trim()[0]?.toUpperCase();
-  const create = (to: string) => { setMenu(null); if (to === "event") { if (path === "/app") dispatchEvent(new CustomEvent("cid:create-event-type")); else location.href = `${BP}/app?new=1`; } };
-  const CreateMenu = ({ id }: { id: "side" | "top" }) => menu === id ? <div className="cs-menu" role="menu">
-    <button role="menuitem" onClick={() => create("event")}>Event type</button>
-    <Link role="menuitem" href="/app/one-off" onClick={() => setMenu(null)}>Single-use link</Link>
-    <Link role="menuitem" href="/app/polls" onClick={() => setMenu(null)}>Meeting poll</Link>
-    <Link role="menuitem" href="/app/routing" onClick={() => setMenu(null)}>Routing form</Link></div> : null;
+  const create = (kind: "one_on_one" | "group") => {
+    closeCreate(true);
+    if (path === "/app") dispatchEvent(new CustomEvent("cid:create-event-type", { detail: kind }));
+    else location.href = `${BP}/app?new=${kind}`;
+  };
   return <div className="cs" ref={ref}>
     <div className="cs-user"><button className="cs-who" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Account menu"><span className="cs-av">{initial}</span><b>{user.name || user.email}</b>{I.chev(16)}</button>
       <button className="cs-ico" aria-label="Collapse sidebar">{I.panel(20)}</button>
       {menu === "user" && <div className="cs-menu cs-menu-user" role="menu"><div className="cs-em">{user.email}</div><a role="menuitem" href={`${BP}/${user.username}`} target="_blank">My booking page</a><Link role="menuitem" href="/app/branding" onClick={() => setMenu(null)}>Settings</Link>
         {signOut}</div>}</div>
     <aside className="cs-side">
-      <div className="cs-create"><button className="cs-btn cs-outline cs-wide" onClick={() => setMenu(menu === "side" ? null : "side")} aria-haspopup="menu">{I.plus(16)}Create{I.chev(14)}</button><CreateMenu id="side" /></div>
+      <div className="cs-create"><button ref={sideCreate} className="cs-btn cs-outline cs-wide" onClick={() => setMenu(menu === "side" ? null : "side")} onKeyDown={e => { if (e.key === "ArrowDown") { e.preventDefault(); setMenu("side"); } }} aria-haspopup="menu" aria-expanded={menu === "side"} aria-controls="create-side">{I.plus(16)}Create{I.chev(14)}</button>{menu === "side" && <CreateMenu id="create-side" trigger={sideCreate} onCreate={create} onClose={closeCreate} />}</div>
       <nav>{NAV.map(n => { const on = n.match(path); return <Link key={n.href} href={n.href} className={"cs-nav" + (on ? " on" : "")} aria-current={on ? "page" : undefined}>{I[n.icon](24)}{n.label}</Link>; })}</nav>
       <div className="cs-grow" />
       <div className="cs-promo"><div className="cs-promo-art" /><b>Free and open source</b><span>No seats, no gates. Read the code, fork it, self-host it.</span><a href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">View the source →</a></div>
@@ -62,7 +96,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
         {meta[0] && <header className="cs-head">
           <div className="cs-title"><h1>{meta[0]}</h1><span className="cs-help" title="Help">{I.help(16)}</span></div>
           {sched && <div className="cs-actions"><Link className="cs-btn cs-outline" href="/app/availability">{I.avail(16)}Manage availability</Link>
-            <div className="cs-create"><button className="cs-btn cs-dark" onClick={() => setMenu(menu === "top" ? null : "top")} aria-haspopup="menu">{I.plus(16)}Create{I.chev(14)}</button><CreateMenu id="top" /></div></div>}
+            <div className="cs-create"><button ref={topCreate} className="cs-btn cs-dark" onClick={() => setMenu(menu === "top" ? null : "top")} onKeyDown={e => { if (e.key === "ArrowDown") { e.preventDefault(); setMenu("top"); } }} aria-haspopup="menu" aria-expanded={menu === "top"} aria-controls="create-top">{I.plus(16)}Create{I.chev(14)}</button>{menu === "top" && <CreateMenu id="create-top" trigger={topCreate} onCreate={create} onClose={closeCreate} />}</div></div>}
           {meta[1] && <div className="cs-tabs" role="tablist">{meta[1].map(t => {
             const selected = path === t.href || (t.href === "/app/meetings" && path.startsWith("/app/meetings/")) || (settings && t.href === "/app");
             return <Link key={t.href + t.label} href={t.href} role="tab" className={selected ? "on" : ""} aria-selected={selected}>{t.label}</Link>;
