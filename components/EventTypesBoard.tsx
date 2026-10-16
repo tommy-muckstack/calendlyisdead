@@ -1,5 +1,6 @@
 "use client";
 import { BP } from "@/lib/basepath";
+import { I } from "@/components/app/icons";
 import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
@@ -23,18 +24,18 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
   const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase()));
   const sched = schedules.find(x => x.id === (shown[0]?.scheduleId ?? ""))?.name;
   return <>
-    <div className="cs-search"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></svg><input placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
+    <div className="cs-search">{I.search(18)}<input placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
     <div className="cs-grp"><span className="cs-av">{(owner || username)[0]?.toUpperCase()}</span><b>{owner || username}</b>
-      <a href={`${BP}/${username}`} target="_blank">View landing page <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg></a></div>
+      <a href={`${BP}/${username}`} target="_blank">View landing page {I.ext(14)}</a></div>
     {shown.map(et => <div key={et.id} className="cs-et" style={{ borderLeftColor: et.color, opacity: et.active ? 1 : .55 }} onClick={() => setOpenId(et.id)} data-testid="event-type">
       <input type="checkbox" aria-label={`Select ${et.title}`} onClick={e => e.stopPropagation()} />
-      <div style={{ flex: 1 }}>
-        <h3>{et.title}</h3>
+      <div className="cs-et-copy">
+        <h3><button className="cs-et-title" onClick={e => { e.stopPropagation(); setOpenId(et.id); }} aria-label={`Edit ${et.title}`}>{et.title}</button></h3>
         <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-One"}{et.managedParentId ? " • Managed by your team" : ""}</p>
         <p>{sched ? `${sched}` : "Weekdays, 9 am - 5 pm"}</p>
       </div>
-      <button className="cs-btn cs-outline" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>Copy link</button>
-      <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg></a>
+      <button className="cs-btn cs-outline" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }}>{I.link(14)}Copy link</button>
+      <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}>{I.ext(16)}</a>
     </div>)}
     {open && <Editor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}

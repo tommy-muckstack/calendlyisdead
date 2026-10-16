@@ -1,0 +1,112 @@
+[
+  {
+    "name": "hourglass_empty",
+    "sha": "445c6add74b1aaf53e63f7da833a059933002f13",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/hourglass_empty/materialsymbolsoutlined/hourglass_empty_24px.svg"
+  },
+  {
+    "name": "calendar_today",
+    "sha": "94a0451b5594da3d7079bdd51699099532c0b3e2",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/calendar_today/materialsymbolsoutlined/calendar_today_24px.svg"
+  },
+  {
+    "name": "auto_awesome",
+    "sha": "67333d3747d8afbff02ed13fa8fdd3a9105dfe9a",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/auto_awesome/materialsymbolsoutlined/auto_awesome_24px.svg"
+  },
+  {
+    "name": "group",
+    "sha": "dbc2c937e4c4f0ca7a65fce140eada00ba4985c6",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/group/materialsymbolsoutlined/group_24px.svg"
+  },
+  {
+    "name": "mode_fan",
+    "sha": "20859c71a2cabd26423e1a7f8dfad1c5321a88e0",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/mode_fan/materialsymbolsoutlined/mode_fan_24px.svg"
+  },
+  {
+    "name": "bar_chart",
+    "sha": "e5584a3ca3a0cd4ab18d7447c31bf3aaaf6108cc",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/bar_chart/materialsymbolsoutlined/bar_chart_24px.svg"
+  },
+  {
+    "name": "settings",
+    "sha": "817c782f0591e478421a5d83f17c3ba07b3532f7",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/settings/materialsymbolsoutlined/settings_24px.svg"
+  },
+  {
+    "name": "add",
+    "sha": "f8bc9309ceb699ad56dcb912390fad223a4eafc5",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/add/materialsymbolsoutlined/add_24px.svg"
+  },
+  {
+    "name": "keyboard_arrow_down",
+    "sha": "60482b650e93e82f53cca822e4347360508fc5be",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/keyboard_arrow_down/materialsymbolsoutlined/keyboard_arrow_down_24px.svg"
+  },
+  {
+    "name": "search",
+    "sha": "ef0d0521eb034cbb1243a5cdd3dcd6487c731bd9",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/search/materialsymbolsoutlined/search_24px.svg"
+  },
+  {
+    "name": "link",
+    "sha": "319a0681c4f139c8247b6c6797f49c95a0024e75",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/link/materialsymbolsoutlined/link_24px.svg"
+  },
+  {
+    "name": "open_in_new",
+    "sha": "42895ffd1376f52824690c7530b2dac5ffa7d12e",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/open_in_new/materialsymbolsoutlined/open_in_new_24px.svg"
+  },
+  {
+    "name": "more_vert",
+    "sha": "e172f878a6cd80533d919ad992e4ee40bbfc9ecc",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/more_vert/materialsymbolsoutlined/more_vert_24px.svg"
+  },
+  {
+    "name": "close",
+    "sha": "5a60c58e77bd20036a345d0befd31fc5741317e4",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/close/materialsymbolsoutlined/close_24px.svg"
+  },
+  {
+    "name": "help",
+    "sha": "0f10691c55297418a97122686e2f5a8bf889ee29",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/help/materialsymbolsoutlined/help_24px.svg"
+  },
+  {
+    "name": "edit_calendar",
+    "sha": "a34ee41c8e9aa55eed38870396e6ed864c11f922",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/edit_calendar/materialsymbolsoutlined/edit_calendar_24px.svg"
+  },
+  {
+    "name": "left_panel_close",
+    "sha": "a208c17095bf4e0c50d43b0be534034876c06784",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/left_panel_close/materialsymbolsoutlined/left_panel_close_24px.svg"
+  },
+  {
+    "name": "upgrade",
+    "sha": "304067d338ece6e3116a87c73a6faa62958744f8",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/upgrade/materialsymbolsoutlined/upgrade_24px.svg"
+  },
+  {
+    "name": "star",
+    "sha": "6a72ecc226ddb483c9df429cc78d0c448649ffe1",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/star/materialsymbolsoutlined/star_24px.svg"
+  },
+  {
+    "name": "lightbulb",
+    "sha": "78e4426224c28dcb2a7b35adb482d831cd6db01b",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/lightbulb/materialsymbolsoutlined/lightbulb_24px.svg"
+  },
+  {
+    "name": "mark_email_read",
+    "sha": "3a8513a798f296bade689fce82264ac698c5ac9f",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/mark_email_read/materialsymbolsoutlined/mark_email_read_24px.svg"
+  },
+  {
+    "name": "groups",
+    "sha": "998ff03729bd58e8ba6e90c24bcbf99f99bb59b2",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/groups/materialsymbolsoutlined/groups_24px.svg"
+  }
+]
