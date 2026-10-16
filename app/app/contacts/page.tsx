@@ -18,6 +18,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
   const date = (value: string | null) => value ? <time dateTime={value}>{DateTime.fromISO(value).setZone(zone).toFormat("LLL d, yyyy · h:mm a")}</time> : "—";
   return <section className="contacts" aria-labelledby="contacts-title">
     <div className="contacts-heading"><h2 id="contacts-title">All contacts</h2><ContactEditorButton /></div>
+    <Link href="/app/contact-settings">Contacts settings</Link>
     <form className="contacts-filters" action={`${BP}/app/contacts`} method="get">
       <label>Search contacts<input className="input" name="q" type="search" maxLength={200} defaultValue={filters.q} placeholder="Name, email, phone or company" /></label>
       <label>Sort by<select className="input" name="sort" defaultValue={filters.sort}><option value="name">Name</option><option value="updated">Recently updated</option></select></label>

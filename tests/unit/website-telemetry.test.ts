@@ -23,6 +23,7 @@ describe("website route privacy", () => {
     ["/calendlyisdead/app/meetings/private-id", "/app/meetings/[uid]", "app"],
     ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
     ["/calendlyisdead/app/contacts?q=private@example.invalid", "/app/contacts", "app"],
+    ["/calendlyisdead/app/contact-settings?exclusions=private@example.invalid", "/app/contact-settings", "app"],
     ["/calendlyisdead/app/contacts/private-id?email=private@example.invalid", "/app/contacts/[id]", "app"],
     ["/calendlyisdead/app/availability/advanced?timezone=private", "/app/availability/advanced", "app"],
     ["/calendlyisdead/booking/private-id/cancel?email=person@example.test", "/booking/[uid]/cancel", "booking"],

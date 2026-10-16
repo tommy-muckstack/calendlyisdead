@@ -4,6 +4,7 @@ import { getDb, schema } from "./db";
 import { finalize } from "./booking";
 import { confirmedReservations } from "./booking-busy";
 import { hostLimitCheck } from "./host-meeting-limits";
+import { recordBookingContact } from "./automatic-contacts";
 const { polls, pollVotes, eventTypes, bookings, users, schedules } = schema;
 export const shortId = customAlphabet("abcdefghijkmnpqrstuvwxyz23456789", 10);
 
@@ -67,6 +68,7 @@ export async function bookPoll(userId: string, pollId: string, option: string) {
         bufferBeforeMin: 0, bufferAfterMin: 0,
         inviteeTz: host.timezone, notes: `Booked from meeting poll "${p.title}"`, guests: attendees.slice(1).map((a: any) => a.email), answers: {}, seat: 0, groupUid: null };
       await tx.insert(bookings).values(row);
+      for (const attendee of attendees) await recordBookingContact(tx, { ...row, inviteeName: attendee.name, inviteeEmail: attendee.email });
       await tx.update(polls).set({ status: "booked", chosen: option, bookingUid: row.uid }).where(eq(polls.id, pollId));
       return { row, et, host };
     }, { isolationLevel: "read committed" });

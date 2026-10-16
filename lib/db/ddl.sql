@@ -102,9 +102,16 @@ CREATE TABLE IF NOT EXISTS contacts (
   version integer NOT NULL DEFAULT 1, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now(), "deletedAt" timestamptz
 );
 CREATE UNIQUE INDEX IF NOT EXISTS contacts_active_owner_email ON contacts ("userId", lower(email)) WHERE "deletedAt" IS NULL;
+CREATE INDEX IF NOT EXISTS contacts_owner_email_history ON contacts ("userId", lower(email));
 CREATE INDEX IF NOT EXISTS bookings_contact_lookup ON bookings ("hostId", lower(btrim("inviteeEmail")));
 CREATE TABLE IF NOT EXISTS contact_meetings (
   "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
   "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE,
   PRIMARY KEY ("contactId", "bookingUid")
 );
+CREATE TABLE IF NOT EXISTS contact_settings (
+  "userId" text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  "bookingEnabled" boolean NOT NULL DEFAULT true, exclusions jsonb NOT NULL DEFAULT '[]',
+  version integer NOT NULL DEFAULT 1, "backfilledAt" timestamptz
+);
+ALTER TABLE contact_meetings ADD COLUMN IF NOT EXISTS "inviteeEmail" text;

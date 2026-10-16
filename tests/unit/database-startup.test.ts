@@ -21,6 +21,24 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds contact preferences without modifying records and retains opt-out, exclusions and backfill progress on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('DROP TABLE contact_settings;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contact_settings ("userId") VALUES ('host');`);
+    expect((await client!.query('SELECT "bookingEnabled", exclusions, version, "backfilledAt" FROM contact_settings')).rows).toEqual([{ bookingEnabled: true, exclusions: [], version: 1, backfilledAt: null }]);
+    await client!.exec(`UPDATE contact_settings SET "bookingEnabled" = false, exclusions = '["company.invalid"]', version = 3, "backfilledAt" = now();`); await client!.exec(ddl);
+    expect((await client!.query('SELECT "bookingEnabled", exclusions, version, "backfilledAt" IS NOT NULL AS imported FROM contact_settings')).rows).toEqual([{ bookingEnabled: false, exclusions: ["company.invalid"], version: 3, imported: true }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+  });
+  it("adds per-attendee history addresses without losing old links and preserves captured addresses on replay", async () => {
+    await setup(); await seat("meeting", 0);
+    await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'Second attendee', 'second@example.invalid');
+      INSERT INTO contact_meetings ("contactId", "bookingUid") VALUES ('contact', 'meeting'); ALTER TABLE contact_meetings DROP COLUMN "inviteeEmail";`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "contactId", "bookingUid", "inviteeEmail" FROM contact_meetings')).rows).toEqual([{ contactId: "contact", bookingUid: "meeting", inviteeEmail: null }]);
+    await client!.exec(`UPDATE contact_meetings SET "inviteeEmail" = 'second@example.invalid';`); await client!.exec(ddl);
+    expect((await client!.query('SELECT "inviteeEmail" FROM contact_meetings')).rows).toEqual([{ inviteeEmail: "second@example.invalid" }]);
+  });
   it("adds contact records and history without changing meetings, and preserves deleted contacts on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);

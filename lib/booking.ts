@@ -13,6 +13,7 @@ import { confFor, meetingUrlFor } from "./conferencing";
 import { HOLD_MIN } from "./payments";
 import { confirmedReservations, reservationBusy } from "./booking-busy";
 import { hostLimitCheck } from "./host-meeting-limits";
+import { recordBookingContact } from "./automatic-contacts";
 const { users, eventTypes, schedules, bookings, teams, eventTypeHosts } = schema;
 
 export type Host = { user: any; schedule: any; priority: number };
@@ -254,6 +255,7 @@ export async function createBooking(input: BookingInput) {
       } else {
         for (const row of rows) await tx.insert(bookings).values(row);
       }
+      for (const row of rows) await recordBookingContact(tx, row, et.questions ?? []);
     }, { isolationLevel: "read committed" });
   } catch { throw new Error("slot_unavailable"); }
 
