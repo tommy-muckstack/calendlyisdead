@@ -24,7 +24,7 @@ async function poll(options = [at("11:00"), at("12:00")]) {
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   vi.stubEnv("PGLITE_DIR", path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cid-polls-")), "db"));
-  const module = await import("../../lib/db"); db = await module.getDb(); schema = module.schema;
+  const database = await import("../../lib/db"); db = await database.getDb(); schema = database.schema;
   polls = await import("../../lib/polls"); booking = await import("../../lib/booking");
 });
 beforeEach(async () => {

@@ -11,7 +11,7 @@ export function EmbedBuilder({ base, username, types }: { base: string; username
     : `<a href="#" data-cid-popup="${url}" data-color="${color}">${text.replace(/</g, "&lt;")}</a>\n${script}`;
   return <>
     <h2>Add to your website</h2>
-    <p className="muted">Paste one snippet into any site. No account or tracking script needed on the visitor's side.</p>
+    <p className="muted">Paste one snippet into any site. No account or tracking script needed on the visitor&#39;s side.</p>
     <div className="row" style={{ gap: 8, margin: "12px 0" }} role="tablist">
       {([["inline", "Inline embed"], ["widget", "Popup widget"], ["text", "Popup text link"]] as const).map(([k, l]) =>
         <button key={k} role="tab" aria-selected={kind === k} className={`btn ${kind === k ? "primary" : ""}`} onClick={() => setKind(k)}>{l}</button>)}

@@ -63,7 +63,7 @@ function ScheduleEditor({ initial, countries, canDelete, onSaved, onDeleted }: {
       <h3 style={{ marginTop: 28 }}>Holidays</h3>
       <p className="muted">Close on public holidays automatically. Date-specific hours below still win.</p>
       <select aria-label="Holiday calendar" className="input" style={{ maxWidth: 360 }} value={s.holidayCountry ?? ""} onChange={e => setS({ ...s, holidayCountry: e.target.value || null })}>
-        <option value="">Don't block holidays</option>{countries.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
+        <option value="">Don&#39;t block holidays</option>{countries.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select>
       <h3 style={{ marginTop: 28 }}>Date-specific hours</h3>
       <p className="muted">Override your weekly hours on particular dates, or mark a day off.</p>
       <div className="row"><input className="input" type="date" style={{ width: 200 }} value={ovDate} onChange={e => setOvDate(e.target.value)} />

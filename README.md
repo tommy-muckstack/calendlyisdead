@@ -55,7 +55,7 @@ Without them the login page says "Sign-in not configured" (demo button still wor
 
 Website usage telemetry: optional PostHog integration for US project 666931. See [the shared website/subapp taxonomy](docs/ANALYTICS.md) for configuration, event meanings, redaction, environment gates and rollout to other apps. This is separate from the host-facing booking analytics.
 
-`npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
+`npm run lint` (Next.js/React/TypeScript rules; existing type debt remains visible as warnings), `npm run typecheck`, `npm run build`, and `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
 
 ## Status
 M0-M9 built (see docs/PLAN.md), including meeting polls and one-off links. Launch thread draft: `docs/launch/X_THREAD_DRAFT.md` (not posted). Not deployed.

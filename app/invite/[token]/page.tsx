@@ -7,7 +7,7 @@ export default async function Invite({ params, searchParams }: { params: Promise
   const { token } = await params; const { e } = await searchParams;
   const s = await auth();
   if (!s) return <main style={{ maxWidth: 460, margin: "80px auto", padding: 24 }}><div className="card" style={{ padding: 28 }}>
-    <h1 style={{ marginTop: 0 }}>You're invited to a team</h1><p className="muted">Sign in with the email address the invite was sent to.</p>
+    <h1 style={{ marginTop: 0 }}>You&#39;re invited to a team</h1><p className="muted">Sign in with the email address the invite was sent to.</p>
     <Link className="btn primary" href={`/login?callbackUrl=/invite/${token}`}>Sign in to accept</Link></div></main>;
   return <main style={{ maxWidth: 460, margin: "80px auto", padding: 24 }}><div className="card" style={{ padding: 28 }}>
     <h1 style={{ marginTop: 0 }}>Join the team?</h1>

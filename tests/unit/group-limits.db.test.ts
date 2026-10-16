@@ -21,7 +21,7 @@ const slots = async (offset = 0, zone = tz) => (await booking.slotsFor("demo", "
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   vi.stubEnv("PGLITE_DIR", path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cid-group-limits-")), "db"));
-  const module = await import("../../lib/db"); db = await module.getDb(); schema = module.schema;
+  const database = await import("../../lib/db"); db = await database.getDb(); schema = database.schema;
   booking = await import("../../lib/booking");
   await db.insert(schema.eventTypes).values({ id: "limited-group", userId: "demo-user", slug: "limited-group", title: "Limited group", kind: "group",
     durationMin: 60, seats: 3, minNoticeMin: 0, maxPerDay: 1 });

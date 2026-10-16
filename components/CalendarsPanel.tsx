@@ -35,7 +35,7 @@ export function CalendarsPanel({ conns, cals: initialCals, addToId, available, f
     {conns.length > 0 && <div className="card" style={{ padding: 20, marginBottom: 20 }}>
       <label className="f" htmlFor="addto" style={{ marginTop: 0 }}>Add new bookings to</label>
       <select id="addto" className="input" style={{ maxWidth: 420 }} value={addToId ?? ""} onChange={e => call("/api/calendars/add-to", "PUT", { calendarId: e.target.value || null })}>
-        <option value="">Don't add to a calendar</option>
+        <option value="">Don&#39;t add to a calendar</option>
         {cals.filter(c => c.canWrite).map(c => <option key={c.id} value={c.id}>{c.name} ({LABEL[conns.find(x => x.id === c.connectionId)?.provider ?? ""] ?? ""})</option>)}
       </select>
     </div>}

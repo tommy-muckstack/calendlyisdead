@@ -29,7 +29,7 @@ const edit = (uid: string, inviteeLimit: unknown) => patch(new NextRequest(`http
 beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "");
   vi.stubEnv("PGLITE_DIR", path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cid-group-capacity-")), "db"));
-  const module = await import("../../lib/db"); db = await module.getDb(); schema = module.schema;
+  const database = await import("../../lib/db"); db = await database.getDb(); schema = database.schema;
   booking = await import("../../lib/booking");
   groups = await import("../../lib/group-sessions");
   patch = (await import("../../app/api/meetings/[uid]/invitee-limit/route")).PATCH;

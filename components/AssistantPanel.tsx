@@ -35,7 +35,7 @@ export function AssistantPanel({ types, llm }: { types: { slug: string; title: s
         <span className="pill">{r.parsed.durationMin ? `${r.parsed.durationMin} min asked` : "Length not mentioned"}</span>
         <span className="pill">{r.zone}</span><span className="pill">parser: {r.source}</span>
       </div>
-      {r.durationMismatch && <p style={{ color: "var(--warn)" }}>They asked for {r.durationMismatch} min but "{r.eventType.title}" is {r.eventType.durationMin} min.</p>}
+      {r.durationMismatch && <p style={{ color: "var(--warn)" }}>They asked for {r.durationMismatch} min but &quot;{r.eventType.title}&quot; is {r.eventType.durationMin} min.</p>}
       <h3>Proposed times</h3>
       {r.slots.map((s: string, i: number) => <div key={s} className="row" style={{ justifyContent: "space-between", padding: "6px 0" }} data-testid="proposed">
         <span>{DateTime.fromISO(s).setZone(r.zone).toFormat("cccc, LLL d · h:mm a ZZZZ")}</span><a className="btn" href={r.links[i]} target="_blank">Book this</a></div>)}
@@ -44,6 +44,6 @@ export function AssistantPanel({ types, llm }: { types: { slug: string; title: s
       <pre className="code" data-testid="reply">{r.reply}</pre>
       <button className="btn" onClick={() => { navigator.clipboard?.writeText(r.reply); setCopied(true); }}>{copied ? "Copied" : "Copy reply"}</button>
     </div>}
-    {r?.error && <p style={{ color: "var(--warn)" }}>Couldn't read that thread.</p>}
+    {r?.error && <p style={{ color: "var(--warn)" }}>Couldn&#39;t read that thread.</p>}
   </>;
 }
