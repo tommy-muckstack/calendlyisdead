@@ -123,7 +123,7 @@ describe("group event settings after booking", () => {
     expect(meetings).toHaveLength(2);
     expect(meetings.every((b: typeof schema.bookings.$inferSelect) => +b.end - +b.start === 30 * 60000)).toBe(true);
   });
-  it.each([{ durationMin: 60 }, { location: "Room B" }, { kind: "one_on_one" }])("rejects a stale reservation if %j is saved before its transaction", async change => {
+  it.each([{ durationMin: 60 }, { location: "Room B" }, { kind: "one_on_one" }])("serializes a reservation with a concurrent protected-field edit %j", async change => {
     const transact = db.transaction.bind(db);
     let entered!: () => void, release!: () => void;
     const ready = new Promise<void>(resolve => { entered = resolve; });
@@ -139,9 +139,15 @@ describe("group event settings after booking", () => {
     await ready;
     let response: Response;
     try { response = await edit(change); } finally { release(); }
-    expect(response!.status).toBe(200);
+    expect(response!.status).toBe("kind" in change ? 409 : 200);
     const [outcome] = await result;
     spy.mockRestore();
+    if ("kind" in change) {
+      expect(outcome.status).toBe("fulfilled");
+      expect(await savedType()).toMatchObject({ kind: "group" });
+      expect(await db.select().from(schema.bookings)).toHaveLength(1);
+      return;
+    }
     expect(outcome.status).toBe("rejected");
     if (outcome.status === "rejected") expect(outcome.reason.message).toBe("slot_unavailable");
     expect(await db.select().from(schema.bookings)).toHaveLength(0);

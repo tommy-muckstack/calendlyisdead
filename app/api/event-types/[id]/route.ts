@@ -30,7 +30,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
       delete data.lockedFields;
     }
-    if (current.teamId) delete data.kind;
     if (!current.teamId) delete data.rrMode;
     if (current.kind !== "managed") delete data.lockedFields;
     const groupSettingsLocked = current.kind === "group" && (await connection.select({ uid: schema.bookings.uid })
@@ -41,6 +40,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (fields.length) return NextResponse.json({ error: "group_settings_locked", fields,
         settings: { durationMin: current.durationMin, location: current.location, kind: current.kind } }, { status: 409 });
     }
+    // The chosen kind defines the booking model; editing must never convert it.
+    if (data.kind !== undefined && data.kind !== current.kind)
+      return NextResponse.json({ error: "event_kind_locked" }, { status: 409 });
+    delete data.kind;
     if ((data.kind ?? current.kind) === "group" && Number(data.seats ?? current.seats) < 2)
       return NextResponse.json({ error: "invalid_invitee_limit" }, { status: 400 });
     if (typeof data.scheduleId === "string") {
