@@ -1,3 +1,4 @@
+import type { LocationOption, BookedLocationChoice } from "../event-locations";
 import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Weekly } from "../slots";
@@ -95,6 +96,7 @@ export const eventTypes = pgTable("event_types", {
   durationMin: integer("durationMin").notNull().default(30),
   startIntervalMin: integer("startIntervalMin").notNull().default(30),
   location: text("location").notNull().default(""),
+  locations: jsonb("locations").$type<LocationOption[] | null>(),
   color: text("color").notNull().default("#0E7C66"),
   bufferBeforeMin: integer("bufferBeforeMin").notNull().default(0),
   bufferAfterMin: integer("bufferAfterMin").notNull().default(0),
@@ -143,6 +145,7 @@ export const bookings = pgTable("bookings", {
   start: timestamp("start", { mode: "date", withTimezone: true }).notNull(),
   end: timestamp("end", { mode: "date", withTimezone: true }).notNull(),
   // Snapshots: changes to an event type must not change existing reservations.
+  locationChoice: jsonb("locationChoice").$type<BookedLocationChoice | null>(),
   location: text("location").notNull().default(""),
   bufferBeforeMin: integer("bufferBeforeMin").notNull().default(0),
   bufferAfterMin: integer("bufferAfterMin").notNull().default(0),

@@ -1,3 +1,4 @@
+import { LocationOptionsSchema } from "./event-locations";
 import { z } from "zod";
 import { MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "./start-increments";
 import { validBookingTimezone } from "./booking-timezone";
@@ -5,6 +6,7 @@ import { BookingDateRangeSchema } from "./booking-date-range";
 
 // Shared browser/API field validation; authorization and managed locks stay server-side.
 export const EventTypePatch = z.object({ title: z.string().min(1).max(120), slug: z.string().regex(/^[a-z0-9-]{1,60}$/), description: z.string().max(5000),
+  locations: LocationOptionsSchema.nullable(),
   durationMin: z.number().int().min(5).max(720), location: z.string().max(300), color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   startIntervalMin: z.number().int().min(MIN_START_INTERVAL_MIN).max(MAX_START_INTERVAL_MIN),
   bufferBeforeMin: z.number().int().min(0).max(240), bufferAfterMin: z.number().int().min(0).max(240), minNoticeMin: z.number().int().min(0).max(43200),

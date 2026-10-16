@@ -1,4 +1,6 @@
 "use client";
+import type { PublicLocationOption, LocationSelection } from "@/lib/event-locations";
+import { BookingLocationFields } from "./BookingLocationFields";
 import { BP } from "@/lib/basepath";
 import { loadSlotCalendar, readBookingQuery, type SlotCalendar } from "@/lib/booking-client";
 import { useEffect, useMemo, useState } from "react";
@@ -7,7 +9,8 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ProfileAvatar } from "./ProfileAvatar";
 
 type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; hostImage?: string | null; title: string; durationMin: number; location: string; description: string; color: string; lockedTimezone?: string | null;
-  reschedule?: { uid: string; name: string; email: string; start: string };
+  locations?: PublicLocationOption[] | null;
+  reschedule?: { locationSelection?: LocationSelection; uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
 
@@ -56,6 +59,7 @@ export function BookingWidget(p: Props) {
     try {
       const r = await fetch(BP + "/api/bookings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
         username: p.username, slug: p.slug, start: slot, tz, name: fd.get("name"), email: fd.get("email"), notes: fd.get("notes"), guests, rescheduleUid: p.reschedule?.uid, embed: !!p.embed,
+        ...(fd.get("locationId") ? { locationSelection: { id: String(fd.get("locationId")), input: String(fd.get("locationInput") ?? "") } } : {}),
         answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
       const j = await r.json();
       if (r.ok) {
@@ -65,7 +69,7 @@ export function BookingWidget(p: Props) {
         router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);
       }
       else if (r.status >= 500) throw new Error("booking_unconfirmed");
-      else setErr(j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
+      else setErr(j.error === "location_changed" ? "The location choices have changed. Refresh this page and choose again." : String(j.error).startsWith("location_") ? "Choose a location and provide its required details." : j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
     } catch {
       setErr("We couldn’t confirm your booking. Check for a confirmation before trying again.");
     } finally { setBusy(false); }
@@ -80,6 +84,7 @@ export function BookingWidget(p: Props) {
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
       <div className="muted">◷ {p.durationMin} min{p.kindLabel ? ` · ${p.kindLabel}` : ""}</div>
       {p.location && <div className="muted" style={{ marginTop: 6 }}>📍 {p.location}</div>}
+      {p.locations?.length === 1 && <p className="location-description muted">{p.locations[0].description}</p>}
       {p.price && <div className="muted" style={{ marginTop: 6 }} data-testid="price">💳 {p.price}, paid when you book</div>}
       {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {fmt(slot, "h:mm a")} – {DateTime.fromISO(slot).plus({ minutes: p.durationMin }).setZone(tz).toFormat("h:mm a, cccc, LLLL d")}</div>}
       {slot && <p className="muted" data-testid="booking-timezone">{tz.replaceAll("_", " ")}</p>}
@@ -121,6 +126,7 @@ export function BookingWidget(p: Props) {
       <form onSubmit={submit}>
         <label className="f" htmlFor="name">Name</label><input className="input" id="name" name="name" required defaultValue={p.reschedule?.name ?? q.get("name") ?? undefined} />
         <label className="f" htmlFor="email">Email</label><input className="input" id="email" name="email" type="email" required defaultValue={p.reschedule?.email ?? q.get("email") ?? undefined} />
+        {p.locations && <BookingLocationFields key={JSON.stringify(p.locations)} options={p.locations} initial={p.reschedule?.locationSelection} disabled={busy} />}
         <label className="f" htmlFor="guests">Guest emails (optional)</label><input className="input" id="guests" name="guests" placeholder="comma separated" />
         {p.questions.map(q => <div key={q.id}>
           <label className="f" htmlFor={`q_${q.id}`}>{q.label}{q.required ? " *" : ""}</label>

@@ -7,7 +7,7 @@ import { insertEventWithLink } from "@/lib/event-type-links";
 import { duplicateSharedEvent } from "@/lib/shared-events";
 import { SharedEventError } from "@/lib/shared-event-validation";
 export const runtime = "nodejs";
-const COPY_FIELDS = ["description", "durationMin", "startIntervalMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
+const COPY_FIELDS = ["description", "durationMin", "startIntervalMin", "location", "locations", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
   "minNoticeMin", "rangeDays", "dateRange", "active", "secret", "lockedTimezone", "kind", "questions", "maxPerDay", "maxPerWeek", "maxPerMonth", "seats", "rrMode",
   "priceCents", "currency", "redirectUrl"] as const;
 

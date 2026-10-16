@@ -276,3 +276,7 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "sharedReschedule" text NOT NUL
 ALTER TABLE event_type_hosts ADD COLUMN IF NOT EXISTS "membershipId" text;
 ALTER TABLE event_type_hosts ADD COLUMN IF NOT EXISTS "scheduleId" text;
 CREATE INDEX IF NOT EXISTS shared_workspace_events ON event_types ("sharedWorkspaceId") WHERE "deletedAt" IS NULL;
+
+-- Structured event options remain null for legacy location strings.
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS locations jsonb;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "locationChoice" jsonb;
