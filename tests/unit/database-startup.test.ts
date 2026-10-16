@@ -21,6 +21,13 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds transfer storage and preserves receipts and export snapshots across replay", async () => {
+    await setup(); await client!.exec('DROP TABLE contact_imports; DROP TABLE contact_exports;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contact_imports ("userId", id, "requestHash", result) VALUES ('host', 'import', 'hash', '{"rows":[]}');
+      INSERT INTO contact_exports ("userId", id, "requestHash", csv, count, email, "expiresAt") VALUES ('host', 'export', 'hash', 'Name,Email', 1, 'unavailable', '2026-11-01T00:00:00Z');`);
+    await client!.exec(ddl); expect((await client!.query('SELECT result FROM contact_imports')).rows).toEqual([{ result: { rows: [] } }]);
+    expect((await client!.query('SELECT csv, count, email FROM contact_exports')).rows).toEqual([{ csv: "Name,Email", count: 1, email: "unavailable" }]);
+  });
   it("adds custom fields and preserves typed values, versions and deleted definitions across replay", async () => {
     await setup(); await seat("meeting", 0);
     await client!.exec('DROP TABLE contact_field_values; DROP TABLE contact_fields;'); await client!.exec(ddl);

@@ -13,7 +13,7 @@ const owned = (userId: string, id: string) => and(eq(C.userId, userId), eq(C.id,
 
 // Keep durable history when a contact's email changes. Only the actual host's
 // booking rows may be linked; a team owner is not implicitly a meeting host.
-async function linkMeetings(db: DB, userId: string, id: string | null = null) {
+export async function linkContactMeetings(db: DB, userId: string, id: string | null = null) {
   await db.execute(sql`INSERT INTO contact_meetings ("contactId", "bookingUid", "inviteeEmail")
     SELECT c.id, b.uid, b."inviteeEmail" FROM contacts c JOIN bookings b ON lower(btrim(b."inviteeEmail")) = c.email
     WHERE c."userId" = ${userId} AND b."hostId" = ${userId} AND c."deletedAt" IS NULL
@@ -31,7 +31,7 @@ export async function createContact(userId: string, id: string, input: ContactDr
     const existing = inserted[0] ?? (await tx.select().from(C).where(owned(userId, id)))[0];
     if (!existing) throw new ContactError("email_in_use", 409);
     if (existing.deletedAt || !sameFields(existing, fields)) throw new ContactError("creation_conflict", 409);
-    await linkMeetings(tx, userId, id);
+    await linkContactMeetings(tx, userId, id);
     return ContactData.parse(existing);
   });
 }
@@ -47,9 +47,9 @@ export async function updateContact(userId: string, id: string, version: number,
     if (current.version !== version) throw new ContactError("changed", 409);
     const [duplicate] = await tx.select({ id: C.id }).from(C).where(and(eq(C.userId, userId), eq(C.email, fields.email), isNull(C.deletedAt)));
     if (duplicate && duplicate.id !== id) throw new ContactError("email_in_use", 409);
-    await linkMeetings(tx, userId, id);
+    await linkContactMeetings(tx, userId, id);
     const [saved] = await tx.update(C).set({ ...fields, version: current.version + 1, updatedAt: new Date() }).where(owned(userId, id)).returning();
-    await linkMeetings(tx, userId, id);
+    await linkContactMeetings(tx, userId, id);
     return ContactData.parse(saved);
   });
 }
@@ -74,7 +74,7 @@ export async function getContact(userId: string, id: string) {
 
 export async function listContacts(userId: string, filters: ContactFilter, now = new Date()) {
   await syncHistoricalContacts(userId);
-  const db = await getDb(); await linkMeetings(db, userId);
+  const db = await getDb(); await linkContactMeetings(db, userId);
   const pattern = `%${filters.q.replace(/[\\%_]/g, "\\$&")}%`;
   const where = and(eq(C.userId, userId), isNull(C.deletedAt), filters.q ? or(ilike(C.name, pattern), ilike(C.email, pattern), ilike(C.company, pattern), ilike(C.phone, pattern)) : undefined);
   const dates = (direction: "next" | "last") => sql<string | null>`(SELECT ${direction === "next" ? sql`min(b.start)` : sql`max(b.start)`}
@@ -93,7 +93,7 @@ export async function listContacts(userId: string, filters: ContactFilter, now =
 }
 
 export async function contactHistory(userId: string, id: string, page = 1) {
-  const db = await getDb(); await linkMeetings(db, userId, id);
+  const db = await getDb(); await linkContactMeetings(db, userId, id);
   const where = and(owned(userId, id), isNull(C.deletedAt), eq(B.hostId, userId));
   const [rows, counts] = await Promise.all([
     db.select({ uid: B.uid, title: E.title, start: B.start, end: B.end, status: B.status, inviteeEmail: sql<string>`coalesce(${CM.inviteeEmail}, ${B.inviteeEmail})` }).from(C)

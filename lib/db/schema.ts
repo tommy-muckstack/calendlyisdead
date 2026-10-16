@@ -199,3 +199,13 @@ export const contactFieldValues = pgTable("contact_field_values", {
   // An object prevents drivers from parsing a JSON string such as "1.2" twice.
   value: jsonb("value").$type<{ data: string | string[] }>().notNull(),
 }, v => [primaryKey({ columns: [v.contactId, v.fieldId] })]);
+export const contactImports = pgTable("contact_imports", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), id: text("id").notNull(),
+  requestHash: text("requestHash").notNull(), result: jsonb("result").$type<import("../contact-transfer-validation").TransferResult>().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.id] })]);
+export const contactExports = pgTable("contact_exports", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), id: text("id").notNull(),
+  requestHash: text("requestHash").notNull(), csv: text("csv").notNull(), count: integer("count").notNull(),
+  email: text("email").notNull().default("pending"), expiresAt: timestamp("expiresAt", { withTimezone: true, mode: "date" }).notNull(),
+}, t => [primaryKey({ columns: [t.userId, t.id] })]);

@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
       }
     });
     test("adds all documented fields, preserves dirty drafts and reopens the saved contact", async ({ page }, info) => {
-      await page.getByRole("button", { name: "+ Add contact", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Add contact", exact: true });
+      await page.locator("summary").filter({ hasText: "+ Add contact" }).click(); await page.getByRole("button", { name: "Create a contact", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Add contact", exact: true });
       await expect(editor.getByLabel("Name (required)")).toBeFocused(); const name = `Contacts QA ${width} ${Date.now()}`, email = `contact-${width}-${Date.now()}@example.invalid`;
       await editor.getByLabel("Name (required)").fill(name); await editor.getByLabel("Email address (required)").fill(email.toUpperCase());
       for (const [label, value] of [["Phone", "+1 555 0100"], ["Job title", "Engineer"], ["Company", "Example"], ["LinkedIn", "https://www.linkedin.com/in/example"], ["Country", "Japan"], ["City", "Tokyo"], ["State", "Tokyo"]]) await editor.getByLabel(label, { exact: true }).fill(value);
@@ -53,7 +53,7 @@ for (const width of [1440, 390]) {
     });
     test("retries a committed create after a lost response without adding a duplicate", async ({ page }) => {
       const name = `Lost response ${width} ${Date.now()}`, email = `lost-${width}-${Date.now()}@example.invalid`; let firstId: string | undefined;
-      await page.getByRole("button", { name: "+ Add contact", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Add contact", exact: true });
+      await page.locator("summary").filter({ hasText: "+ Add contact" }).click(); await page.getByRole("button", { name: "Create a contact", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Add contact", exact: true });
       await editor.getByLabel("Name (required)").fill(name); await editor.getByLabel("Email address (required)").fill(email);
       await page.route("**/api/contacts", async route => { const response = await route.fetch(); expect(response.ok()).toBeTruthy(); const contact = await response.json(); firstId = contact.id; ids.add(contact.id); await route.abort("failed"); });
       await editor.getByRole("button", { name: "Save contact", exact: true }).click(); await expect(editor.getByRole("alert")).toContainText("could not be confirmed"); await expect(editor.getByLabel("Name (required)")).toHaveValue(name);

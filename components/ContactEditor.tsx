@@ -97,9 +97,9 @@ export function ContactEditor({ initial, onClose, onSaved, onDeleted }: {
   </dialog>;
 }
 
-export function ContactEditorButton({ contact }: { contact?: ContactRecord }) {
+export function ContactEditorButton({ contact, label }: { contact?: ContactRecord; label?: string }) {
   const [open, setOpen] = useState(false); const router = useRouter();
-  return <><button className={`btn${contact ? "" : " primary"}`} onClick={() => setOpen(true)}>{contact ? "Edit contact" : "+ Add contact"}</button>
+  return <><button className={`btn${contact ? "" : " primary"}`} onClick={() => setOpen(true)}>{label ?? (contact ? "Edit contact" : "+ Add contact")}</button>
     {open && <ContactEditor initial={contact} onClose={() => setOpen(false)} onSaved={saved => { setOpen(false); router.push(`/app/contacts/${saved.id}`); router.refresh(); }}
       onDeleted={() => { setOpen(false); router.push("/app/contacts"); router.refresh(); }} />}</>;
 }
