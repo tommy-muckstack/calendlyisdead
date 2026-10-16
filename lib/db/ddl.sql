@@ -136,3 +136,16 @@ CREATE TABLE IF NOT EXISTS contact_field_values (
   "fieldId" text NOT NULL REFERENCES contact_fields(id) ON DELETE CASCADE,
   value jsonb NOT NULL, PRIMARY KEY ("contactId", "fieldId")
 );
+CREATE TABLE IF NOT EXISTS contact_notes (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE, title text NOT NULL DEFAULT '', body text NOT NULL DEFAULT '', "reminderDate" text,
+  "completedAt" timestamptz, version integer NOT NULL DEFAULT 1, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now(), "deletedAt" timestamptz
+);
+CREATE INDEX IF NOT EXISTS contact_notes_timeline ON contact_notes ("userId", "contactId", "updatedAt");
+CREATE INDEX IF NOT EXISTS contact_notes_reminders ON contact_notes ("userId", "reminderDate") WHERE "deletedAt" IS NULL AND "completedAt" IS NULL;
+CREATE TABLE IF NOT EXISTS contact_reminder_digests (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, day text NOT NULL, timezone text NOT NULL,
+  "to" text NOT NULL, subject text NOT NULL, body text NOT NULL, status text NOT NULL, attempts integer NOT NULL DEFAULT 1,
+  "createdAt" timestamptz NOT NULL, "attemptedAt" timestamptz NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS contact_reminder_daily ON contact_reminder_digests ("userId", day);

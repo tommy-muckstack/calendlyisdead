@@ -23,7 +23,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
   const url = (page: number) => `/app/contacts?${new URLSearchParams({ q: filters.q, sort: filters.sort, page: String(page) })}`;
   return <section className="contacts" aria-labelledby="contacts-title">
     <div className="contacts-heading"><h2 id="contacts-title">All contacts</h2><ContactAddMenu fields={fields} sources={sources} /></div>
-    <Link href="/app/contact-settings">Contacts settings</Link>
+    <Link href="/app/contact-settings">Contacts settings</Link>{" · "}<Link href="/app/contacts/reminders">Reminders</Link>
     <ContactFieldControl sources={sources} />
     <form className="contacts-filters" action={`${BP}/app/contacts`} method="get">
       <label>Search contacts<input className="input" name="q" type="search" maxLength={200} defaultValue={filters.q} placeholder="Name, email, phone or company" /></label>

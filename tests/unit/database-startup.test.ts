@@ -21,6 +21,14 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds notes and reminder claims without resetting saved edits or delivery state", async () => {
+    await setup(); await client!.exec('DROP TABLE contact_notes; DROP TABLE contact_reminder_digests;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('person', 'host', 'QA', 'qa@example.invalid');
+      INSERT INTO contact_notes (id, "userId", "contactId", body, "reminderDate", version) VALUES ('note', 'host', 'person', 'Saved note', '2027-03-14', 2);
+      INSERT INTO contact_reminder_digests (id, "userId", day, timezone, "to", subject, body, status, "createdAt", "attemptedAt") VALUES ('digest', 'host', '2027-03-14', 'UTC', 'host@example.invalid', 'Summary', 'Saved', 'sent', now(), now());`);
+    await client!.exec(ddl); expect((await client!.query('SELECT body, "reminderDate", version FROM contact_notes')).rows).toEqual([{ body: "Saved note", reminderDate: "2027-03-14", version: 2 }]);
+    expect((await client!.query('SELECT status FROM contact_reminder_digests')).rows).toEqual([{ status: "sent" }]);
+  });
   it("adds transfer storage and preserves receipts and export snapshots across replay", async () => {
     await setup(); await client!.exec('DROP TABLE contact_imports; DROP TABLE contact_exports;'); await client!.exec(ddl);
     await client!.exec(`INSERT INTO contact_imports ("userId", id, "requestHash", result) VALUES ('host', 'import', 'hash', '{"rows":[]}');
@@ -60,7 +68,7 @@ describe("database startup and booking migrations", () => {
   });
   it("adds contact records and history without changing meetings, and preserves deleted contacts on replay", async () => {
     await setup(); await seat("retained", 0);
-    await client!.exec('DROP TABLE contact_field_values; DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
+    await client!.exec('DROP TABLE contact_notes; DROP TABLE contact_field_values; DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
       INSERT INTO contact_meetings ("contactId", "bookingUid") VALUES ('contact', 'retained');
       UPDATE contacts SET "deletedAt" = now(), version = 2;`); await client!.exec(ddl);
