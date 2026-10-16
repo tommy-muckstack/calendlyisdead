@@ -23,7 +23,8 @@ export async function upsertFirebaseUser(id: FirebaseIdentity): Promise<User | {
     const [byEmail] = await db.select().from(schema.users).where(eq(schema.users.email, email));
     if (byEmail) {
       if (byEmail.firebaseUid) return { error: "This email is linked to a different sign-in." };
-      if (!id.emailVerified) return { error: "Verify your email address (check your inbox), then sign in again." };
+      // No verification emails are sent, so an unverified (password) sign-in can never claim an existing row. Google proves ownership.
+      if (!id.emailVerified) return { error: "This email already has an account. Continue with Google to sign in to it." };
       await db.update(schema.users).set({ firebaseUid: id.uid }).where(eq(schema.users.id, byEmail.id));
       return { ...byEmail, firebaseUid: id.uid };
     }
