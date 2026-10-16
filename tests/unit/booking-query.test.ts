@@ -5,6 +5,19 @@ import { readBookingQuery } from "../../lib/booking-client";
 const now = DateTime.fromISO("2026-11-01T00:30:00Z");
 const read = (query: Record<string, string>, fallback = "America/New_York") => readBookingQuery(new URLSearchParams(query), fallback, now);
 describe("booking link calendar parameters", () => {
+  it.each(["Pacific/Honolulu", "Invalid/Zone", ""])("uses the locked zone over device and query zone %j without dropping a valid instant", tz => {
+    const slot = "2026-11-01T00:30:00Z";
+    expect(readBookingQuery(new URLSearchParams({ tz, slot }), "America/New_York", now, "Asia/Tokyo"))
+      .toEqual({ tz: "Asia/Tokyo", month: "2026-11", date: null, slot, invalid: false });
+  });
+  it("still rejects malformed dates when the timezone is locked", () => {
+    expect(readBookingQuery(new URLSearchParams({ month: "2026-13", slot: "2026-11-01T00:30:00Z" }), "UTC", now, "Asia/Tokyo"))
+      .toMatchObject({ tz: "Asia/Tokyo", invalid: true, slot: null });
+  });
+  it("restores normal device/query selection when the timezone lock is removed", () => {
+    expect(readBookingQuery(new URLSearchParams(), "America/New_York", now, null)).toMatchObject({ tz: "America/New_York", month: "2026-10" });
+    expect(readBookingQuery(new URLSearchParams({ tz: "UTC" }), "America/New_York", now, null)).toMatchObject({ tz: "UTC", month: "2026-11" });
+  });
   it("uses the visitor's local month at UTC month boundaries", () => {
     expect(read({})).toEqual({ tz: "America/New_York", month: "2026-10", date: null, slot: null, invalid: false });
     expect(read({ tz: "UTC" })).toMatchObject({ tz: "UTC", month: "2026-11", invalid: false });

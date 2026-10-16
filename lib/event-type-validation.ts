@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "./start-increments";
+import { validBookingTimezone } from "./booking-timezone";
 
 // Shared browser/API field validation; authorization and managed locks stay server-side.
 export const EventTypePatch = z.object({ title: z.string().min(1).max(120), slug: z.string().regex(/^[a-z0-9-]{1,60}$/), description: z.string().max(5000),
@@ -7,6 +8,7 @@ export const EventTypePatch = z.object({ title: z.string().min(1).max(120), slug
   startIntervalMin: z.number().int().min(MIN_START_INTERVAL_MIN).max(MAX_START_INTERVAL_MIN),
   bufferBeforeMin: z.number().int().min(0).max(240), bufferAfterMin: z.number().int().min(0).max(240), minNoticeMin: z.number().int().min(0).max(43200),
   rangeDays: z.number().int().min(1).max(730), active: z.boolean(), secret: z.boolean(),
+  lockedTimezone: z.string().max(100).refine(validBookingTimezone, "Choose a valid time zone.").nullable(),
   scheduleId: z.string().min(1).nullable(), maxPerDay: z.number().int().min(1).max(100).nullable(), maxPerWeek: z.number().int().min(1).max(500).nullable(),
   maxPerMonth: z.number().int().min(1).max(2_147_483_647).nullable(),
   questions: z.array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/), label: z.string().min(1).max(200), type: z.enum(["text", "textarea", "phone", "select"]),

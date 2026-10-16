@@ -6,16 +6,16 @@ import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ProfileAvatar } from "./ProfileAvatar";
 
-type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; hostImage?: string | null; title: string; durationMin: number; location: string; description: string; color: string;
+type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; hostImage?: string | null; title: string; durationMin: number; location: string; description: string; color: string; lockedTimezone?: string | null;
   reschedule?: { uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
 
 export function BookingWidget(p: Props) {
   const router = useRouter(), path = usePathname(), q = useSearchParams();
-  const { tz, month, date, slot, invalid } = readBookingQuery(q, Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const { tz, month, date, slot, invalid } = readBookingQuery(q, Intl.DateTimeFormat().resolvedOptions().timeZone, DateTime.utc(), p.lockedTimezone);
   const zones = [...new Set(["UTC", tz, ...ZONES])];
-  const [availability, setAvailability] = useState<{ url: string; slots: SlotCalendar | null; error: string }>({ url: "", slots: null, error: "" });
+  const [availability, setAvailability] = useState<{ url: string; slots: SlotCalendar | null; error: string; reload?: boolean }>({ url: "", slots: null, error: "" });
   const [retry, setRetry] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
@@ -29,6 +29,7 @@ export function BookingWidget(p: Props) {
     ...(p.reschedule ? { exclude: p.reschedule.uid } : {}) })}`;
   const slots = availability.url === availabilityUrl ? availability.slots : null;
   const availabilityError = availability.url === availabilityUrl ? availability.error : "";
+  const zoneChanged = availability.url === availabilityUrl && !!availability.reload;
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -36,16 +37,19 @@ export function BookingWidget(p: Props) {
     setAvailability({ url: availabilityUrl, slots: null, error: "" });
     setChosen(null);
     const timeout = setTimeout(() => { if (active) failed(); controller.abort(); }, 20_000);
-    loadSlotCalendar(availabilityUrl, controller.signal).then(slots => {
+    loadSlotCalendar(availabilityUrl, controller.signal, tz).then(slots => {
       if (active && !controller.signal.aborted) setAvailability({ url: availabilityUrl, slots, error: "" });
-    }).catch(() => { if (active && !controller.signal.aborted) failed(); }).finally(() => clearTimeout(timeout));
+    }).catch(error => { if (active && !controller.signal.aborted) {
+      if (error instanceof Error && error.message === "booking_timezone_changed") setAvailability({ url: availabilityUrl, slots: null, error: "The event’s time zone has changed. Refresh this page to see current times.", reload: true });
+      else failed();
+    } }).finally(() => clearTimeout(timeout));
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [availabilityUrl, retry]);
+  }, [availabilityUrl, retry, tz]);
   const cells = useMemo(() => { const first = m.startOf("month"); const pad = first.weekday % 7; return [...Array(pad).fill(null), ...Array.from({ length: first.daysInMonth! }, (_, i) => first.plus({ days: i }))]; }, [month, tz]);
   const fmt = (iso: string, f: string) => DateTime.fromISO(iso).setZone(tz).toFormat(f);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); if (busy) return;
+    e.preventDefault(); if (busy || zoneChanged) return;
     setBusy(true); setErr("");
     const fd = new FormData(e.currentTarget);
     const guests = String(fd.get("guests") ?? "").split(/[,\s]+/).filter(Boolean);
@@ -70,6 +74,7 @@ export function BookingWidget(p: Props) {
   return <div className="card bk">
     <section className="info">
       {invalid && <p role="alert">This link contains an invalid date or time zone. Check the calendar and choose a time.</p>}
+      {zoneChanged && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => router.refresh()}>Refresh booking page</button></div>}
       {p.hostImage && <div style={{ marginBottom: 14 }}><ProfileAvatar name={p.host} image={p.hostImage} size={64} /></div>}
       <div className="muted" style={{ fontWeight: 600 }}>{p.host}</div>
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
@@ -77,6 +82,7 @@ export function BookingWidget(p: Props) {
       {p.location && <div className="muted" style={{ marginTop: 6 }}>📍 {p.location}</div>}
       {p.price && <div className="muted" style={{ marginTop: 6 }} data-testid="price">💳 {p.price}, paid when you book</div>}
       {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {fmt(slot, "h:mm a")} – {DateTime.fromISO(slot).plus({ minutes: p.durationMin }).setZone(tz).toFormat("h:mm a, cccc, LLLL d")}</div>}
+      {slot && <p className="muted" data-testid="booking-timezone">{tz.replaceAll("_", " ")}</p>}
       {p.reschedule && <div className="card" style={{ padding: 12, marginTop: 16, background: "var(--brand-soft)" }}>Moving your booking from <b>{fmt(p.reschedule.start, "ccc LLL d, h:mm a")}</b></div>}
       {p.description && <p style={{ whiteSpace: "pre-wrap" }}>{p.description}</p>}
     </section>
@@ -94,10 +100,12 @@ export function BookingWidget(p: Props) {
             return <button key={k} className={`day ${open ? "open" : ""} ${date === k ? "sel" : ""}`} disabled={!open} aria-label={c.toFormat("cccc, LLLL d")} onClick={() => { setChosen(null); nav({ date: k }); }}>{c.day}</button>; })}
         </div>
         {!slots && !availabilityError && <p className="muted" role="status">Loading open times…</p>}
-        {availabilityError && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => setRetry(value => value + 1)}>Retry available times</button></div>}
+        {availabilityError && !zoneChanged && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => setRetry(value => value + 1)}>Retry available times</button></div>}
         {slots && !Object.values(slots).some(times => times.length > 0) && <p className="muted" role="status">No available times this month. Try another month.</p>}
-        <label className="f" htmlFor="tz">Time zone</label>
-        <select id="tz" className="input" value={tz} onChange={e => nav({ tz: e.target.value })}>{zones.map(z => <option key={z}>{z}</option>)}</select>
+        {p.lockedTimezone ? <div className="f">Time zone<p data-testid="booking-timezone">{tz.replaceAll("_", " ")}</p></div> : <>
+          <label className="f" htmlFor="tz">Time zone</label>
+          <select id="tz" className="input" value={tz} onChange={e => nav({ tz: e.target.value })}>{zones.map(z => <option key={z}>{z}</option>)}</select>
+        </>}
       </div>
       {date && <div className="times" data-testid="times">
         <b style={{ marginBottom: 4 }}>{DateTime.fromISO(date).toFormat("cccc, LLLL d")}</b>
@@ -123,7 +131,7 @@ export function BookingWidget(p: Props) {
         <label className="f" htmlFor="notes">Anything to prepare?</label><textarea className="input" id="notes" name="notes" rows={4} />
         {err && <p role="alert" style={{ color: "var(--warn)" }}>{err}</p>}
         {busy && <p role="status">Submitting your details…</p>}
-        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy} aria-busy={busy}>{p.reschedule ? "Confirm new time" : p.price ? `Continue to payment (${p.price})` : "Book it"}</button>
+        <button className="btn primary" style={{ marginTop: 16 }} disabled={busy || zoneChanged} aria-busy={busy}>{p.reschedule ? "Confirm new time" : p.price ? `Continue to payment (${p.price})` : "Book it"}</button>
       </form>
     </section>}
   </div>;

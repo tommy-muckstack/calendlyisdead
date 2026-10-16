@@ -105,10 +105,17 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
 
 /** Open slots for an event type plus, per slot, which hosts are free (needed for round robin). */
 export async function availability(owner: string, slug: string, from: string, to: string, tz: string, now = DateTime.utc(), excludeUids: string[] = []) {
+  return eventAvailability(owner, slug, { from, to }, tz, now, excludeUids);
+}
+
+// For a booking, determine its calendar day only after reading the event's zone.
+async function eventAvailability(owner: string, slug: string, range: { from: string; to: string } | { start: DateTime }, tz: string, now: DateTime, excludeUids: string[]) {
   await expireUnpaid();
   const ev = await loadEvent(owner, slug);
   if (!ev) return null;
   const et = ev.eventType, exclude = new Set(excludeUids);
+  tz = et.lockedTimezone ?? tz;
+  const { from, to } = "start" in range ? { from: range.start.setZone(tz).toISODate()!, to: range.start.setZone(tz).toISODate()! } : range;
   const per = await Promise.all(ev.hosts.map(h => hostSlots(h, et, from, to, tz, now, exclude, ev.limitsTimezone)));
   const free = new Map<string, string[]>(); // slot -> host ids
   per.forEach((p, i) => { for (const ss of Object.values(p.slots)) for (const s of ss) free.set(s, [...(free.get(s) ?? []), ev.hosts[i].user.id]); });
@@ -118,7 +125,7 @@ export async function availability(owner: string, slug: string, from: string, to
     const d = DateTime.fromISO(s).setZone(tz).toFormat("yyyy-MM-dd"); (slots[d] ??= []).push(s);
   }
   for (const d of Object.keys(slots)) slots[d].sort();
-  return { ev, slots, free, calendarErrors: per.flatMap(p => p.errors) };
+  return { ev, slots, free, timezone: tz, calendarErrors: per.flatMap(p => p.errors) };
 }
 
 /** Back-compat wrapper used by older callers. */
@@ -160,15 +167,15 @@ export async function createBooking(input: BookingInput) {
   const db = await getDb();
   const startDt = DateTime.fromISO(input.start, { zone: "utc" });
   const startIso = startDt.toISO()!;
-  const day = startDt.setZone(input.tz).toFormat("yyyy-MM-dd");
   let old: any = null, oldGroup: any[] = [];
   if (input.rescheduleUid) {
     [old] = await db.select().from(bookings).where(eq(bookings.uid, input.rescheduleUid));
     if (!old || old.status !== "confirmed") throw new Error("not_found");
     oldGroup = old.groupUid ? await db.select().from(bookings).where(eq(bookings.groupUid, old.groupUid)) : [old];
   }
-  const r = await availability(input.username, input.slug, day, day, input.tz, DateTime.utc(), oldGroup.map(b => b.uid));
+  const r = await eventAvailability(input.username, input.slug, { start: startDt }, input.tz, DateTime.utc(), oldGroup.map(b => b.uid));
   if (!r) throw new Error("not_found");
+  const day = startDt.setZone(r.timezone).toISODate()!;
   if (!(r.slots[day] ?? []).includes(startIso)) throw new Error("slot_unavailable");
   const et = r.ev.eventType;
   // A deleted event's slug may now belong to a different template. A reschedule
@@ -180,13 +187,13 @@ export async function createBooking(input: BookingInput) {
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
     bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeLimit: et.kind === "group" ? et.seats : 1,
-    inviteeTz: input.tz, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
+    inviteeTz: r.timezone, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
   try {
     await db.transaction(async (tx: any) => {
       const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
         active: eventTypes.active, deletedAt: eventTypes.deletedAt, maxPerDay: eventTypes.maxPerDay,
-        maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
+        maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin, lockedTimezone: eventTypes.lockedTimezone }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
       // Serialize team-wide allowances even if membership changed between two
       // preflights. Team host editors also lock the event before touching hosts.
       let currentType = et.teamId ? (await lockType())[0] : undefined;
@@ -207,13 +214,15 @@ export async function createBooking(input: BookingInput) {
         if (!consumed.length) throw new Error("slot_unavailable");
       }
       const eligible: string[] = [];
+      const currentZone = currentType.lockedTimezone ?? input.tz, currentDay = startDt.setZone(currentZone).toISODate()!;
+      base.inviteeTz = currentZone;
       for (const host of r.ev.hosts) {
         if (!free.includes(host.user.id)) continue;
         const currentHost = currentHosts.find((u: typeof users.$inferSelect) => u.id === host.user.id);
         if (!currentHost) continue;
         const fresh = await hostSlots({ ...host, user: currentHost }, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
-          maxPerMonth: currentType.maxPerMonth, startIntervalMin: currentType.startIntervalMin }, day, day, input.tz, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
-        if ((fresh.slots[day] ?? []).includes(startIso)) eligible.push(host.user.id);
+          maxPerMonth: currentType.maxPerMonth, startIntervalMin: currentType.startIntervalMin }, currentDay, currentDay, currentZone, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
+        if ((fresh.slots[currentDay] ?? []).includes(startIso)) eligible.push(host.user.id);
       }
       if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error("slot_unavailable");
       const hostIds = et.kind === "collective" ? eligible

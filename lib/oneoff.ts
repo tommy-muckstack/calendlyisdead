@@ -11,7 +11,7 @@ export async function createOneOff(userId: string, o: { title: string; durationM
   const id = crypto.randomUUID(), slug = `o-${shortId()}`;
   const [et] = await db.insert(eventTypes).values({ id, userId, scheduleId: base?.scheduleId ?? sc?.id, slug, kind: "one_off",
     title: o.title || base?.title || "Meeting", durationMin: o.durationMin || base?.durationMin || 30, location: o.location ?? base?.location ?? "",
-    description: base?.description ?? "", questions: base?.questions ?? [], minNoticeMin: base?.minNoticeMin ?? 240, bufferBeforeMin: base?.bufferBeforeMin ?? 0, bufferAfterMin: base?.bufferAfterMin ?? 0,
+    description: base?.description ?? "", questions: base?.questions ?? [], lockedTimezone: base?.lockedTimezone ?? null, minNoticeMin: base?.minNoticeMin ?? 240, bufferBeforeMin: base?.bufferBeforeMin ?? 0, bufferAfterMin: base?.bufferAfterMin ?? 0,
     color: base?.color ?? "#0E7C66", priceCents: base?.priceCents ?? 0, currency: base?.currency ?? "usd" }).returning();
   return et;
 }
