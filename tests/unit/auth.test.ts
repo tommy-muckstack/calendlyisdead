@@ -60,7 +60,7 @@ describe("shared Firebase session", () => {
   });
   it("refuses to link an unverified email to an existing account", async () => {
     const r = await R.POST(post({ idToken: "tok-unverified" })); expect(r.status).toBe(403);
-    expect((await r.json()).error).toMatch(/Verify your email/);
+    expect((await r.json()).error).toMatch(/Continue with Google/);
   });
   it("rejects bad tokens and bad cookies", async () => {
     expect((await R.POST(post({ idToken: "nope" }))).status).toBe(401);
