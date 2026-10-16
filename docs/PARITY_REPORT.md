@@ -89,8 +89,12 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | B11 | Personal/team booking indexes and inactive events | unverified | P2 | Dynamic user/team pages exist; compare empty/not-found states. | pending B2 |
 | V01 | Availability schedules, defaults and weekly hours | unverified | P1 | `AvailabilityEditor`; compare all controls and persistence. | pending B2 |
 | V02 | Date overrides, holidays and overlap validation | differs | P1 | Local fix on current main rejects invalid clock times, calendar dates, weekdays and empty timezone before saving. All 13 API/database regressions pass; valid 24:00 ends, leap dates and closed days persist. Original/browser parity remains unverified. | pending B2 |
-| M01 | Meetings list, filters, search and export | missing | P1 | No host meetings-list route in source. | pending B2 |
-| M02 | Host meeting detail | missing | P2 | Public booking detail exists; no host meeting detail experience. | pending B2 |
+| M01 | Meetings list, filters, search and export | differs | P1 | New authenticated Calendar → Meetings timeline with upcoming/past/cancelled/all, literal search, event/date filters, pagination and streaming CSV. Functional tests pass; organization-wide reporting, external events and paired UI comparison remain. | pending B2 |
+| M02 | Host meeting detail | differs | P2 | New owner-scoped detail includes invitee/guests/answers, timezone, location/join link, cancellation reason and existing reschedule/cancel actions. Full original detail/interaction comparison still required. | pending B2 |
+| M03 | Private host notes | missing | P2 | Existing invitee notes are displayed; separate private host notes/editor are not implemented. | pending B2 |
+| M04 | Mark and undo invitee no-show | missing | P2 | No persisted no-show state or controls yet. | pending B2 |
+| M05 | Connected Google/Outlook events in calendar timeline | missing | P2 | Current timeline reads app bookings; provider free/busy integration does not yet supply external event detail. | pending B2 |
+| M06 | Organization-wide meeting filters/export and reporting fields | missing | P2 | Current view is scoped to participating host records. Role-authorized cross-host reports, UTM/CRM/consent fields remain; payment changes are excluded. | pending B2 |
 | C01 | Contacts list/detail, history and actions | missing | P2 | No contacts route or component. | pending B2 |
 | I01 | Integration directory and connection controls | unverified | P2 | `CalendarsPanel`; Google/Microsoft/iCloud/demo supported in source. | pending B2 |
 | I02 | Provider failure, conflict calendars, write-back | unverified | P1 | Local provider tests pass; live accounts and error UI not compared. | pending B2 |
@@ -141,8 +145,9 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Logical area | Branch / PR | State |
 | --- | --- | --- |
 | Current audit baseline, free capabilities, scope, capture tooling | [PR #1](https://github.com/tommy-muckstack/calendlyisdead/pull/1) | Current-main source review; no visual claims. |
-| Event-type default schedule | `codex/event-default-schedule` / draft PR pending | 91 tests, standalone TypeScript and production build pass on current main plus PR #2. Browser evidence and lint remain blocked. |
+| Event-type default schedule | [PR #3](https://github.com/tommy-muckstack/calendlyisdead/pull/3) | 91 tests, standalone TypeScript and production build pass on current main plus PR #2. Browser evidence and lint remain blocked. |
 | Availability input validation | [PR #2](https://github.com/tommy-muckstack/calendlyisdead/pull/2) | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
+| Host meetings timeline, detail and CSV | `feat/host-meetings` / local only | Local implementation; 105 tests, TypeScript and build pass, including 14 ownership/filter/DST/export tests. Browser comparison and lint blocked. |
 
 ## Capturing evidence with other workers
 
@@ -162,3 +167,23 @@ Compared the real schedule PUT handler and persisted PGlite state before/after. 
 ### Default event schedule change
 
 Selecting Default schedule after choosing explicit hours now clears the saved schedule ID. Reloaded booking availability follows the host’s current default, including subsequent default changes. Three API/database regressions cover persistence, fallback behavior, ownership and empty IDs. The editor retains null in its request body. Screenshots and keyboard interaction remain pending B2; no visual parity claim.
+
+### Host meetings functionality
+
+Reference behavior: [Calendly meeting management](https://calendly.com/help/how-to-manage-your-meetings) (updated August 20, 2026) and [meeting export](https://calendly.com/help/tracking-and-reporting) (updated October 13, 2026). Public documentation establishes the timeline, search/filter, detail and export requirements; it does not establish visual parity.
+
+The new host-only timeline/detail and CSV export use existing booking records and are available to every account without a plan gate. Calendar connections remain reachable from the Calendar tabs. Collective hosts see their own persisted participant row. Queries and export are constrained by the signed-in host; private provider/payment fields are not selected. CSV preserves filters, exports all matching pages in batches, and escapes spreadsheet formulas from invitee text. No emails are sent by viewing or exporting meetings.
+
+Before: no host meetings list/detail/export. After: working routes, dated results, filters, pagination, accessible labels and links, loading/error/empty states, details, and existing cancel/reschedule destinations. New private notes, no-show, external-calendar timeline entries and organization reporting are explicitly still missing, not accepted exceptions. Browser screenshots and visual/keyboard checks remain blocked by B2. Tests use isolated PGlite and reserved addresses.
+
+### Publication and cost clarification (October 15 history)
+
+After the user asked about local storage and costs, further pushes/PRs were put on hold pending their preference. PRs #1–#3 already exist on GitHub. GitHub reports a completed Vercel preview for PR #3; no GitHub Actions runs were listed for that commit. Billing impact is unknown. No paid services were purchased or billing settings changed. The new meetings implementation remains local only.
+
+The initial local dev-server HTTP smoke attempt returned 404 for the export endpoint while Watchpack repeatedly restarted with EMFILE errors. That attempt did not reach sign-in or send mail; the dev server was stopped. A subsequent production-build server with `DEMO_MODE=1`, empty `DATABASE_URL` and isolated local PGlite passed HTTP checks: anonymous CSV export returns 401, demo sign-in returns 204, the authenticated meetings page returns 200 with the Calendar connections link, CSV export returns 200 with its expected header/content type, and an invalid date filter returns 400. The production server was then stopped. Session cookies stayed in process memory, and no cloud database or email provider was used. This is server/HTTP evidence, not browser or visual evidence.
+
+### QA #40 — publication verification, October 16
+
+The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
+
+Fresh isolated-checkout verification of the product source: 105 tests in 12 files pass, production build and standalone TypeScript pass. `npm run lint` was attempted and fails because this historical base has no lint script; lint tooling exists later in the local review stack and must reach this branch before final approval. Installed dependencies were reused from the current local checkout. Original/before/after screenshots and 1440px/390px native interaction checks remain blocked by browser startup. No real accounts, calendars, emails, payment details or secrets were used. Publishing source/PR metadata to GitHub may trigger existing previews; test databases, outbox and raw logs stay local.

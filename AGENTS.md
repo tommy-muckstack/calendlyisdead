@@ -9,6 +9,8 @@
 
 ## Parity workflow
 
+- Publication resumed (2026-10-16): the new CALENDLYISDEAD_FIX_PROMPT.md explicitly requests small PRs, superseding the earlier inferred hold. Publish scoped draft PRs with verification gaps stated; never merge. Keep test data and credentials local. Existing GitHub/Vercel automation may run on publication; do not provision paid services or claim hosting/AI use is cost-free.
+
 - Current scope (user-confirmed 2026-10-15): marketing comparison covers the **homepage and login page only**. Pricing and other marketing pages are excluded. All logged-in functionality remains in scope, including original paid capabilities. Keep end-to-end invitee booking, confirmation, cancellation and rescheduling checks as core scheduling verification.
 
 - The replica is **completely free**. All replica features must remain available without subscriptions, paid tiers, upgrade prompts or trial limits. Original prices and feature gates are intentional economic differences, not behavior to reproduce. Do not introduce fake checkout or sales flows.
