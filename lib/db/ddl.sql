@@ -172,3 +172,8 @@ CREATE TABLE IF NOT EXISTS contact_list_automation_runs (
   "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE,
   "inviteeEmail" text NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(), PRIMARY KEY ("userId", "bookingUid", "inviteeEmail")
 );
+CREATE TABLE IF NOT EXISTS contact_field_automations (
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "eventTypeId" text NOT NULL REFERENCES event_types(id) ON DELETE CASCADE,
+  actions jsonb NOT NULL, enabled boolean NOT NULL DEFAULT false, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz,
+  PRIMARY KEY ("userId", "eventTypeId")
+);

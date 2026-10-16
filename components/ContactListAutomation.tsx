@@ -4,26 +4,13 @@ import { BP } from "@/lib/basepath";
 import { ContactAutomationState, SaveListAutomation, type AutomationState, type ListAutomationChange } from "@/lib/contact-automation-validation";
 import { ContactCollectionEditor } from "./ContactCollectionEditor";
 import "@/app/app/contacts/contacts.css";
-class AutomationResponseError extends Error { constructor(message: string, public status: number) { super(message); } }
+import { AutomationResponseError, useAutomationOperation } from "./useContactAutomationOperation";
 async function request(eventId: string, method: string, body: unknown, signal: AbortSignal) {
   const response = await fetch(`${BP}/api/event-types/${encodeURIComponent(eventId)}/contact-automations/lists`, { method, signal, headers: { "Content-Type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   if (response.status === 204 && method === "DELETE") return null;
   const value = await response.json(); if (!response.ok) throw new AutomationResponseError(typeof value.error === "string" ? value.error : "The change could not be confirmed. Try again.", response.status);
   if (method === "DELETE") throw new Error("Unconfirmed deletion");
   const state = ContactAutomationState.parse(value); if (state.automation.eventTypeId !== eventId) throw new Error("Unconfirmed event"); return state;
-}
-function useAutomationOperation() {
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [conflict, setConflict] = useState(false);
-  const pending = useRef(false), active = useRef(false), abort = useRef<AbortController | null>(null);
-  useEffect(() => { active.current = true; return () => { active.current = false; abort.current?.abort(); }; }, []);
-  async function run<T>(action: (signal: AbortSignal) => Promise<T>): Promise<{ value: T } | null> {
-    if (pending.current) return null; pending.current = true; setBusy(true); setError("");
-    const controller = new AbortController(); abort.current = controller; const timeout = setTimeout(() => controller.abort(), 15000);
-    try { const value = await action(controller.signal); if (!active.current) return null; setConflict(false); return { value }; }
-    catch (cause) { if (active.current) { setError(cause instanceof AutomationResponseError ? cause.message : "The change could not be confirmed. Your choices are still here. Try again."); setConflict(cause instanceof AutomationResponseError && cause.status === 409); } return null; }
-    finally { clearTimeout(timeout); pending.current = false; if (active.current) setBusy(false); }
-  }
-  return { busy, error, conflict, pending, setError, run };
 }
 const sameIds = (a: string[], b: string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 export function ContactListAutomationEditor({ initial, onClose, onSaved }: { initial: AutomationState; onClose(): void; onSaved(state: AutomationState, close: boolean): void }) {

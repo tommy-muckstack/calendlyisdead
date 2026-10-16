@@ -1,21 +1,15 @@
-import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { lockContactOwner, type ContactDB } from "./contact-store";
 import { CollectionData } from "./contact-list-validation";
 import { ChangeListAutomation, ContactListAutomation, emptyListAutomation, type ListAutomationChange } from "./contact-automation-validation";
-const { eventTypes: E, eventTypeHosts: H, contactListAutomations: A, contactListAutomationRuns: R, contactCollections: L, contactListMembers: M, contacts: C, bookings: B } = schema;
-export class ContactAutomationError extends Error { constructor(message: string, public status = 409) { super(message); } }
+import { ContactAutomationError, contactAutomationEvent, availableAutomationEvents } from "./contact-automation-store";
+import { applyContactFieldAutomation } from "./contact-field-automations";
+const { eventTypes: E, contactListAutomations: A, contactListAutomationRuns: R, contactCollections: L, contactListMembers: M, contacts: C, bookings: B } = schema;
+export { ContactAutomationError } from "./contact-automation-store";
 const owned = (userId: string, eventTypeId: string) => and(eq(A.userId, userId), eq(A.eventTypeId, eventTypeId));
-// Each host manages their own contacts and lists, including their own copy of
-// an assigned event. A team administrator does not gain access to others' lists.
-const available = (userId: string) => and(isNull(E.deletedAt), ne(E.kind, "managed"), ne(E.kind, "poll"), or(and(isNull(E.teamId), eq(E.userId, userId)), sql`EXISTS (SELECT 1 FROM ${H} WHERE ${H.eventTypeId} = ${E.id} AND ${H.userId} = ${userId})`));
 export async function contactAutomationEvents(userId: string) {
-  const db = await getDb(); return db.select({ id: E.id, title: E.title, kind: E.kind }).from(E).where(available(userId)).orderBy(asc(E.title), asc(E.id));
-}
-async function eventFor(db: ContactDB, userId: string, eventTypeId: string, lock = false) {
-  const query = db.select({ id: E.id, title: E.title }).from(E).where(and(eq(E.id, eventTypeId), available(userId)));
-  const [event] = await (lock ? query.for("key share") : query);
-  if (!event) throw new ContactAutomationError("Contact automations are available to this event's hosts. The event may also have been removed.", 404); return event;
+  const db = await getDb(); return db.select({ id: E.id, title: E.title, kind: E.kind }).from(E).where(availableAutomationEvents(userId)).orderBy(asc(E.title), asc(E.id));
 }
 async function read(db: ContactDB, userId: string, eventTypeId: string) {
   const [row] = await db.select().from(A).where(owned(userId, eventTypeId));
@@ -25,7 +19,7 @@ async function choices(db: ContactDB, userId: string) {
   const rows = await db.select().from(L).where(and(eq(L.userId, userId), eq(L.kind, "list"), isNull(L.deletedAt))).orderBy(asc(L.name), asc(L.id)); return rows.map(row => CollectionData.parse(row));
 }
 export async function readContactAutomation(userId: string, eventTypeId: string) {
-  const db = await getDb(), event = await eventFor(db, userId, eventTypeId);
+  const db = await getDb(), event = await contactAutomationEvent(db, userId, eventTypeId);
   return { automation: await read(db, userId, eventTypeId), lists: await choices(db, userId), eventTitle: event.title };
 }
 export async function changeContactAutomation(userId: string, eventTypeId: string, input: ListAutomationChange) {
@@ -33,7 +27,7 @@ export async function changeContactAutomation(userId: string, eventTypeId: strin
   return db.transaction(async (tx: ContactDB) => {
     // Team reservations lock the event before hosts. Acquire the FK-compatible
     // event lock first to avoid the inverse order on first configuration insert.
-    const event = await eventFor(tx, userId, eventTypeId, true); await lockContactOwner(tx, userId); const current = await read(tx, userId, eventTypeId);
+    const event = await contactAutomationEvent(tx, userId, eventTypeId, true); await lockContactOwner(tx, userId); const current = await read(tx, userId, eventTypeId);
     if (request.action === "toggle" && !current.configured) throw new ContactAutomationError("This automation was removed. Reload it before making changes.");
     const listIds = request.action === "save" ? [...request.listIds].sort() : [...current.listIds].sort(), lists = await choices(tx, userId);
     // Turning an existing automation off must remain possible after a target
@@ -49,7 +43,7 @@ export async function changeContactAutomation(userId: string, eventTypeId: strin
 }
 export async function deleteContactAutomation(userId: string, eventTypeId: string, version: number) {
   const db = await getDb(); await db.transaction(async (tx: ContactDB) => {
-    await eventFor(tx, userId, eventTypeId, true); await lockContactOwner(tx, userId); const current = await read(tx, userId, eventTypeId);
+    await contactAutomationEvent(tx, userId, eventTypeId, true); await lockContactOwner(tx, userId); const current = await read(tx, userId, eventTypeId);
     if (!current.configured && current.version === version + 1) return;
     if (!current.configured || current.version !== version) throw new ContactAutomationError("This automation changed elsewhere. Reload it before deleting.");
     await tx.update(A).set({ enabled: false, listIds: [], deletedAt: new Date(), version: version + 1 }).where(owned(userId, eventTypeId));
@@ -58,12 +52,13 @@ export async function deleteContactAutomation(userId: string, eventTypeId: strin
 /** Reservation transaction already holds this host's lock. Claim every newly
  * created booking/contact pair, even with no enabled automation, so a later
  * retry cannot apply settings added after that booking or undo manual removal. */
-export async function runContactListAutomation(db: ContactDB, booking: { hostId: string; uid: string; eventTypeId: string; inviteeEmail: string }, contactId: string) {
+export async function runContactAutomations(db: ContactDB, booking: { hostId: string; uid: string; eventTypeId: string; inviteeEmail: string }, contactId: string) {
   const [contact] = await db.select({ id: C.id }).from(C).where(and(eq(C.id, contactId), eq(C.userId, booking.hostId), isNull(C.deletedAt)));
   if (!contact) return;
   const [reservation] = await db.select({ uid: B.uid }).from(B).where(and(eq(B.uid, booking.uid), eq(B.hostId, booking.hostId), eq(B.eventTypeId, booking.eventTypeId), eq(B.status, "confirmed"), isNull(B.rescheduledFrom)));
   if (!reservation) return;
   const claimed = await db.insert(R).values({ userId: booking.hostId, bookingUid: booking.uid, inviteeEmail: booking.inviteeEmail.trim().toLowerCase() }).onConflictDoNothing().returning({ uid: R.bookingUid }); if (!claimed.length) return;
+  await applyContactFieldAutomation(db, booking, contactId);
   const [automation] = await db.select().from(A).where(and(owned(booking.hostId, booking.eventTypeId), eq(A.enabled, true), isNull(A.deletedAt)));
   if (!automation?.listIds.length) return;
   const targets = await db.select({ id: L.id }).from(L).where(and(eq(L.userId, booking.hostId), eq(L.kind, "list"), isNull(L.deletedAt), inArray(L.id, automation.listIds)));

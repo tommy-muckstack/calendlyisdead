@@ -148,7 +148,7 @@ describe("booking-triggered membership", () => {
   it("rejects forged host/contact combinations at the automation runner", async () => {
     const target = await list(); await save([target.id]); const saved = await person(), foreign = await person("private@example.invalid", "demo-mate");
     await db.insert(schema.bookings).values({ uid: "foreign", hostId: "demo-mate", eventTypeId: "personal", start: new Date(at()), end: new Date(at(11)), inviteeName: "Foreign", inviteeEmail: email, inviteeTz: "UTC" });
-    await service.runContactListAutomation(db, { hostId: user, uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, saved.id); await service.runContactListAutomation(db, { hostId: "demo-mate", uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, saved.id); await service.runContactListAutomation(db, { hostId: user, uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, foreign.id); expect(await members(target.id)).toEqual([]); expect(await db.select().from(schema.contactListAutomationRuns)).toEqual([]);
+    await service.runContactAutomations(db, { hostId: user, uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, saved.id); await service.runContactAutomations(db, { hostId: "demo-mate", uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, saved.id); await service.runContactAutomations(db, { hostId: user, uid: "foreign", eventTypeId: "personal", inviteeEmail: email }, foreign.id); expect(await members(target.id)).toEqual([]); expect(await db.select().from(schema.contactListAutomationRuns)).toEqual([]);
   });
 });
 describe("automation API", () => {

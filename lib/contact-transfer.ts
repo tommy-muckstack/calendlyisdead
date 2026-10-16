@@ -49,7 +49,8 @@ export async function importContacts(userId: string, input: ImportInput): Promis
       for (const definition of definitions) {
         const raw = row[request.mapping.indexOf(definition.id)];
         try {
-          const value = normalizeFieldValue(definition, definition.type === "multi_select" && raw.trim() ? JSON.parse(raw) : raw);
+          const arrayInput = definition.type === "multi_select" || (definition.type === "tag" && raw.trim().startsWith("[") && !definition.options.includes(raw.trim()));
+          const value = normalizeFieldValue(definition, arrayInput && raw.trim() ? JSON.parse(raw) : raw);
           const saved = existing ? custom.find(v => v.contactId === existing.id && v.fieldId === definition.id)?.value.data : null;
           if (!existing || request.policy === "overwrite" || saved == null) values[definition.id] = value;
         } catch { outcome.issues.push(`${definition.name}: invalid ${definition.type.replaceAll("_", " ")} value; field left unchanged.`); }

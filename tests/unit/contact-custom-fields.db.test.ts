@@ -102,7 +102,7 @@ describe("typed custom values and concurrency", () => {
   it.each([
     [{ type: "text" }, "  Notes  ", "Notes"], [{ type: "number" }, "-000.500", "-0.5"], [{ type: "currency", currency: "USD" }, "00012.3400", "12.34"],
     [{ type: "text" }, "true", "true"], [{ type: "text" }, "null", "null"], [{ type: "text" }, "42", "42"], [{ type: "number" }, "123456789012345.123456", "123456789012345.123456"],
-    [{ type: "date" }, "2028-02-29", "2028-02-29"], [{ type: "tag", options: ["A", "B"] }, "B", "B"], [{ type: "multi_select", options: ["A", "B"] }, ["B", "A", "A"], ["A", "B"]],
+    [{ type: "date" }, "2028-02-29", "2028-02-29"], [{ type: "tag", options: ["A", "B"] }, "B", ["B"]], [{ type: "tag", options: ["A", "B"] }, ["B", "A", "A"], ["A", "B"]], [{ type: "multi_select", options: ["A", "B"] }, ["B", "A", "A"], ["A", "B"]],
   ] as [Partial<FieldDraft>, FieldValueType, FieldValueType][])("validates, persists and clears %j", async (extra, input, expected) => {
     const person = await contact(), field = await (await create(extra)).json(); const response = await save(person.id, { [field.id]: input }); expect(response.status).toBe(200); expect((await response.json()).values[field.id]).toEqual(expected);
     expect((await service.listContactCustomValues("demo-user", [person.id]))[person.id][field.id]).toEqual(expected);
