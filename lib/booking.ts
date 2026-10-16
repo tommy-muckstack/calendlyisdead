@@ -47,15 +47,17 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   return { eventType: et, ownerName: team?.name ?? ownerUser.name ?? owner, ownerUser, team, hosts };
 }
 
-async function hostSlots(h: Host, et: any, from: string, to: string, tz: string, now: DateTime, exclude: Set<string>) {
-  const db = await getDb();
+async function hostSlots(h: Host, et: any, from: string, to: string, tz: string, now: DateTime, exclude: Set<string>, transaction?: any) {
+  const db = transaction ?? await getDb();
   const lo = DateTime.fromISO(from, { zone: tz }).minus({ days: 2 }).toJSDate();
   const hi = DateTime.fromISO(to, { zone: tz }).plus({ days: 2 }).toJSDate();
   const existing = (await db.select().from(bookings).where(and(eq(bookings.hostId, h.user.id), eq(bookings.status, "confirmed"), gte(bookings.start, lo), lte(bookings.start, hi))))
     .filter((b: any) => !exclude.has(b.uid));
   const isGroup = et.kind === "group";
   const busyRows = isGroup ? existing.filter((b: any) => b.eventTypeId !== et.id) : existing;
-  const ext = await externalBusy(h.user.id, lo, hi);
+  // Reservation rechecks use only local state under the host lock. Provider I/O
+  // was checked in the preflight; never hold database locks during network I/O.
+  const ext = transaction ? { busy: [], errors: [] } : await externalBusy(h.user.id, lo, hi);
   // a group session that already exists is shown on the host's external calendar too; don't let that hide its own open seats
   const ownStarts = new Set(existing.filter((b: any) => b.eventTypeId === et.id).map((b: any) => b.start.toISOString()));
   const extBusy = isGroup ? ext.busy.filter(b => !ownStarts.has(new Date(b.start).toISOString())) : ext.busy;
@@ -103,8 +105,8 @@ export async function slotsFor(owner: string, slug: string, from: string, to: st
 }
 
 /** Round robin: pick the host. even = fewest bookings of this type in the last 30 days and upcoming; priority = highest priority first, then even. */
-export async function pickHost(et: any, hosts: Host[], candidates: string[]) {
-  const db = await getDb();
+export async function pickHost(et: any, hosts: Host[], candidates: string[], transaction?: any) {
+  const db = transaction ?? await getDb();
   const since = DateTime.utc().minus({ days: 30 }).toJSDate();
   const rows = await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.status, "confirmed"), gte(bookings.start, since)));
   const count = (id: string) => rows.filter((b: any) => b.hostId === id).length;
@@ -149,28 +151,45 @@ export async function createBooking(input: BookingInput) {
   const et = r.ev.eventType;
   const answers = validateAnswers(et.questions ?? [], input.answers ?? {});
   const free = r.free.get(startIso) ?? [];
-  const hostIds = et.kind === "collective" ? r.ev.hosts.map(h => h.user.id)
-    : et.kind === "round_robin" ? [await pickHost(et, r.ev.hosts, free)]
-    : [r.ev.hosts[0].user.id];
-  const hostUsers = hostIds.map(id => r.ev.hosts.find(h => h.user.id === id)!.user);
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
     inviteeTz: input.tz, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
-  const rows = hostIds.map((hostId, i) => ({ ...base, uid: i === 0 ? uid : `${uid}-${i}`, hostId, groupUid: hostIds.length > 1 ? uid : null, seat: 0 })) as any[];
-
-  if (oldGroup.length) await db.update(bookings).set({ status: "cancelled", cancelReason: "rescheduled" }).where(inArray(bookings.uid, oldGroup.map(b => b.uid)));
-  const restore = async () => { if (oldGroup.length) await db.update(bookings).set({ status: "confirmed", cancelReason: null }).where(inArray(bookings.uid, oldGroup.map(b => b.uid))); };
+  let rows: any[] = [], hostUsers: any[] = [];
   try {
-    if (et.kind === "group") {
-      let ok = false;
-      for (let seat = 0; seat < et.seats && !ok; seat++) {
-        try { await db.insert(bookings).values({ ...rows[0], seat }); rows[0].seat = seat; ok = true; } catch { /* seat taken, try next */ }
+    await db.transaction(async (tx: any) => {
+      // Lock hosts in a consistent order, including the old hosts of a move.
+      // Read committed gives the following checks a fresh snapshot after waiting.
+      const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
+      await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
+      const eligible: string[] = [];
+      for (const host of r.ev.hosts) {
+        if (!free.includes(host.user.id)) continue;
+        const fresh = await hostSlots(host, et, day, day, input.tz, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), tx);
+        if ((fresh.slots[day] ?? []).includes(startIso)) eligible.push(host.user.id);
       }
-      if (!ok) throw new Error("full");
-    } else {
-      await db.transaction(async (tx: any) => { for (const row of rows) await tx.insert(bookings).values(row); });
-    }
-  } catch { await restore(); throw new Error("slot_unavailable"); }
+      if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error("slot_unavailable");
+      const hostIds = et.kind === "collective" ? eligible
+        : et.kind === "round_robin" ? [await pickHost(et, r.ev.hosts, eligible, tx)] : [eligible[0]];
+      hostUsers = hostIds.map(id => r.ev.hosts.find(h => h.user.id === id)!.user);
+      rows = hostIds.map((hostId, i) => ({ ...base, uid: i === 0 ? uid : `${uid}-${i}`, hostId, groupUid: hostIds.length > 1 ? uid : null, seat: 0 }));
+
+      if (oldGroup.length) {
+        const moved = await tx.update(bookings).set({ status: "cancelled", cancelReason: "rescheduled" })
+          .where(and(inArray(bookings.uid, oldGroup.map(b => b.uid)), eq(bookings.status, "confirmed"))).returning({ uid: bookings.uid });
+        if (moved.length !== oldGroup.length) throw new Error("slot_unavailable");
+      }
+      if (et.kind === "group") {
+        let reserved = false;
+        for (let seat = 0; seat < et.seats && !reserved; seat++) {
+          const inserted = await tx.insert(bookings).values({ ...rows[0], seat }).onConflictDoNothing().returning({ uid: bookings.uid });
+          if (inserted.length) { rows[0].seat = seat; reserved = true; }
+        }
+        if (!reserved) throw new Error("slot_unavailable");
+      } else {
+        for (const row of rows) await tx.insert(bookings).values(row);
+      }
+    }, { isolationLevel: "read committed" });
+  } catch { throw new Error("slot_unavailable"); }
 
   for (const o of oldGroup) await removeEvent(o.externalCalendarId, o.externalEventId);
   const paidBefore = oldGroup.find(o => o.paymentStatus === "paid");

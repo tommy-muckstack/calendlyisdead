@@ -76,6 +76,9 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | E08 | Event notifications and cancellation policy | missing | P2 | No event notification editor or cancellation-policy controls; separate workflows exist. | pending B2 |
 | E09 | Redirect and confirmation options | unverified | P2 | Redirect URL exists; compare free equivalents without changing payments. | pending B2 |
 | E10 | Editor autosave, errors, close/reopen, focus | unverified | P1 | Debounced save; check closing before timer fires and keyboard dialog behavior. | pending B2 |
+| E11 | Free/busy title exceptions and conflict notifications | missing | P2 | Original documents exact/partial title exceptions for booking over selected meetings, with conflict alerts. No matching event settings or behavior in this source. This is separate from preventing unintended booking races. | pending B2 |
+| E12 | Monthly and all-event meeting limits | missing | P2 | Original documents monthly and account-wide limits; local event fields currently cover daily/weekly limits only. | pending B2 |
+| E13 | Start increments, locked timezone, hidden event settings | missing | P2 | Source uses duration as the slot increment and has no corresponding editor fields; inspect original settings and allowed values. | pending B2 |
 | B01 | Invitee event/host summary | unverified | P3 | `BookingWidget`; needs paired reference with equivalent event. | pending B2 |
 | B02 | Calendar/month/day states and mobile sizing | unverified | P2 | `.cal` has 300px minimum width plus container padding; test 390px and narrower widths for overflow. | pending B2 |
 | B03 | Time-slot selection and progression | unverified | P1 | Local time selection/Next exists; compare state changes and scroll behavior. | pending B2 |
@@ -111,10 +114,13 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | X03 | Error states, 404 and inaccessible resources | unverified | P1 | Next default not-found handling; compare custom routes and status codes. | pending B2 |
 | X04 | Accessibility: labels, keyboard, dialogs, contrast | differs | P2 | Event cards remain click-only; event/settings dialogs lack focus management. Menus and icon buttons require full keyboard audit. | pending B2 |
 | T01 | Timezones, DST, date boundaries and leap days | unverified | P1 | Existing slot tests pass, including spring/fall DST and invitee-zone rebucketing; not original parity proof. | pending B2 |
-| T02 | Buffers, minimum notice, daily/weekly limits | unverified | P1 | Existing unit tests pass; cross-event and concurrent boundaries remain to test. | pending B2 |
-| T03 | Double booking, concurrent overlap and group seats | unverified | P0 | Unique index covers `(hostId,start,seat)` only; different-start overlap races require reproduction and transactional review. | pending B2 |
+| T02 | Buffers, minimum notice, daily/weekly limits | differs | P1 | Concurrent daily/weekly and buffered-slot violations reproduced and fixed locally with a transaction recheck. Cross-event buffer ownership and group-session buffer behavior still need investigation; current busy rows contain only raw meeting intervals. | pending B2 |
+| T03 | Double booking, concurrent overlap and group seats | differs | P0 | Different-start overlapping reservations reproduced. Local fix serializes participating hosts and rechecks slots inside the reservation transaction, including group seats, round robin, collective meetings and reschedule rollback. Ten deterministic PGlite regressions pass. Multi-connection PostgreSQL and browser verification remain. | pending B2 |
 | T04 | Email/ICS confirmation, cancel and reschedule | unverified | P1 | Local outbox transport and ICS builder exist; compare method/UID/sequence/timezone/content using disposable accounts. | pending B2 |
 | T05 | One-off links, polls and team flows | unverified | P2 | Source routes and local tests exist; original plan access may limit comparison. | pending B2 |
+| T06 | Poll reservation races and concurrent single-use link consumption | differs | P0 | Poll booking writes outside the shared reservation transaction and can bypass host locks; one-off usedAt is set after reservation commit. Separate follow-up must cover these writers/consumption rules before certifying concurrency safety. | pending B2 |
+| T07 | Existing-booking buffers across event types | differs | P1 | Source review: busy intervals contain raw start/end, so a new event with zero buffers can consume the buffer belonging to an earlier event. Group sessions also omit same-event busy rows. Add sequential and concurrent boundary reproductions. | pending B2 |
+| T08 | Group-session daily/weekly limits | differs | P1 | Source review: the group limit input filters all of its own existing starts out of the count. Reproduce closing new sessions at the cap while retaining seats in an existing session. | pending B2 |
 
 ## Constraints and potential exceptions
 
@@ -150,7 +156,8 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Availability input validation | [PR #2](https://github.com/tommy-muckstack/calendlyisdead/pull/2) | Replayed on current main; 88 tests pass (13 availability regressions). Browser evidence and lint remain blocked. |
 | Host meetings timeline, detail and CSV | [Draft PR #6](https://github.com/tommy-muckstack/calendlyisdead/pull/6) | 105 tests, standalone TypeScript and build pass. Historical base lacks lint tooling; browser comparison remains blocked. |
 | Booking request failure recovery | [Draft PR #7](https://github.com/tommy-muckstack/calendlyisdead/pull/7) | 115 unit/integration tests, TypeScript and production build pass. Twelve Playwright scenarios at 1440/390px are discoverable and separately typechecked, but execution remains blocked. Lint script still missing. |
-| Booking link validation and timezone selection | `fix/booking-link-validation` / local only | 134 unit/integration tests, standalone TypeScript and production build pass. Four additional browser cases are discoverable/typechecked but unexecuted. Lint/browser evidence blocked. |
+| Booking link validation and timezone selection | [Draft PR #8](https://github.com/tommy-muckstack/calendlyisdead/pull/8) | 134 unit/integration tests, standalone TypeScript and production build pass. Four additional browser cases are discoverable/typechecked but unexecuted. Lint/browser evidence blocked. |
+| Atomic event reservations and rescheduling | `fix/atomic-booking-reservations` / local only | Four pre-change race failures reproduced; all 144 tests, standalone TypeScript and production build pass, including ten focused PGlite regressions. Lint remains missing. Poll/one-off follow-up and multi-connection PostgreSQL/browser checks remain. |
 
 ## Capturing evidence with other workers
 
@@ -197,6 +204,18 @@ Before: malformed `month` or `tz` led to an invalid Luxon weekday and `Array(NaN
 
 Nineteen new unit cases cover malformed/empty inputs, real leap dates, aliases, local month boundaries and ambiguous/invalid slots. All 134 tests pass, along with standalone TypeScript, separate browser-test TypeScript checking and the production build. Four Playwright cases at 1440/390px are authored and discoverable, not executed (B2). `npm run lint` still reports the missing script (B3). No visual match is certified, and the change remains local.
 
+### Atomic event reservations
+
+Deterministic pre-change tests allowed both requests to pass availability before either reservation began. Four cases incorrectly accepted both bookings: overlapping meetings with different starts, daily-limit overflow, weekly-limit overflow and adjacent buffered slots. Non-overlapping bookings correctly succeeded as a control.
+
+The local fix locks host rows in consistent order and rechecks local reservations, limits, notice and buffers inside a read-committed transaction before inserting. This follows PostgreSQL's documented [row-lock semantics](https://www.postgresql.org/docs/current/explicit-locking.html) and [read-committed snapshots](https://www.postgresql.org/docs/current/transaction-iso.html). Provider checks stay in the initial availability phase; no provider I/O occurs while locks are held. Round robin chooses among hosts still available, collective reservations commit together, group seat inserts handle conflicts without aborting the transaction, and a reschedule cancels/replaces its original booking atomically. Existing payment/Stripe branches and configuration are unchanged.
+
+Ten focused tests use an isolated local PGlite database and stub calendar, conferencing, mail and workflow effects. They cover the four reproduced failures, non-overlapping success, exact group capacity, round-robin fallback, collective all-or-nothing reservation, rollback on a failed move and competing moves of one booking. This validates fresh reservation checks and rollback, **not cross-process PostgreSQL lock contention**; no local PostgreSQL server was found for that additional test. Browser parity remains unverified. Poll writes and one-off link consumption remain explicit separate gaps (T06).
+
+Final local checks: 144 tests in 15 files pass, standalone TypeScript passes, and the production build passes. `npm run lint` fails because no lint script exists. The baseline workspace-root/Node-version warnings and browser blocker remain. Source review also identified separate buffer-ownership and group-limit defects (T07/T08); the transaction fix does not claim to resolve those scheduling rules.
+
+Additional reference observations: [free/busy rules](https://calendly.com/help/free-busy-rules-overview) allow configured title exceptions and conflict notifications; [poll setup](https://calendly.com/help/how-to-set-up-a-meeting-poll) includes multiple hosts, up to 40 time options, poll editing/deleting and participant review before booking. These controls are not established as replicated by existing source/tests. The linked help content also identifies monthly/global limits and slot-increment/timezone settings for further comparison. Public documentation does not establish visual parity.
+
 ### QA #40 — publication verification, October 16
 
 The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
@@ -214,3 +233,9 @@ The product files are unchanged from local source commit `e38239ef8a7406c1f9174b
 Fresh isolated checkout: 134 unit/database tests in 14 files, production build and standalone TypeScript pass. npm run lint was attempted and fails because this historical base has no lint script; tooling is a later pending change. Installed dependencies were reused from the current local checkout. Four 1440px/390px link-validation Playwright scenarios are authored, not executed. Coverage includes invalid dates/zones/months, local month boundaries and distinct repeated DST instants. Friendly/searchable timezone UI in QA #33 remains open.
 
 The product files are unchanged from local source commit `8f9800cd73e536d4997c6649818042b0dec6a892`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
+
+### Atomic event reservations — publication verification, October 16
+
+Fresh isolated checkout: 144 unit/database tests in 15 files, production build and standalone TypeScript pass. npm run lint was attempted and fails because this historical base has no lint script; tooling is a later pending change. Installed dependencies were reused from the current local checkout. Ten focused reservation tests cover competing overlaps, limits, buffers, group seats, round-robin fallback, collective atomicity and reschedule rollback. PGlite tests do not prove multi-connection PostgreSQL locking; that check and native-browser evidence remain outstanding. Single-use consumption, poll reservations, buffer ownership and group-session counting are separate fixes later in the stack.
+
+The product files are unchanged from local source commit `6c348592635c267f443344093886d9e926c81965`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
