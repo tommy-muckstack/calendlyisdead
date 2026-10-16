@@ -35,6 +35,7 @@ Without them the login page says "Sign-in not configured" (demo button still wor
 ## Teams and automations
 - Teams at `/team/<slug>`: collective (everyone must be free), round robin (spread evenly, or by priority then evenly), managed event types (copied into each member's account; locked fields follow the template). Invites go out by email and must be accepted by the invited address.
 - Group event types: several invitees per time, up to the seat limit.
+- Account meeting limits: Settings → Scheduling → Advanced availability (`/app/availability/advanced`) automatically saves daily, weekly and monthly caps across all event types. Hosts manage their own caps; event owners/team admins can view them in the event editor. Event-specific limits remain separate.
 - Workflows: email or SMS before or after a meeting, on booking, or on cancellation, with `{{variables}}`. Due messages go out from `/api/cron/workflows` (Vercel Cron every 5 min via `vercel.json`; set `CRON_SECRET`). SMS uses Twilio when `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM` are set, otherwise it's logged.
 - Routing forms at `/f/<id>`: questions plus first-match rules (is, is not, contains, is one of, ≥, ≤) that send people to an event type (prefilled), a URL, or a message.
 - Demo mode has a second account (Sam, Chicago) so team features work with no keys.
@@ -55,7 +56,7 @@ Without them the login page says "Sign-in not configured" (demo button still wor
 
 Website usage telemetry: optional PostHog integration for US project 666931. See [the shared website/subapp taxonomy](docs/ANALYTICS.md) for configuration, event meanings, redaction, environment gates and rollout to other apps. This is separate from the host-facing booking analytics.
 
-`npm run lint` (Next.js/React/TypeScript rules; existing type debt remains visible as warnings), `npm run typecheck`, `npm run build`, and `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, editor auto-save).
+`npm run lint` (Next.js/React/TypeScript rules; existing type debt remains visible as warnings), `npm run typecheck`, `npm run build`, and `npm test` (unit + PGlite integration tests: slots, DST, teams, workflows, payments, polls, one-off links, assistant), `npm run e2e` (Playwright: book, reschedule, cancel, double-booking, explicit event-editor saving and automatic account-limit saving).
 
 ## Status
 M0-M9 built (see docs/PLAN.md), including meeting polls and one-off links. Launch thread draft: `docs/launch/X_THREAD_DRAFT.md` (not posted). Not deployed.

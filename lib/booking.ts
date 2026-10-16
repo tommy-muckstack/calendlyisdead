@@ -12,6 +12,7 @@ import type { Question } from "./db/schema";
 import { confFor, meetingUrlFor } from "./conferencing";
 import { HOLD_MIN } from "./payments";
 import { confirmedReservations, reservationBusy } from "./booking-busy";
+import { hostLimitCheck } from "./host-meeting-limits";
 const { users, eventTypes, schedules, bookings, teams, eventTypeHosts } = schema;
 
 export type Host = { user: any; schedule: any; priority: number };
@@ -89,6 +90,8 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
     rangeDays: et.rangeDays, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
     limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek, perMonth: et.maxPerMonth }, limitsTimezone, existing: forLimits,
     joinableStarts: isGroup ? [...ownStarts] : [], sessionBuffers });
+  const hostFull = await hostLimitCheck(db, h.user, lo, hi, exclude);
+  for (const d of Object.keys(slots)) slots[d] = slots[d].filter(s => (isGroup && ownStarts.has(s)) || !hostFull(s));
   if (isGroup) {
     const taken = new Map<string, number>(), limits = new Map<string, number>();
     for (const b of existing) if (b.eventTypeId === et.id) {
@@ -190,7 +193,7 @@ export async function createBooking(input: BookingInput) {
       // Lock hosts in a consistent order, including the old hosts of a move.
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
-      await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
+      const currentHosts = await tx.select().from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
       if (!et.teamId) currentType = (await lockType())[0];
       // A group template may have changed after the availability preflight but
       // before its first reservation. Never commit that stale session definition.
@@ -206,7 +209,9 @@ export async function createBooking(input: BookingInput) {
       const eligible: string[] = [];
       for (const host of r.ev.hosts) {
         if (!free.includes(host.user.id)) continue;
-        const fresh = await hostSlots(host, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
+        const currentHost = currentHosts.find((u: typeof users.$inferSelect) => u.id === host.user.id);
+        if (!currentHost) continue;
+        const fresh = await hostSlots({ ...host, user: currentHost }, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
           maxPerMonth: currentType.maxPerMonth }, day, day, input.tz, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
         if ((fresh.slots[day] ?? []).includes(startIso)) eligible.push(host.user.id);
       }

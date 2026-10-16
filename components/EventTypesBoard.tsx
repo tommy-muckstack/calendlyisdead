@@ -3,6 +3,7 @@ import { BP } from "@/lib/basepath";
 import { I } from "@/components/app/icons";
 import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
 import { EventTypePatch } from "@/lib/event-type-validation";
+import { HostMeetingLimits } from "./HostMeetingLimits";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
@@ -248,7 +249,8 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
           <input id="et-mpw" disabled={L("maxPerWeek")} className="input" type="number" min={1} value={d.maxPerWeek ?? ""} onChange={e => setD({ ...d, maxPerWeek: e.target.value ? Number(e.target.value) : null })} />
           <label className="f" htmlFor="et-mpm">Max bookings per month (blank = no limit)</label>
           <input id="et-mpm" disabled={L("maxPerMonth")} className="input" type="number" min={1} max={2147483647} value={d.maxPerMonth ?? ""} onChange={e => setD({ ...d, maxPerMonth: e.target.value ? Number(e.target.value) : null })} />
-          <p className="muted">Meeting limits apply across this event type’s hosts. A group session counts once, even when several invitees join.</p></> })}
+          <p className="muted">Meeting limits apply across this event type’s hosts. A group session counts once, even when several invitees join.</p>
+          <HostMeetingLimits eventId={et.id} /></> })}
         {S({ id: "avail", title: "Availability", summary: schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule", children: <>
           {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
           <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>

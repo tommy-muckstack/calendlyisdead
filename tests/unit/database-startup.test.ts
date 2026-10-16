@@ -21,6 +21,17 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds disabled-by-default account limits and preserves configured values and meetings on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE users DROP COLUMN "meetingLimitPerDay", DROP COLUMN "meetingLimitPerWeek", DROP COLUMN "meetingLimitPerMonth";');
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "meetingLimitPerDay", "meetingLimitPerWeek", "meetingLimitPerMonth" FROM users')).rows)
+      .toEqual([{ meetingLimitPerDay: null, meetingLimitPerWeek: null, meetingLimitPerMonth: null }]);
+    await client!.exec('UPDATE users SET "meetingLimitPerDay" = 2, "meetingLimitPerWeek" = 8, "meetingLimitPerMonth" = 20;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT "meetingLimitPerDay", "meetingLimitPerWeek", "meetingLimitPerMonth" FROM users')).rows)
+      .toEqual([{ meetingLimitPerDay: 2, meetingLimitPerWeek: 8, meetingLimitPerMonth: 20 }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+  });
   it("adds nullable monthly limits without rewriting meetings and preserves configured limits on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE event_types DROP COLUMN "maxPerMonth";');
