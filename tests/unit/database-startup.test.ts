@@ -21,6 +21,15 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds event creation receipts without changing existing events and retains them after event deletion", async () => {
+    await setup(); await client!.exec('DROP TABLE event_type_creations;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT * FROM event_type_creations')).rows).toEqual([]);
+    await client!.exec(`INSERT INTO event_type_creations (id, "userId", "requestHash") VALUES ('group', 'host', 'test-hash')`);
+    await client!.exec(ddl); expect((await client!.query('SELECT id, "requestHash" FROM event_type_creations')).rows).toEqual([{ id: 'group', requestHash: 'test-hash' }]);
+    await client!.exec('DELETE FROM event_types'); expect((await client!.query('SELECT id FROM event_type_creations')).rows).toEqual([{ id: 'group' }]);
+    await client!.exec("DELETE FROM users WHERE id = 'host'"); expect((await client!.query('SELECT * FROM event_type_creations')).rows).toEqual([]);
+  });
+
   it("adds resumable onboarding only for new accounts and retains progress on startup", async () => {
     await setup(); await client!.exec('DROP TABLE account_onboarding;'); await client!.exec(ddl);
     expect((await client!.query('SELECT * FROM account_onboarding')).rows).toEqual([]);

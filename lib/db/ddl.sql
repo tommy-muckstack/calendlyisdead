@@ -7,6 +7,11 @@ CREATE TABLE IF NOT EXISTS account_onboarding (
   "calendarSkipped" boolean, version integer NOT NULL DEFAULT 1,
   "lastRequest" jsonb, "completedAt" timestamptz
 );
+-- Retain creation receipts independently of event deletion to reject stale retries.
+CREATE TABLE IF NOT EXISTS event_type_creations (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "requestHash" text NOT NULL
+);
 CREATE TABLE IF NOT EXISTS accounts ("userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, type text NOT NULL, provider text NOT NULL, "providerAccountId" text NOT NULL, refresh_token text, access_token text, expires_at integer, token_type text, scope text, id_token text, session_state text, PRIMARY KEY (provider, "providerAccountId"));
 CREATE TABLE IF NOT EXISTS sessions ("sessionToken" text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires timestamp NOT NULL);
 CREATE TABLE IF NOT EXISTS "verificationTokens" (identifier text NOT NULL, token text NOT NULL, expires timestamp NOT NULL, PRIMARY KEY (identifier, token));

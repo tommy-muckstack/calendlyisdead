@@ -1,74 +1,46 @@
 import { expect, test } from "@playwright/test";
-
 for (const width of [1440, 390]) {
-  test.describe(`choose event kind at ${width}px`, () => {
+  test.describe(`event creation drafts at ${width}px`, () => {
     test.use({ viewport: { width, height: 900 } });
     test.beforeEach(async ({ page }) => {
-      await page.goto("login");
-      await page.getByRole("button", { name: "Use the demo account" }).click();
+      await page.goto("login"); await page.getByRole("button", { name: "Use the demo account" }).click();
       await expect(page.getByRole("heading", { name: "Scheduling", exact: true })).toBeVisible();
     });
-
-    test("keyboard selection creates a group directly, then saves and reopens it", async ({ page }, info) => {
-      const posts: string[] = [];
-      page.on("request", r => { if (r.method() === "POST" && r.url().endsWith("/api/event-types")) posts.push(r.postData()!); });
-      const trigger = page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true });
-      await trigger.focus(); await trigger.press("ArrowDown");
-      const menu = page.getByRole("menu", { name: "Create", exact: true });
-      await expect(menu.getByRole("menuitem", { name: "One-on-one", exact: true })).toBeFocused();
-      await page.keyboard.press("ArrowDown");
-      await expect(menu.getByRole("menuitem", { name: "Group", exact: true })).toBeFocused();
-      expect(posts).toEqual([]);
-      const box = await menu.boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-      await page.screenshot({ path: info.outputPath("create-kinds.png") });
-      await page.keyboard.press("Escape"); await expect(trigger).toBeFocused(); await expect(menu).toHaveCount(0);
-      await trigger.press("ArrowDown"); await page.keyboard.press("ArrowDown");
-      const created = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith("/api/event-types"));
-      await page.keyboard.press("Enter"); const response = await created; expect(response.ok()).toBeTruthy();
-      const event = await response.json(); expect(event.kind).toBe("group"); expect(posts).toEqual(['{"kind":"group"}']);
-      const editor = page.getByRole("dialog", { name: "Edit event type" });
-      await expect(editor.getByTestId("event-kind")).toContainText("Group");
-      await expect(editor.getByLabel("Invitee limit", { exact: true })).toHaveValue("2");
-      await expect(editor.getByRole("combobox", { name: "Type", exact: true })).toHaveCount(0);
-      const title = `Group ${width} ${Date.now()}`;
-      await editor.getByLabel("Name", { exact: true }).fill(title);
-      await editor.getByRole("button", { name: "Save changes", exact: true }).click();
-      await expect(editor.locator("footer").getByRole("status")).toHaveText("Changes saved");
-      await page.screenshot({ path: info.outputPath("created-group.png") });
-      await editor.getByRole("button", { name: "Close", exact: true }).click(); await page.reload();
-      await page.getByRole("button", { name: `Edit ${title}`, exact: true }).click();
-      await expect(editor.getByTestId("event-kind")).toContainText("Group");
-      const conversion = await page.request.patch(`api/event-types/${event.id}`, { data: { kind: "one_on_one", title: "Must not save" } });
-      expect(conversion.status()).toBe(409); expect(await conversion.json()).toEqual({ error: "event_kind_locked" });
+    test("keyboard selection opens an unsaved group and only Create inserts it", async ({ page }, info) => {
+      const posts: string[] = []; page.on("request", request => { if (request.method() === "POST" && request.url().endsWith("/api/event-types")) posts.push(request.postData()!); });
+      const count = await page.getByTestId("event-type").count();
+      const trigger = page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }); await trigger.focus(); await trigger.press("ArrowDown");
+      const menu = page.getByRole("menu", { name: "Create", exact: true }); await expect(menu.getByRole("menuitem", { name: "One-on-one", exact: true })).toBeFocused(); await page.keyboard.press("ArrowDown"); await expect(menu.getByRole("menuitem", { name: "Group", exact: true })).toBeFocused();
+      await page.screenshot({ path: info.outputPath("create-menu.png") }); await page.keyboard.press("Enter");
+      const draft = page.getByRole("dialog", { name: "New event type", exact: true }); await expect(draft.getByLabel("Name", { exact: true })).toBeFocused(); await expect(draft.getByLabel("Invitee limit", { exact: true })).toHaveValue("2"); expect(posts).toEqual([]); await expect(page.getByTestId("event-type")).toHaveCount(count);
+      const title = `Draft group ${width} ${Date.now()}`; await draft.getByLabel("Name", { exact: true }).fill(title); await page.waitForTimeout(800); expect(posts).toEqual([]);
+      const box = await draft.boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width); expect(box!.height).toBeLessThanOrEqual(900);
+      await page.screenshot({ path: info.outputPath("event-draft-before-create.png") }); await info.attach("event-draft-styles.json", { contentType: "application/json", body: JSON.stringify(await draft.evaluate(element => { const style = getComputedStyle(element); return { fontFamily: style.fontFamily, fontSize: style.fontSize, color: style.color, padding: style.padding, width: style.width }; })) });
+      const pending = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/event-types")); await draft.getByRole("button", { name: "Create", exact: true }).click(); const response = await pending; expect(response.status()).toBe(201); const result = await response.json(); expect(result.event.kind).toBe("group"); expect(posts).toHaveLength(1);
+      const editor = page.getByRole("dialog", { name: "Edit event type", exact: true }); await expect(editor.getByLabel("Name", { exact: true })).toHaveValue(title); await expect(page.getByTestId("event-type")).toHaveCount(count + 1); await page.screenshot({ path: info.outputPath("event-draft-created.png") });
+      await editor.getByRole("button", { name: "Close", exact: true }).click(); await page.reload(); await expect(page.getByRole("button", { name: `Edit ${title}`, exact: true })).toBeVisible();
+      const conversion = await page.request.patch(`api/event-types/${result.event.id}`, { data: { kind: "one_on_one" } }); expect(conversion.status()).toBe(409); await page.request.delete(`api/event-types/${result.event.id}`);
     });
-
-    test("creation from another scheduling tab preserves the chosen kind without repeating on reload", async ({ page }) => {
-      await page.goto("app/polls");
-      const posts: string[] = []; page.on("request", r => { if (r.method() === "POST" && r.url().endsWith("/api/event-types")) posts.push(r.postData()!); });
-      await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click();
-      await page.getByRole("menuitem", { name: "One-on-one", exact: true }).click();
-      const editor = page.getByRole("dialog", { name: "Edit event type" });
-      await expect(editor.getByTestId("event-kind")).toContainText("One-on-one");
-      expect(posts).toEqual(['{"kind":"one_on_one"}']);
-      await expect(page).toHaveURL(/\/calendlyisdead\/app$/);
-      await page.reload(); await expect(editor).toHaveCount(0); expect(posts).toHaveLength(1);
+    test("Cancel and Escape leave no event, with confirmation for edited drafts", async ({ page }) => {
+      const count = await page.getByTestId("event-type").count(); let writes = 0; page.on("request", request => { if (["POST", "PATCH", "DELETE"].includes(request.method()) && request.url().includes("/api/event-types")) writes++; });
+      const trigger = page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }); await trigger.click(); await page.getByRole("menuitem", { name: "One-on-one", exact: true }).click(); const draft = page.getByRole("dialog", { name: "New event type" }); await draft.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(draft).toHaveCount(0); await expect(trigger).toBeFocused();
+      await trigger.click(); await page.getByRole("menuitem", { name: "Group", exact: true }).click(); await draft.getByLabel("Name", { exact: true }).fill("Discard me"); page.once("dialog", dialog => dialog.dismiss()); await draft.getByRole("button", { name: "Cancel", exact: true }).click(); await expect(draft).toBeVisible(); page.once("dialog", dialog => dialog.accept()); await page.keyboard.press("Escape"); await expect(draft).toHaveCount(0); expect(writes).toBe(0); await page.reload(); await expect(page.getByTestId("event-type")).toHaveCount(count);
     });
-
-    test("uncertain creation does not add a phantom card or blindly retry", async ({ page }, info) => {
-      const count = await page.getByTestId("event-type").count(); let posts = 0;
-      await page.route("**/api/event-types", async route => {
-        if (route.request().method() !== "POST") return route.continue();
-        posts++; await route.fulfill({ status: 503, body: "Unavailable" });
-      });
-      for (let attempt = 0; attempt < 2; attempt++) {
-        await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click();
-        await page.getByRole("menuitem", { name: "Group", exact: true }).click();
-        await expect(page.getByRole("alert")).toContainText("Creation could not be confirmed");
-      }
-      expect(posts).toBe(1); await expect(page.getByTestId("event-type")).toHaveCount(count);
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Reload event types", exact: true })).toBeVisible();
-      await page.screenshot({ path: info.outputPath("create-failure.png") });
+    test("creation from another tab consumes the request without saving or repeating on reload", async ({ page }) => {
+      await page.goto("app/polls"); let posts = 0; page.on("request", request => { if (request.method() === "POST" && request.url().endsWith("/api/event-types")) posts++; }); await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click(); await page.getByRole("menuitem", { name: "One-on-one", exact: true }).click(); await expect(page.getByRole("dialog", { name: "New event type" })).toBeVisible(); await expect(page).toHaveURL(/\/calendlyisdead\/app$/); expect(posts).toBe(0); await page.reload(); await expect(page.getByRole("dialog")).toHaveCount(0); expect(posts).toBe(0);
+    });
+    test("lost-response retry finds the same event without a duplicate card", async ({ page }, info) => {
+      const count = await page.getByTestId("event-type").count(); let id = "", payload = "";
+      await page.route("**/api/event-types", async route => { if (route.request().method() !== "POST") return route.continue(); payload = route.request().postData()!; const response = await route.fetch(); expect(response.status()).toBe(201); id = (await response.json()).event.id; await route.abort(); });
+      await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click(); await page.getByRole("menuitem", { name: "Group", exact: true }).click(); const draft = page.getByRole("dialog", { name: "New event type" }); await draft.getByLabel("Name", { exact: true }).fill(`Retry ${width} ${Date.now()}`); await draft.getByRole("button", { name: "Create", exact: true }).click(); await expect(draft.getByRole("alert")).toContainText("draft is still here"); await expect(draft.getByRole("alert")).toBeFocused(); await expect(page.getByTestId("event-type")).toHaveCount(count); await page.screenshot({ path: info.outputPath("event-create-uncertain.png") });
+      await page.unroute("**/api/event-types"); const pending = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/event-types")); await draft.getByRole("button", { name: "Create", exact: true }).click(); const retry = await pending; expect(retry.status()).toBe(200); expect(retry.request().postData()).toBe(payload); expect(await retry.json()).toMatchObject({ replayed: true, event: { id } }); await expect(page.getByTestId("event-type")).toHaveCount(count + 1); await page.request.delete(`api/event-types/${id}`);
+    });
+    test("validates drafts and preserves a custom link on a name change", async ({ page }) => {
+      await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click(); await page.getByRole("menuitem", { name: "Group", exact: true }).click(); const draft = page.getByRole("dialog", { name: "New event type" }); await draft.getByRole("button", { name: "Create", exact: true }).click(); await expect(draft.getByRole("alert")).toContainText("Name:"); await draft.getByLabel("Name", { exact: true }).fill("Original title"); await draft.getByRole("button", { name: /^Booking page options/ }).click(); const slug = `custom-${width}-${Date.now()}`; await draft.getByLabel("Link", { exact: true }).fill(slug); await draft.getByRole("button", { name: /^Basics/ }).click(); await draft.getByLabel("Name", { exact: true }).fill("Revised title");
+      const pending = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/event-types")); await draft.getByRole("button", { name: "Create", exact: true }).click(); const response = await pending, result = await response.json(); expect(result.event).toMatchObject({ title: "Revised title", slug }); expect(JSON.parse(response.request().postData()!).autoSlug).toBe(false); await page.request.delete(`api/event-types/${result.event.id}`);
+    });
+    test("does not overwrite a created event when an uncertain draft is edited", async ({ page }) => {
+      let id = ""; await page.route("**/api/event-types", async route => { const response = await route.fetch(); id = (await response.json()).event.id; await route.abort(); }); await page.locator(".cs-actions").getByRole("button", { name: "Create", exact: true }).click(); await page.getByRole("menuitem", { name: "One-on-one", exact: true }).click(); const draft = page.getByRole("dialog", { name: "New event type" }); await draft.getByLabel("Name", { exact: true }).fill("Original saved request"); await draft.getByRole("button", { name: "Create", exact: true }).click(); await expect(draft.getByRole("alert")).toBeVisible(); await page.unroute("**/api/event-types"); await draft.getByLabel("Name", { exact: true }).fill("Unsaved later edit"); await draft.getByRole("button", { name: "Create", exact: true }).click(); await expect(draft.getByRole("alert")).toContainText("earlier Create request"); await expect(draft.getByRole("button", { name: "Create", exact: true })).toBeDisabled(); await expect(draft.getByLabel("Name", { exact: true })).toHaveValue("Unsaved later edit"); await page.request.delete(`api/event-types/${id}`);
     });
   });
 }

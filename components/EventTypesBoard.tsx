@@ -3,6 +3,7 @@ import { BP } from "@/lib/basepath";
 import { I } from "@/components/app/icons";
 import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
 import { EventTypePatch } from "@/lib/event-type-validation";
+import { initialEventFields, NewEventFields, eventSlug } from "@/lib/event-creation-validation";
 import { HostMeetingLimits } from "./HostMeetingLimits";
 import { START_INTERVAL_PRESETS, MIN_START_INTERVAL_MIN, MAX_START_INTERVAL_MIN } from "@/lib/start-increments";
 import { setEventVisibility } from "@/lib/event-visibility-client";
@@ -12,7 +13,7 @@ import { BookingDateRangeFields } from "./BookingDateRangeFields";
 import { ContactCustomFieldAutomations } from "./ContactFieldAutomation";
 import { OpportunityAutomationsPanel } from "./OpportunityAutomations";
 import { ContactListAutomationPanel } from "./ContactListAutomation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; dateRange: BookingDateRange | null; active: boolean; secret: boolean; lockedTimezone: string | null;
   scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
@@ -41,29 +42,18 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
   const [boardError, setBoardError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const busyRef = useRef(false);
-  const [creationUncertain, setCreationUncertain] = useState(false);
-  const creationUncertainRef = useRef(false);
+  const [draft, setDraft] = useState<ET | null>(null);
+  const draftOpen = useRef(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const open = items.find(i => i.id === openId) ?? null;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
-  async function create(kind: PersonalKind) {
-    if (busyRef.current) return;
-    if (creationUncertainRef.current) { setBoardError("Creation could not be confirmed. Reload to check your event types before creating another."); return; }
-    busyRef.current = true; setBusy("create"); setBoardError("");
-    const abort = new AbortController(); const timeout = setTimeout(() => abort.abort(), 15_000);
-    try {
-      const response = await fetch(BP + "/api/event-types", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }), signal: abort.signal });
-      if (response.status === 401) { setBoardError("Sign in again to create an event type."); return; }
-      if (!response.ok) throw new Error("create_failed");
-      const et = await response.json();
-      if (typeof et?.id !== "string" || !et.id || et.kind !== kind || !NEW_EVENT_FIELDS.safeParse(et).success ||
-        (kind === "group" && et.seats < 2) || !Array.isArray(et.lockedFields)) throw new Error("invalid_response");
-      setItems(x => [...x, et]); setQ(""); setOpenId(et.id);
-    } catch {
-      creationUncertainRef.current = true; setCreationUncertain(true);
-      setBoardError("Creation could not be confirmed. Reload to check your event types before creating another.");
-    } finally { clearTimeout(timeout); busyRef.current = false; setBusy(null); }
-  }
+  const create = useCallback((kind: PersonalKind) => {
+    if (busyRef.current || draftOpen.current) return;
+    draftOpen.current = true; setBoardError(""); setOpenId(null);
+    const fields = initialEventFields(kind, schedules.find(schedule => schedule.isDefault)?.id ?? null);
+    setDraft({ ...fields, id: crypto.randomUUID(), rangeDays: 60, secret: false, managedParentId: null, lockedFields: [], teamId: null });
+  }, [schedules]);
+  const closeDraft = () => { draftOpen.current = false; setDraft(null); };
   async function remove(et: ET) {
     const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "DELETE" });
     if (!response.ok) throw new Error("delete_failed");
@@ -102,14 +92,13 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
       if (["1", "one_on_one", "group"].includes(kind)) void create(kind === "group" ? "group" : "one_on_one");
     }
     return () => removeEventListener("cid:create-event-type", f);
-  }, []);
+  }, [create]);
   const [q, setQ] = useState("");
   const shown = items.filter(i => !q || i.title.toLowerCase().includes(q.toLowerCase()));
   const sched = schedules.find(x => x.id === (shown[0]?.scheduleId ?? ""))?.name;
   return <>
     {boardError && <p role="alert" className="cs-board-error">{boardError}</p>}
-    {creationUncertain && <button className="cs-btn cs-outline" onClick={() => location.reload()}>Reload event types</button>}
-    {busy && <p role="status" className="muted">{busy === "create" ? "Creating event type…" : "Updating event type…"}</p>}
+    {busy && <p role="status" className="muted">Updating event type…</p>}
     <div className="cs-search">{I.search(18)}<input ref={searchInput} placeholder="Search event types" aria-label="Search event types" value={q} onChange={e => setQ(e.target.value)} /></div>
     <div className="cs-grp"><span className="cs-av">{(owner || username)[0]?.toUpperCase()}</span><b>{owner || username}</b>
       <a href={`${BP}/${username}`} target="_blank">View landing page {I.ext(14)}</a></div>
@@ -130,6 +119,9 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
         bookingUrl={`${BP}/${username}/${et.slug}`} embedUrl={`/app/embed?event=${encodeURIComponent(et.slug)}`}
         onAction={action => { void act(action, et); }} />
     </div>)}
+    {draft && <EventTypeEditor key={draft.id} et={draft} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={closeDraft}
+      onCreate={(event, replayed) => { setItems(items => [...items.filter(item => item.id !== event.id), event]); setQ(""); closeDraft(); setOpenId(event.id); flash(replayed ? "Event type already created" : "Event type created"); }}
+      onChange={() => {}} onSaved={() => {}} onDelete={async () => {}} />}
     {open && <EventTypeEditor key={open.id} et={open} username={username} schedules={schedules} defaultTimezone={defaultTimezone} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
       onDelete={() => remove(open)} />}
@@ -137,7 +129,9 @@ export function EventTypesBoard({ initial, username, schedules, owner, defaultTi
   </>;
 }
 
-export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UTC", onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; defaultTimezone?: string; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void> }) {
+export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UTC", onClose, onChange, onSaved, onDelete, onCreate }: { et: ET; username: string; schedules: Sch[]; defaultTimezone?: string; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void>; onCreate?(event: ET, replayed: boolean): void }) {
+  const creating = !!onCreate;
+  const [slugEdited, setSlugEdited] = useState(false), [creationAttempted, setCreationAttempted] = useState(false), [creationBlocked, setCreationBlocked] = useState(false);
   const [d, setD] = useState(et);
   const [baseline, setBaseline] = useState(et);
   const [zoneSearch, setZoneSearch] = useState("");
@@ -161,7 +155,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
   const [saveCount, setSaveCount] = useState(0);
   const requestPending = useRef(false);
   const controller = useRef<AbortController | null>(null);
-  const dirty = JSON.stringify(draftBody(d)) !== JSON.stringify(draftBody(baseline));
+  const dirty = creationAttempted || JSON.stringify(draftBody(d)) !== JSON.stringify(draftBody(baseline));
   const pending = saving || deleting;
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
@@ -174,15 +168,17 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
   useEffect(() => { if (saveCount) closeButton.current?.focus(); }, [saveCount]);
   function requestClose() {
     if (requestPending.current) return;
-    if (!dirty || confirm("Discard unsaved changes?")) onClose();
+    if (!dirty || confirm(creationAttempted ? "A Create request was sent and may have completed. Close this draft? Reload event types to check for the saved event before creating another." : "Discard unsaved changes?")) onClose();
   }
   async function save() {
-    if (requestPending.current || !dirty) return;
+    if (requestPending.current || creationBlocked || (!dirty && !creating)) return;
     const body = draftBody(d);
-    const parsed = EventTypePatch.safeParse(body);
+    const parsed = creating ? NewEventFields.safeParse(body) : EventTypePatch.safeParse(body);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      if (issue.path[0] === "startIntervalMin" || issue.path[0] === "lockedTimezone") setSect("link");
+      if (["slug", "startIntervalMin", "lockedTimezone"].includes(String(issue.path[0]))) setSect("link");
+      if (["title", "durationMin", "seats", "color"].includes(String(issue.path[0]))) setSect("basics");
+      if (issue.path[0] === "questions") setSect("questions");
       if (issue.path[0] === "dateRange" || issue.path[0] === "minNoticeMin") setSect("avail");
       setErr(`${FIELD_NAMES[String(issue.path[0])] ?? "Event settings"}: ${issue.message}`);
       return;
@@ -191,14 +187,17 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
       setSect("questions"); setErr("Enter a label for every question and at least one choice for each choice question."); return;
     }
     if (d.kind === "group" && d.seats < 2) { setSect("basics"); setErr("Invitee limit must be at least 2."); return; }
-    requestPending.current = true; setSaving(true); setErr("");
+    requestPending.current = true; setSaving(true); setErr(""); if (creating) setCreationAttempted(true);
     const abort = new AbortController(); controller.current = abort;
     const timeout = setTimeout(() => abort.abort(), 15_000);
     try {
-      const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data), signal: abort.signal });
-      const result = await response.json();
+      const response = await fetch(`${BP}/api/event-types${creating ? "" : `/${et.id}`}`, { method: creating ? "POST" : "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(creating ? { draftId: et.id, autoSlug: !slugEdited, settings: parsed.data } : parsed.data), signal: abort.signal });
+      const raw = await response.json(), result = creating && response.ok ? raw?.event : raw;
       if (!response.ok) {
-        if (result?.error === "group_settings_locked" && result.settings?.kind === "group" &&
+        if (creating && ["creation_conflict", "created_event_deleted"].includes(result?.error)) {
+          setCreationBlocked(true);
+          setErr(result.error === "created_event_deleted" ? "This event was already created and then deleted. Close this draft and start a new event type." : "An earlier Create request used this draft. Reload event types to review the saved event before creating another.");
+        } else if (result?.error === "group_settings_locked" && result.settings?.kind === "group" &&
           typeof result.settings.durationMin === "number" && typeof result.settings.location === "string") {
           const settings = { kind: "group", durationMin: result.settings.durationMin, location: result.settings.location };
           setGroupLocked(true);
@@ -207,6 +206,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           setBaseline(current => ({ ...current, ...settings }));
           setErr("This group event was booked. Its duration and location can no longer change. Your other edits are still here; save again to apply them.");
         } else if (result?.error === "slug_taken") { setSect("link"); setErr("That link is already used. Choose another link and save again."); }
+        else if (creating && result?.error === "too_large") setErr("Event details are too long. Shorten the description or invitee questions before trying again.");
         else if (result?.error === "unauthorized") setErr("Your session expired. Your edits have not been saved. Sign in again before saving.");
         else if (result?.error === "locked") setErr("Your team changed the locked settings. Your edits have not been saved. Copy your changes before reloading.");
         else if (result?.error === "event_kind_locked") setErr("An event type cannot be converted to another kind. Create a new event type instead.");
@@ -216,11 +216,17 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
       }
       if (!result || result.id !== et.id || !Object.keys(body).every(key => Object.hasOwn(result, key)) ||
         !EventTypePatch.safeParse(Object.fromEntries(Object.keys(body).map(key => [key, result[key]]))).success) throw new Error("invalid_response");
+      if (creating) {
+        const confirmed = NewEventFields.safeParse(Object.fromEntries(Object.keys(body).map(key => [key, result[key]])));
+        if (typeof raw.replayed !== "boolean" || result.kind !== d.kind || !NEW_EVENT_FIELDS.safeParse(result).success || !Array.isArray(result.lockedFields) || !confirmed.success ||
+          (!raw.replayed && !Object.entries(parsed.data).every(([key, value]) => (key === "slug" && !slugEdited) || JSON.stringify(confirmed.data[key as keyof typeof confirmed.data]) === JSON.stringify(value)))) throw new Error("invalid_creation_response");
+        onCreate!({ ...d, ...result }, raw.replayed); return;
+      }
       const saved: ET = { ...d, ...result };
       if (saved.groupSettingsLocked) setGroupLocked(true);
       setD(saved); setBaseline(saved); setSaveCount(count => count + 1); onChange(saved); onSaved();
     } catch {
-      setErr("Saving could not be confirmed. Your edits are still here. Try saving again.");
+      setErr(creating ? "Creation could not be confirmed. Your draft is still here. Try Create again to check the same request." : "Saving could not be confirmed. Your edits are still here. Try saving again.");
     } finally {
       clearTimeout(timeout); controller.current = null; requestPending.current = false; setSaving(false);
     }
@@ -232,20 +238,21 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
     <button onClick={() => setSect(sect === id ? "" : id)} aria-expanded={sect === id}><span><b>{title}</b><small>{summary}</small></span><span>{sect === id ? "–" : "+"}</span></button>
     {sect === id && <div style={{ paddingBottom: 16 }}>{children}</div>}
   </div>;
-  return <dialog ref={dialog} className="pane" aria-label="Edit event type" aria-modal="true"
+  return <dialog ref={dialog} className="pane" aria-label={creating ? "New event type" : "Edit event type"} aria-modal="true"
     onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onClick={event => {
       if (event.target !== event.currentTarget) return;
       const bounds = event.currentTarget.getBoundingClientRect();
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) requestClose();
     }}>
-      <header><b>Edit event type</b><button ref={closeButton} className="btn" disabled={pending} onClick={requestClose} aria-label="Close">✕</button></header>
+      <header><b>{creating ? "New event type" : "Edit event type"}</b><button ref={closeButton} className="btn" disabled={pending} onClick={requestClose} aria-label="Close">✕</button></header>
       <div className="body">
         {err && <p ref={errorMessage} role="alert" tabIndex={-1} style={{ color: "var(--warn)" }}>{err}</p>}
+        {creationBlocked && <button className="btn" onClick={() => location.reload()}>Reload event types</button>}
         {groupLocked && <p id="group-settings-lock" className="muted" role="status">This group event has bookings. Duration, location and event type are locked. Create a new event type to use different settings.</p>}
         {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
         <fieldset className="editor-fields" disabled={pending} aria-label="Event settings">
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
-          <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
+          <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={event => setD({ ...d, title: event.target.value, ...(creating && !slugEdited ? { slug: eventSlug(event.target.value) } : {}) })} />
           <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
           <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
           <p className="muted" data-testid="event-kind">{KIND_LABEL[d.kind] ?? "Event type"} · To use another kind, create a new event type.</p>
@@ -255,7 +262,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <input className="input" list="locs" aria-label="Location" disabled={L("location")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
           <datalist id="locs"><option>Google Meet</option><option>Zoom</option><option>Phone call</option><option>In person</option></datalist></> })}
         {S({ id: "link", title: "Booking page options", summary: `/${username}/${d.slug} · ${Number.isFinite(d.startIntervalMin) ? `${d.startIntervalMin} min` : "Custom"} increments`, children: <>
-          <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />
+          <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => { setSlugEdited(true); setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") }); }} />
           <label className="f" htmlFor="et-start-interval">Start time increments</label>
           <select id="et-start-interval" className="input" disabled={L("startIntervalMin")} value={customInterval ? "custom" : String(d.startIntervalMin)} aria-describedby="et-start-help" onChange={event => {
             const custom = event.target.value === "custom"; setCustomInterval(custom);
@@ -288,7 +295,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <label className="f" htmlFor="et-mpm">Max bookings per month (blank = no limit)</label>
           <input id="et-mpm" disabled={L("maxPerMonth")} className="input" type="number" min={1} max={2147483647} value={d.maxPerMonth ?? ""} onChange={e => setD({ ...d, maxPerMonth: e.target.value ? Number(e.target.value) : null })} />
           <p className="muted">Meeting limits apply across this event type’s hosts. A group session counts once, even when several invitees join.</p>
-          <HostMeetingLimits eventId={et.id} /></> })}
+          {!creating && <HostMeetingLimits eventId={et.id} />}</> })}
         {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"} · ${dateRangeSummary(effectiveDateRange(d))} · ${d.minNoticeMin / 60}h notice`, children: <>
           <BookingDateRangeFields value={effectiveDateRange(d)} disabled={L("dateRange") || L("rangeDays")} onChange={dateRange => setD({ ...d, dateRange })} />
           <p className="muted">{d.teamId ? "Dates use the event creator’s default schedule time zone." : "Dates use your selected availability schedule’s time zone."}</p>
@@ -311,7 +318,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
                 value={(q.options ?? []).join(", ")} onChange={e => up({ options: e.target.value.split(",").map(x => x.trim()) })} />}
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
-        {S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /><OpportunityAutomationsPanel eventId={et.id} /></> })}
+        {!creating && S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <><ContactListAutomationPanel eventId={et.id} /><ContactCustomFieldAutomations eventId={et.id} /><OpportunityAutomationsPanel eventId={et.id} /></> })}
         {S({ id: "pay", title: "Payment and confirmation", summary: `${d.priceCents ? `${(d.priceCents / 100).toFixed(2)} ${d.currency.toUpperCase()}` : "Free"}${d.redirectUrl ? " · redirects after booking" : ""}`, children: <>
           <label className="f" htmlFor="et-price">Price (0 = free)</label>
           <input id="et-price" className="input" type="number" min={0} step="0.01" value={(d.priceCents ?? 0) / 100} onChange={e => setD({ ...d, priceCents: Math.round(Number(e.target.value || 0) * 100) })} />
@@ -320,7 +327,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
           <p className="muted" style={{ fontSize: 13 }}>Payments go through Stripe Checkout when STRIPE_SECRET_KEY is set; otherwise a demo checkout is shown.</p>
           <label className="f" htmlFor="et-redirect">Redirect after booking (optional)</label>
           <input id="et-redirect" className="input" placeholder="https://example.com/thanks" value={d.redirectUrl ?? ""} onChange={e => setD({ ...d, redirectUrl: e.target.value.trim() || null })} /></> })}
-        {!d.managedParentId && <button className="btn danger" disabled={deleting} onClick={async () => {
+        {!creating && !d.managedParentId && <button className="btn danger" disabled={deleting} onClick={async () => {
           if (requestPending.current) return;
           if (!confirm("Delete this event type? Scheduled meetings will remain unchanged.")) return;
           requestPending.current = true; setDeleting(true);
@@ -333,7 +340,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
       <footer className="editor-actions">
         <span className="muted" role="status">{saving ? "Saving…" : dirty ? "Unsaved changes" : saveCount ? "Changes saved" : ""}</span>
         <button className="btn" disabled={pending} onClick={requestClose}>Cancel</button>
-        <button className="btn primary" disabled={pending || !dirty} onClick={() => { void save(); }}>Save changes</button>
+        <button className="btn primary" disabled={pending || creationBlocked || (!dirty && !creating)} onClick={() => { void save(); }}>{creating ? "Create" : "Save changes"}</button>
       </footer>
     </dialog>;
 }
