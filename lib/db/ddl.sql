@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS contacts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS contacts_active_owner_email ON contacts ("userId", lower(email)) WHERE "deletedAt" IS NULL;
 CREATE INDEX IF NOT EXISTS contacts_owner_email_history ON contacts ("userId", lower(email));
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS bookings_contact_lookup ON bookings ("hostId", lower(btrim("inviteeEmail")));
 CREATE TABLE IF NOT EXISTS contact_meetings (
   "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
@@ -149,3 +150,16 @@ CREATE TABLE IF NOT EXISTS contact_reminder_digests (
   "createdAt" timestamptz NOT NULL, "attemptedAt" timestamptz NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS contact_reminder_daily ON contact_reminder_digests ("userId", day);
+CREATE TABLE IF NOT EXISTS contact_collections (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, kind text NOT NULL,
+  rules jsonb NOT NULL, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS contact_collections_owner_name ON contact_collections ("userId", lower(name)) WHERE "deletedAt" IS NULL;
+CREATE TABLE IF NOT EXISTS contact_list_members (
+  "collectionId" text NOT NULL REFERENCES contact_collections(id) ON DELETE CASCADE, "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  PRIMARY KEY ("collectionId", "contactId")
+);
+CREATE TABLE IF NOT EXISTS contact_membership_receipts (
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, id text NOT NULL, "requestHash" text NOT NULL, result jsonb NOT NULL,
+  PRIMARY KEY ("userId", id)
+);

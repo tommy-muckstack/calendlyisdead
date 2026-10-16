@@ -1,0 +1,33 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
+import type { ContactField } from "@/lib/contact-field-validation";
+import { CONTACT_SOURCES, EMPTY_RULES, FILTER_OPERATORS, ViewCondition, fieldOperators, filterFields, normalizeContactRules, type ContactRuleSet } from "@/lib/contact-view-validation";
+export function ContactViewFilters({ initial, fields, timezone, onApply, onClose }: { initial: ContactRuleSet; fields: ContactField[]; timezone: string; onApply(rules: ContactRuleSet): void; onClose(): void }) {
+  const [draft, setDraft] = useState(initial), [error, setError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null), alert = useRef<HTMLParagraphElement>(null), add = useRef<HTMLButtonElement>(null), choices = filterFields(fields);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  useEffect(() => { const before = document.activeElement, panel = dialog.current; panel?.showModal(); return () => { panel?.close(); if (before instanceof HTMLElement && before.isConnected) before.focus(); }; }, []);
+  useEffect(() => { if (error) alert.current?.focus(); }, [error]);
+  function close() { if (!dirty || confirm("Discard unapplied filters?")) onClose(); }
+  function apply() { try { onApply(normalizeContactRules(draft, fields)); } catch (cause) { setError(cause instanceof Error ? cause.message : "Check the filter values."); } }
+  return <dialog ref={dialog} className="contact-dialog contact-filter-dialog" aria-labelledby="contact-filter-title" onCancel={event => { event.preventDefault(); close(); }}><form noValidate onSubmit={event => { event.preventDefault(); apply(); }}>
+    <header><h2 id="contact-filter-title">Filter contacts</h2><button className="btn" type="button" onClick={close} aria-label="Close filters">Close</button></header>
+    <label htmlFor="contact-filter-match">Match conditions</label><select id="contact-filter-match" className="input" value={draft.match} onChange={event => setDraft({ ...draft, match: event.target.value as ContactRuleSet["match"] })}><option value="all">All conditions</option><option value="any">Any condition</option></select>
+    {draft.conditions.map((condition, index) => {
+      const field = choices.find(field => field.id === condition.field), operators = field ? fieldOperators(field) : [], prefix = `contact-filter-${index}`;
+      const update = (patch: Partial<typeof condition>) => setDraft({ ...draft, conditions: draft.conditions.map((current, at) => at === index ? { ...current, ...patch } : current) });
+      const relative = condition.operator === "within" || condition.operator === "not_within", valueNeeded = !["blank", "today", "yesterday", "within", "not_within"].includes(condition.operator);
+      return <fieldset className="contact-filter-condition" key={index}><legend>Condition {index + 1}</legend><div className="contact-filter-grid">
+        <label htmlFor={`${prefix}-field`}>Field<select id={`${prefix}-field`} className="input" value={condition.field} onChange={event => { const next = choices.find(field => field.id === event.target.value)!; update({ field: next.id, operator: fieldOperators(next)[0], value: "", to: "" }); }}>{!field && <option value={condition.field}>Unavailable field — choose another</option>}{choices.map(field => <option key={field.id} value={field.id}>{field.label}</option>)}</select></label>
+        <label htmlFor={`${prefix}-operator`}>Condition<select id={`${prefix}-operator`} className="input" value={condition.operator} onChange={event => update({ operator: event.target.value as typeof condition.operator })}>{!operators.includes(condition.operator) && <option value={condition.operator}>Unavailable condition</option>}{operators.map(operator => <option key={operator} value={operator}>{FILTER_OPERATORS[operator]}</option>)}</select></label>
+        {relative && <><label htmlFor={`${prefix}-direction`}>Period<select className="input" id={`${prefix}-direction`} value={condition.direction} onChange={event => update({ direction: event.target.value as typeof condition.direction })}><option value="past">Past, including today</option><option value="future">Next, including today</option></select></label><label htmlFor={`${prefix}-days`}>Days<input className="input" id={`${prefix}-days`} type="number" min={1} max={36500} value={Number.isNaN(condition.days) ? "" : condition.days} onChange={event => update({ days: event.target.value ? Number(event.target.value) : NaN })} /></label></>}
+        {valueNeeded && <label htmlFor={`${prefix}-value`}>{condition.operator === "between" ? "From date" : "Value"}{field?.options ? <select className="input" id={`${prefix}-value`} value={condition.value} onChange={event => update({ value: event.target.value })}><option value="">Choose an option</option>{condition.value && !field.options.includes(condition.value) && <option value={condition.value}>Unavailable: {condition.value}</option>}{field.options.map(option => <option key={option} value={option}>{field.id === "source" ? CONTACT_SOURCES[option as keyof typeof CONTACT_SOURCES] : option}</option>)}</select> : <input className="input" id={`${prefix}-value`} type={field?.type === "date" ? "date" : "text"} inputMode={field?.type === "number" || field?.type === "currency" ? "decimal" : undefined} value={condition.value} maxLength={2000} onChange={event => update({ value: event.target.value })} />}</label>}
+        {condition.operator === "between" && <label htmlFor={`${prefix}-to`}>Through date<input className="input" id={`${prefix}-to`} type="date" value={condition.to} onChange={event => update({ to: event.target.value })} /></label>}
+      </div><button className="btn" type="button" aria-label={`Remove condition ${index + 1}`} onClick={() => { setDraft({ ...draft, conditions: draft.conditions.filter((_, at) => at !== index) }); add.current?.focus(); }}>Remove condition</button></fieldset>;
+    })}
+    <button ref={add} className="btn" type="button" disabled={draft.conditions.length >= 20} onClick={() => setDraft({ ...draft, conditions: [...draft.conditions, ViewCondition.parse({ field: "name", operator: "contains" })] })}>+ Add condition</button>
+    <p className="muted">Dates use {timezone}. Date ranges include both endpoints; relative ranges include today. Empty values match only “Is blank”. Filters update the displayed contacts; use Save view to keep changes.</p>
+    {error && <p role="alert" tabIndex={-1} ref={alert} className="contact-error">{error}</p>}
+    <footer><button className="btn" type="button" onClick={() => setDraft(EMPTY_RULES)}>Clear conditions</button><button className="btn" type="button" onClick={close}>Cancel</button><button className="btn primary">Apply</button></footer>
+  </form></dialog>;
+}

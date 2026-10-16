@@ -1,8 +1,9 @@
-import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { ContactData, ContactFields, type ContactDraft, type ContactFilter } from "./contact-validation";
 import { lockContactOwner } from "./contact-store";
 import { syncHistoricalContacts } from "./automatic-contacts";
+import { contactScopeQuery } from "./contact-query";
 
 const C = schema.contacts, CM = schema.contactMeetings, B = schema.bookings, E = schema.eventTypes;
 type DB = Awaited<ReturnType<typeof getDb>>;
@@ -27,7 +28,7 @@ export async function createContact(userId: string, id: string, input: ContactDr
   const db = await getDb(), fields = ContactFields.parse(input);
   return db.transaction(async (tx: DB) => {
     await lockContactOwner(tx, userId);
-    const inserted = await tx.insert(C).values({ ...fields, id, userId }).onConflictDoNothing().returning();
+    const inserted = await tx.insert(C).values({ ...fields, id, userId, source: "manual" }).onConflictDoNothing().returning();
     const existing = inserted[0] ?? (await tx.select().from(C).where(owned(userId, id)))[0];
     if (!existing) throw new ContactError("email_in_use", 409);
     if (existing.deletedAt || !sameFields(existing, fields)) throw new ContactError("creation_conflict", 409);
@@ -75,8 +76,7 @@ export async function getContact(userId: string, id: string) {
 export async function listContacts(userId: string, filters: ContactFilter, now = new Date()) {
   await syncHistoricalContacts(userId);
   const db = await getDb(); await linkContactMeetings(db, userId);
-  const pattern = `%${filters.q.replace(/[\\%_]/g, "\\$&")}%`;
-  const where = and(eq(C.userId, userId), isNull(C.deletedAt), filters.q ? or(ilike(C.name, pattern), ilike(C.email, pattern), ilike(C.company, pattern), ilike(C.phone, pattern)) : undefined);
+  const { where } = await contactScopeQuery(db, userId, { q: filters.q, collectionId: filters.collection, rules: filters.rules }, now);
   const dates = (direction: "next" | "last") => sql<string | null>`(SELECT ${direction === "next" ? sql`min(b.start)` : sql`max(b.start)`}
     FROM contact_meetings cm JOIN bookings b ON b.uid = cm."bookingUid"
     WHERE cm."contactId" = ${C.id} AND b."hostId" = ${userId} AND b.status != 'cancelled'

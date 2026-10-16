@@ -167,6 +167,7 @@ export const pollVotes = pgTable("poll_votes", { id: text("id").primaryKey(), po
 export const contacts = pgTable("contacts", {
   id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(), email: text("email").notNull(), phone: text("phone").notNull().default(""),
+  source: text("source").notNull().default(""),
   jobTitle: text("jobTitle").notNull().default(""), company: text("company").notNull().default(""), linkedIn: text("linkedIn").notNull().default(""),
   timezone: text("timezone").notNull().default(""), country: text("country").notNull().default(""), city: text("city").notNull().default(""), state: text("state").notNull().default(""),
   version: integer("version").notNull().default(1),
@@ -222,3 +223,13 @@ export const contactReminderDigests = pgTable("contact_reminder_digests", {
   to: text("to").notNull(), subject: text("subject").notNull(), body: text("body").notNull(), status: text("status").notNull(), attempts: integer("attempts").notNull().default(1),
   createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" }).notNull(), attemptedAt: timestamp("attemptedAt", { withTimezone: true, mode: "date" }).notNull(),
 }, d => [uniqueIndex("contact_reminder_daily").on(d.userId, d.day)]);
+export const contactCollections = pgTable("contact_collections", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), name: text("name").notNull(), kind: text("kind").notNull(),
+  rules: jsonb("rules").$type<import("../contact-view-validation").ContactRuleSet>().notNull(), version: integer("version").notNull().default(1), deletedAt: timestamp("deletedAt", { withTimezone: true, mode: "date" }),
+}, c => [uniqueIndex("contact_collections_owner_name").on(c.userId, sql`lower(${c.name})`).where(sql`${c.deletedAt} IS NULL`)]);
+export const contactListMembers = pgTable("contact_list_members", {
+  collectionId: text("collectionId").notNull().references(() => contactCollections.id, { onDelete: "cascade" }), contactId: text("contactId").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+}, m => [primaryKey({ columns: [m.collectionId, m.contactId] })]);
+export const contactMembershipReceipts = pgTable("contact_membership_receipts", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), id: text("id").notNull(), requestHash: text("requestHash").notNull(), result: jsonb("result").$type<import("../contact-list-validation").MembershipReceipt>().notNull(),
+}, r => [primaryKey({ columns: [r.userId, r.id] })]);
