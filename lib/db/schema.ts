@@ -233,3 +233,12 @@ export const contactListMembers = pgTable("contact_list_members", {
 export const contactMembershipReceipts = pgTable("contact_membership_receipts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), id: text("id").notNull(), requestHash: text("requestHash").notNull(), result: jsonb("result").$type<import("../contact-list-validation").MembershipReceipt>().notNull(),
 }, r => [primaryKey({ columns: [r.userId, r.id] })]);
+export const contactListAutomations = pgTable("contact_list_automations", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), eventTypeId: text("eventTypeId").notNull().references(() => eventTypes.id, { onDelete: "cascade" }),
+  listIds: jsonb("listIds").$type<string[]>().notNull(), enabled: boolean("enabled").notNull().default(false), version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, a => [primaryKey({ columns: [a.userId, a.eventTypeId] })]);
+export const contactListAutomationRuns = pgTable("contact_list_automation_runs", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), bookingUid: text("bookingUid").notNull().references(() => bookings.uid, { onDelete: "cascade" }),
+  inviteeEmail: text("inviteeEmail").notNull(), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, r => [primaryKey({ columns: [r.userId, r.bookingUid, r.inviteeEmail] })]);

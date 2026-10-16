@@ -21,6 +21,14 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds contact automation state and preserves pauses, tombstones and booking receipts on replay", async () => {
+    await setup(); await seat("meeting", 0); await client!.exec('DROP TABLE contact_list_automation_runs; DROP TABLE contact_list_automations;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT * FROM contact_list_automations')).rows).toEqual([]);
+    await client!.exec(`INSERT INTO contact_list_automations ("userId", "eventTypeId", "listIds", enabled, version, "deletedAt") VALUES ('host', 'group', '[]', false, 3, now());
+      INSERT INTO contact_list_automation_runs ("userId", "bookingUid", "inviteeEmail") VALUES ('host', 'meeting', 'test@example.invalid');`); await client!.exec(ddl);
+    expect((await client!.query('SELECT enabled, version, "deletedAt" IS NOT NULL AS deleted FROM contact_list_automations')).rows).toEqual([{ enabled: false, version: 3, deleted: true }]);
+    expect((await client!.query('SELECT "bookingUid", "inviteeEmail" FROM contact_list_automation_runs')).rows).toEqual([{ bookingUid: "meeting", inviteeEmail: "test@example.invalid" }]);
+  });
   it("adds contact collections and provenance without rewriting legacy contacts or saved membership", async () => {
     await setup(); await client!.exec('DROP TABLE contact_list_members; DROP TABLE contact_collections; DROP TABLE contact_membership_receipts; ALTER TABLE contacts DROP COLUMN source;');
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('person', 'host', 'Legacy', 'legacy@example.invalid');`); await client!.exec(ddl);
