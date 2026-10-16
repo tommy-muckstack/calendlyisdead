@@ -15,7 +15,7 @@ export default async function Page() {
     const kids = ets.length ? await db.select().from(schema.eventTypes).where(and(inArray(schema.eventTypes.managedParentId, ets.map((e: any) => e.id)), isNull(schema.eventTypes.deletedAt))) : [];
     return { id: t.id, name: t.name, slug: t.slug, role: mine.find((m: any) => m.teamId === t.id).role,
       members: (await teamMembers(t.id)).map(m => ({ userId: m.userId, role: m.role, name: m.user?.name ?? m.user?.email, email: m.user?.email })),
-      eventTypes: ets.map((e: any) => ({ id: e.id, title: e.title, slug: e.slug, kind: e.kind, durationMin: e.durationMin, rrMode: e.rrMode, lockedFields: e.lockedFields,
+      eventTypes: ets.map((e: any) => ({ ...e,
         hosts: hosts.filter((h: any) => h.eventTypeId === e.id).map((h: any) => ({ userId: h.userId, priority: h.priority })),
         assigned: kids.filter((k: any) => k.managedParentId === e.id).map((k: any) => k.userId) })) };
   }));

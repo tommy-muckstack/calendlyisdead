@@ -15,7 +15,7 @@ import { confirmedReservations, reservationBusy } from "./booking-busy";
 const { users, eventTypes, schedules, bookings, teams, eventTypeHosts } = schema;
 
 export type Host = { user: any; schedule: any; priority: number };
-export type Loaded = { eventType: any; ownerName: string; ownerUser: any | null; team: any | null; hosts: Host[] };
+export type Loaded = { eventType: any; ownerName: string; ownerUser: any | null; team: any | null; hosts: Host[]; limitsTimezone: string };
 
 /** owner is a username, or "team:<slug>" for team event types. */
 export async function loadEvent(owner: string, slug: string): Promise<Loaded | null> {
@@ -44,10 +44,17 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   }
   hosts = hosts.filter(h => h.user && h.schedule);
   if (!hosts.length) return null;
-  return { eventType: et, ownerName: team?.name ?? ownerUser.name ?? owner, ownerUser, team, hosts };
+  // Team-wide caps need a single calendar, even when hosts use different zones.
+  let limitsTimezone = hosts[0].schedule.timezone;
+  if (team) {
+    const schedule = await defaultSchedule(et.userId);
+    const [creator] = schedule ? [] : await db.select({ timezone: users.timezone }).from(users).where(eq(users.id, et.userId));
+    limitsTimezone = schedule?.timezone ?? creator?.timezone ?? "UTC";
+  }
+  return { eventType: et, ownerName: team?.name ?? ownerUser.name ?? owner, ownerUser, team, hosts, limitsTimezone };
 }
 
-async function hostSlots(h: Host, et: any, from: string, to: string, tz: string, now: DateTime, exclude: Set<string>, transaction?: any) {
+async function hostSlots(h: Host, et: any, from: string, to: string, tz: string, now: DateTime, exclude: Set<string>, limitsTimezone: string, transaction?: any) {
   const db = transaction ?? await getDb();
   const lo = DateTime.fromISO(from, { zone: tz }).minus({ days: 2 }).toJSDate();
   const hi = DateTime.fromISO(to, { zone: tz }).plus({ days: 2 }).toJSDate();
@@ -64,17 +71,23 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
     joinableAt: isGroup && b.eventTypeId === et.id ? b.start.toISOString() : undefined })), ...extBusy];
   const sessionBuffers = isGroup ? Object.fromEntries(existing.filter((b: any) => b.eventTypeId === et.id)
     .map((b: any) => [b.start.toISOString(), { beforeMin: b.bufferBeforeMin, afterMin: b.bufferAfterMin }])) : undefined;
-  const wLo = DateTime.fromJSDate(lo).startOf("week").minus({ days: 1 }).toJSDate(), wHi = DateTime.fromJSDate(hi).endOf("week").plus({ days: 1 }).toJSDate();
-  const forLimits = (et.maxPerDay || et.maxPerWeek)
-    ? [...new Set((await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.hostId, h.user.id), eq(bookings.status, "confirmed"), gte(bookings.start, wLo), lte(bookings.start, wHi))))
-        .filter((b: any) => !exclude.has(b.uid)).map((b: any) => b.start.toISOString()))] as string[]
-    : [];
+  const first = DateTime.fromJSDate(lo, { zone: limitsTimezone }), last = DateTime.fromJSDate(hi, { zone: limitsTimezone });
+  const limitLo = (et.maxPerMonth ? first.startOf("month") : first).startOf("week").toJSDate();
+  const limitHi = (et.maxPerMonth ? last.endOf("month") : last).endOf("week").toJSDate();
+  const limitRows = (et.maxPerDay || et.maxPerWeek || et.maxPerMonth)
+    ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.status, "confirmed"), gte(bookings.start, limitLo), lte(bookings.start, limitHi))))
+      .filter((b: typeof bookings.$inferSelect) => !exclude.has(b.uid)) : [];
+  // One group session or collective meeting consumes one allowance. Independent
+  // round-robin meetings at the same instant still consume separate allowances.
+  const meetings = new Map<string, string>();
+  for (const b of limitRows) meetings.set(isGroup ? b.start.toISOString() : b.groupUid ?? b.uid, b.start.toISOString());
+  const forLimits = [...meetings.values()];
   const y0 = DateTime.fromJSDate(lo).year, y1 = DateTime.fromJSDate(hi).year;
   const sc = h.schedule;
   let slots = generateSlots({ schedule: { timezone: sc.timezone, weekly: sc.weekly, overrides: sc.overrides ?? {} },
     durationMin: et.durationMin, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin, minNoticeMin: et.minNoticeMin,
     rangeDays: et.rangeDays, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
-    limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek }, existing: forLimits,
+    limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek, perMonth: et.maxPerMonth }, limitsTimezone, existing: forLimits,
     joinableStarts: isGroup ? [...ownStarts] : [], sessionBuffers });
   if (isGroup) {
     const taken = new Map<string, number>(), limits = new Map<string, number>();
@@ -93,7 +106,7 @@ export async function availability(owner: string, slug: string, from: string, to
   const ev = await loadEvent(owner, slug);
   if (!ev) return null;
   const et = ev.eventType, exclude = new Set(excludeUids);
-  const per = await Promise.all(ev.hosts.map(h => hostSlots(h, et, from, to, tz, now, exclude)));
+  const per = await Promise.all(ev.hosts.map(h => hostSlots(h, et, from, to, tz, now, exclude, ev.limitsTimezone)));
   const free = new Map<string, string[]>(); // slot -> host ids
   per.forEach((p, i) => { for (const ss of Object.values(p.slots)) for (const s of ss) free.set(s, [...(free.get(s) ?? []), ev.hosts[i].user.id]); });
   const need = et.kind === "collective" ? ev.hosts.length : 1;
@@ -168,12 +181,17 @@ export async function createBooking(input: BookingInput) {
   let rows: any[] = [], hostUsers: any[] = [];
   try {
     await db.transaction(async (tx: any) => {
+      const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
+        active: eventTypes.active, deletedAt: eventTypes.deletedAt, maxPerDay: eventTypes.maxPerDay,
+        maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
+      // Serialize team-wide allowances even if membership changed between two
+      // preflights. Team host editors also lock the event before touching hosts.
+      let currentType = et.teamId ? (await lockType())[0] : undefined;
       // Lock hosts in a consistent order, including the old hosts of a move.
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
       await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
-      const [currentType] = await tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
-        active: eventTypes.active, deletedAt: eventTypes.deletedAt }).from(eventTypes).where(eq(eventTypes.id, et.id)).for("share");
+      if (!et.teamId) currentType = (await lockType())[0];
       // A group template may have changed after the availability preflight but
       // before its first reservation. Never commit that stale session definition.
       if (!currentType || !currentType.active || currentType.deletedAt || ((et.kind === "group" || currentType.kind === "group") &&
@@ -188,7 +206,8 @@ export async function createBooking(input: BookingInput) {
       const eligible: string[] = [];
       for (const host of r.ev.hosts) {
         if (!free.includes(host.user.id)) continue;
-        const fresh = await hostSlots(host, et, day, day, input.tz, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), tx);
+        const fresh = await hostSlots(host, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
+          maxPerMonth: currentType.maxPerMonth }, day, day, input.tz, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
         if ((fresh.slots[day] ?? []).includes(startIso)) eligible.push(host.user.id);
       }
       if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error("slot_unavailable");

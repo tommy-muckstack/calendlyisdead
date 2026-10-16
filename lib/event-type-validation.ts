@@ -6,6 +6,7 @@ export const EventTypePatch = z.object({ title: z.string().min(1).max(120), slug
   bufferBeforeMin: z.number().int().min(0).max(240), bufferAfterMin: z.number().int().min(0).max(240), minNoticeMin: z.number().int().min(0).max(43200),
   rangeDays: z.number().int().min(1).max(730), active: z.boolean(),
   scheduleId: z.string().min(1).nullable(), maxPerDay: z.number().int().min(1).max(100).nullable(), maxPerWeek: z.number().int().min(1).max(500).nullable(),
+  maxPerMonth: z.number().int().min(1).max(2_147_483_647).nullable(),
   questions: z.array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/), label: z.string().min(1).max(200), type: z.enum(["text", "textarea", "phone", "select"]),
     required: z.boolean(), options: z.array(z.string().min(1).max(100)).max(30).optional() })).max(20),
   kind: z.enum(["one_on_one", "group", "collective", "round_robin", "managed", "one_off", "poll"]), seats: z.number().int().min(1).max(9999), rrMode: z.enum(["even", "priority"]),

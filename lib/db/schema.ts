@@ -62,6 +62,7 @@ export const eventTypes = pgTable("event_types", {
   questions: jsonb("questions").$type<Question[]>().notNull().default([]),
   maxPerDay: integer("maxPerDay"),
   maxPerWeek: integer("maxPerWeek"),
+  maxPerMonth: integer("maxPerMonth"),
   teamId: text("teamId"),
   seats: integer("seats").notNull().default(1),
   rrMode: text("rrMode").notNull().default("even"), // even | priority
