@@ -13,6 +13,9 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS questions jsonb NOT NULL DEFAUL
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerDay" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerWeek" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerMonth" integer;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "meetingLimitPerDay" integer;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "meetingLimitPerWeek" integer;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "meetingLimitPerMonth" integer;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS answers jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalCalendarId" text;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalEventId" text;

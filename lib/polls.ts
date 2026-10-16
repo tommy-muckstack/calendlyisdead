@@ -3,6 +3,7 @@ import { customAlphabet } from "nanoid";
 import { getDb, schema } from "./db";
 import { finalize } from "./booking";
 import { confirmedReservations } from "./booking-busy";
+import { hostLimitCheck } from "./host-meeting-limits";
 const { polls, pollVotes, eventTypes, bookings, users, schedules } = schema;
 export const shortId = customAlphabet("abcdefghijkmnpqrstuvwxyz23456789", 10);
 
@@ -56,6 +57,7 @@ export async function bookPoll(userId: string, pollId: string, option: string) {
       const start = new Date(option), end = new Date(+start + p.durationMin * 60_000);
       const conflicts = await confirmedReservations(tx, userId, start, end);
       if (conflicts.length) throw new Error("slot_unavailable");
+      if ((await hostLimitCheck(tx, host, start, start))(start.toISOString())) throw new Error("slot_unavailable");
 
       const [sc] = await tx.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
       const etId = `poll-${pollId}`;
