@@ -12,7 +12,7 @@ const Patch = z.object({ title: z.string().min(1).max(120), slug: z.string().reg
   scheduleId: z.string().min(1).nullable(), maxPerDay: z.number().int().min(1).max(100).nullable(), maxPerWeek: z.number().int().min(1).max(500).nullable(),
   questions: z.array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/), label: z.string().min(1).max(200), type: z.enum(["text", "textarea", "phone", "select"]),
     required: z.boolean(), options: z.array(z.string().min(1).max(100)).max(30).optional() })).max(20),
-  kind: z.enum(["one_on_one", "group"]), seats: z.number().int().min(1).max(1000), rrMode: z.enum(["even", "priority"]),
+  kind: z.enum(["one_on_one", "group"]), seats: z.number().int().min(1).max(9999), rrMode: z.enum(["even", "priority"]),
   lockedFields: z.array(z.enum(LOCKABLE)),
   priceCents: z.number().int().min(0).max(10_000_000), currency: z.enum(["usd", "eur", "gbp", "cad", "aud"]),
   redirectUrl: z.string().url().regex(/^https?:\/\//).max(500).nullable() }).partial();
@@ -40,6 +40,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (et.teamId) delete data.kind; // team kinds are fixed at creation
   if (!et.teamId) delete data.rrMode;
   if (et.kind !== "managed") delete data.lockedFields;
+  if ((data.kind ?? et.kind) === "group" && (data.seats ?? et.seats) < 2) return NextResponse.json({ error: "invalid_invitee_limit" }, { status: 400 });
   const db = await getDb();
   if (data.scheduleId) { const [sc] = await db.select().from(schema.schedules).where(and(eq(schema.schedules.id, data.scheduleId), eq(schema.schedules.userId, u.id))); if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 }); }
   try {

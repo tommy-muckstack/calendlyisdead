@@ -62,3 +62,9 @@ ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET DEFAULT 0;
 ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET DEFAULT 0;
 ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET NOT NULL;
 ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET NOT NULL;
+-- Original group limits were not stored. Preserve current defaults, at least
+-- the number already attending, and never overwrite a saved session limit.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "inviteeLimit" integer;
+UPDATE bookings b SET "inviteeLimit" = CASE WHEN e.kind = 'group' THEN GREATEST(e.seats, (SELECT count(*)::int FROM bookings s WHERE s."hostId" = b."hostId" AND s."eventTypeId" = b."eventTypeId" AND s.start = b.start AND s.status = 'confirmed'), 1) ELSE 1 END FROM event_types e WHERE b."eventTypeId" = e.id AND b."inviteeLimit" IS NULL;
+ALTER TABLE bookings ALTER COLUMN "inviteeLimit" SET DEFAULT 1;
+ALTER TABLE bookings ALTER COLUMN "inviteeLimit" SET NOT NULL;

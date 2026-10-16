@@ -93,6 +93,7 @@ export const bookings = pgTable("bookings", {
   externalEventId: text("externalEventId"),
   meetingUrl: text("meetingUrl"),
   seat: integer("seat").notNull().default(0),
+  inviteeLimit: integer("inviteeLimit").notNull().default(1), // Shared snapshot for every attendee in a group session.
   groupUid: text("groupUid"),
   paymentStatus: text("paymentStatus").notNull().default("none"), // none | pending | paid
   paymentRef: text("paymentRef"),

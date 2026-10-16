@@ -81,8 +81,8 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
           <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
           <label className="f" htmlFor="et-color">Color</label><input id="et-color" disabled={L("color")} type="color" value={d.color} onChange={set("color")} />
           {!d.managedParentId && <><label className="f" htmlFor="et-kind">Type</label>
-          <select id="et-kind" className="input" value={d.kind} onChange={e => setD({ ...d, kind: e.target.value })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
-          {d.kind === "group" && <><label className="f" htmlFor="et-seats">Seats per time</label><input id="et-seats" className="input" type="number" min={1} value={d.seats} onChange={set("seats")} /></>}
+          <select id="et-kind" className="input" value={d.kind} onChange={e => setD({ ...d, kind: e.target.value, seats: e.target.value === "group" ? Math.max(2, d.seats) : d.seats })}><option value="one_on_one">One-on-one</option><option value="group">Group (several invitees per time)</option></select></>}
+          {d.kind === "group" && <><label className="f" htmlFor="et-seats">Invitee limit</label><input id="et-seats" className="input" type="number" min={2} max={9999} value={d.seats} onChange={set("seats")} /><p className="muted">Applies to new meetings. Edit a scheduled meeting's limit from its meeting details.</p></>}
           <label className="f"><input type="checkbox" checked={d.active} onChange={set("active")} /> Accepting bookings</label></> })}
         {S({ id: "where", title: "Location", summary: d.location || "Not set", children: <>
           <input className="input" list="locs" aria-label="Location" disabled={L("location")} value={d.location} onChange={set("location")} placeholder="Zoom, Google Meet, phone, an address…" />
