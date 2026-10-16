@@ -90,7 +90,7 @@ describe("event type duplication", () => {
     const created = await response.json();
     expect(created).toMatchObject({ kind, teamId: "copy-team", rrMode: "priority" });
     expect(await db.select().from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, created.id))).toEqual([
-      { eventTypeId: created.id, userId: "demo-user", priority: 3 }, { eventTypeId: created.id, userId: "demo-mate", priority: 1 },
+      { eventTypeId: created.id, userId: "demo-user", priority: 3, membershipId: null, scheduleId: null }, { eventTypeId: created.id, userId: "demo-mate", priority: 1, membershipId: null, scheduleId: null },
     ]);
   });
   it("copies managed template locks without assigning the new template", async () => {
@@ -118,7 +118,7 @@ describe("event type duplication", () => {
     try {
       expect((await copy()).status).toBe(500);
       expect(await db.select().from(schema.eventTypes)).toHaveLength(1);
-      expect(await db.select().from(schema.eventTypeHosts)).toEqual([{ eventTypeId: "source", userId: "demo-user", priority: 3 }]);
+      expect(await db.select().from(schema.eventTypeHosts)).toEqual([{ eventTypeId: "source", userId: "demo-user", priority: 3, membershipId: null, scheduleId: null }]);
     } finally {
       await db.execute(sql`DROP TRIGGER fail_copied_host ON event_type_hosts`);
       await db.execute(sql`DROP FUNCTION fail_copied_host()`);
@@ -129,12 +129,12 @@ describe("event type duplication", () => {
     const { setHosts } = await import("../../lib/teams");
     await db.insert(schema.eventTypeHosts).values({ eventTypeId: "source", userId: "demo-user", priority: 3 });
     await expect(setHosts("source", [{ userId: "missing-user", priority: 1 }])).rejects.toThrow();
-    expect(await db.select().from(schema.eventTypeHosts)).toEqual([{ eventTypeId: "source", userId: "demo-user", priority: 3 }]);
+    expect(await db.select().from(schema.eventTypeHosts)).toEqual([{ eventTypeId: "source", userId: "demo-user", priority: 3, membershipId: null, scheduleId: null }]);
     await setHosts("source", [{ userId: "demo-mate", priority: 1 }]);
     await db.update(schema.eventTypes).set({ kind: "round_robin", teamId: "copy-team" }).where(eq(schema.eventTypes.id, "source"));
     const created = await (await copy()).json();
     expect(await db.select().from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, created.id)))
-      .toEqual([{ eventTypeId: created.id, userId: "demo-mate", priority: 1 }]);
+      .toEqual([{ eventTypeId: created.id, userId: "demo-mate", priority: 1, membershipId: null, scheduleId: null }]);
   });
   it("opens the requested owned embed, including turned-off events, and excludes inaccessible or deleted types", async () => {
     auth.mockResolvedValue({ id: "demo-user", username: "demo" });

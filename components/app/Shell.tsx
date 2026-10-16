@@ -33,7 +33,7 @@ const GET_STARTED = [
 
 function CreateMenu({ id, trigger, onCreate, onClose }: {
   id: string; trigger: RefObject<HTMLButtonElement | null>;
-  onCreate(kind: "one_on_one" | "group"): void; onClose(restoreFocus: boolean): void;
+  onCreate(kind: "one_on_one" | "group" | "round_robin" | "collective"): void; onClose(restoreFocus: boolean): void;
 }) {
   const menu = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -44,7 +44,7 @@ function CreateMenu({ id, trigger, onCreate, onClose }: {
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
   }, [onClose, trigger]);
-  return <div ref={menu} id={id} className="cs-menu" role="menu" aria-label="Create" onKeyDown={event => {
+  return <div ref={menu} id={id} className="cs-menu cs-create-menu" role="menu" aria-label="Create" onKeyDown={event => {
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(true); return; }
     if (event.key === "Tab") { onClose(true); return; }
     const items = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
@@ -52,9 +52,19 @@ function CreateMenu({ id, trigger, onCreate, onClose }: {
     const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : event.key === "ArrowDown" ? (index + 1) % items.length : event.key === "ArrowUp" ? (index - 1 + items.length) % items.length : -1;
     if (next >= 0) { event.preventDefault(); items[next]?.focus(); }
   }}>
-    <button role="menuitem" onClick={() => onCreate("one_on_one")}>One-on-one</button>
-    <button role="menuitem" onClick={() => onCreate("group")}>Group</button>
-    <Link role="menuitem" href="/app/teams" onClick={() => onClose(false)}>Team event types</Link>
+    {([
+      ["one_on_one", "One-on-one", "One host with one invitee"],
+      ["group", "Group", "One host with multiple invitees"],
+      ["round_robin", "Round robin", "Rotate meetings between available hosts"],
+      ["collective", "Collective", "Multiple hosts with one invitee"],
+    ] as const).map(([kind, label, description]) => <button key={kind} role="menuitem" aria-label={label} aria-describedby={`${id}-${kind}-description`} onClick={() => onCreate(kind)}>
+      <svg width="84" height="44" viewBox="0 0 84 44" aria-hidden="true" className={`create-kind-art create-kind-${kind}`}>
+        {(kind === "collective" || kind === "round_robin" ? [10, 22, 34] : [22]).map(y => <g key={y}><circle cx="12" cy={y} r="5" /><path d={`M18 ${y} L40 22`} /></g>)}
+        <path d="M40 22H59m-5-4 5 4-5 4" fill="none" />
+        {(kind === "group" ? [10, 22, 34] : [22]).map(y => <g key={y}><path d={`M59 22 L66 ${y}`} /><circle cx="72" cy={y} r="5" /></g>)}
+      </svg><span><b>{label}</b><small id={`${id}-${kind}-description`}>{description}</small></span>
+    </button>)}
+    <div className="cs-menu-label" role="presentation">More ways to schedule</div>
     <Link role="menuitem" href="/app/one-off" onClick={() => onClose(false)}>Single-use link</Link>
     <Link role="menuitem" href="/app/polls" onClick={() => onClose(false)}>Meeting poll</Link>
     <Link role="menuitem" href="/app/routing" onClick={() => onClose(false)}>Routing form</Link>
@@ -76,7 +86,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; im
   const settings = ["/app/profile", "/app/availability", "/app/branding", "/app/embed", "/app/contact-settings", "/app/people", "/app/workspace"].some(x => path.startsWith(x));
   const sched = SCHED.find(t => t.href === path) || (settings ? SCHED[0] : undefined);
   const meta = sched ? ["Scheduling", SCHED] as const : (() => { const t = TITLES.find(x => path.startsWith(x[0])); return t ? [t[1], t[2]] as const : ["", undefined] as const; })();
-  const create = (kind: "one_on_one" | "group") => {
+  const create = (kind: "one_on_one" | "group" | "round_robin" | "collective") => {
     closeCreate(true);
     if (path === "/app") dispatchEvent(new CustomEvent("cid:create-event-type", { detail: kind }));
     else location.href = `${BP}/app?new=${kind}`;

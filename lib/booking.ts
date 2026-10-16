@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+import { loadSharedHosts } from "./shared-events";
 import { BP } from "./basepath";
 import { and, eq, gte, lte, inArray, isNull } from "drizzle-orm";
 import { DateTime } from "luxon";
@@ -35,7 +37,10 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   if (!et || !et.active || et.kind === "managed" || et.kind === "poll" || (et.kind === "one_off" && et.usedAt)) return null;
   const defaultSchedule = async (uid: string) => (await db.select().from(schedules).where(and(eq(schedules.userId, uid), eq(schedules.isDefault, true))))[0];
   let hosts: Host[];
-  if (team) {
+  if (et.sharedWorkspaceId) {
+    const shared = await loadSharedHosts(db, et); if (!shared) return null;
+    hosts = shared;
+  } else if (team) {
     const hs = await db.select().from(eventTypeHosts).where(eq(eventTypeHosts.eventTypeId, et.id));
     if (!hs.length) return null;
     const us = await db.select().from(users).where(inArray(users.id, hs.map((h: any) => h.userId)));
@@ -48,7 +53,7 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   if (!hosts.length) return null;
   // Team-wide caps need a single calendar, even when hosts use different zones.
   let limitsTimezone = hosts[0].schedule.timezone;
-  if (team) {
+  if (team || et.sharedWorkspaceId) {
     const schedule = await defaultSchedule(et.userId);
     const [creator] = schedule ? [] : await db.select({ timezone: users.timezone }).from(users).where(eq(users.id, et.userId));
     limitsTimezone = schedule?.timezone ?? creator?.timezone ?? "UTC";
@@ -117,9 +122,15 @@ async function eventAvailability(owner: string, slug: string, range: { from: str
   const et = ev.eventType, exclude = new Set(excludeUids);
   tz = et.lockedTimezone ?? tz;
   const { from, to } = "start" in range ? { from: range.start.setZone(tz).toISODate()!, to: range.start.setZone(tz).toISODate()! } : range;
-  const per = await Promise.all(ev.hosts.map(h => hostSlots(h, et, from, to, tz, now, exclude, ev.limitsTimezone)));
+  let availableHosts = ev.hosts;
+  if (et.sharedWorkspaceId && et.kind === "round_robin") {
+    const oldRows: typeof bookings.$inferSelect[] = excludeUids.length ? await (await getDb()).select().from(bookings).where(and(inArray(bookings.uid, excludeUids), eq(bookings.eventTypeId, et.id), eq(bookings.status, "confirmed"))) : [];
+    if (et.sharedReschedule === "same" && oldRows.length) availableHosts = ev.hosts.filter(h => oldRows.some(b => b.hostId === h.user.id));
+    else availableHosts = await sharedDistributionHosts(et, ev.hosts);
+  }
+  const per = await Promise.all(availableHosts.map(h => hostSlots(h, et, from, to, tz, now, exclude, ev.limitsTimezone)));
   const free = new Map<string, string[]>(); // slot -> host ids
-  per.forEach((p, i) => { for (const ss of Object.values(p.slots)) for (const s of ss) free.set(s, [...(free.get(s) ?? []), ev.hosts[i].user.id]); });
+  per.forEach((p, i) => { for (const ss of Object.values(p.slots)) for (const s of ss) free.set(s, [...(free.get(s) ?? []), availableHosts[i].user.id]); });
   const need = et.kind === "collective" ? ev.hosts.length : 1;
   const slots: Record<string, string[]> = {};
   for (const [s, hs] of free) if (hs.length >= need) {
@@ -134,9 +145,30 @@ export async function slotsFor(owner: string, slug: string, from: string, to: st
   return availability(owner, slug, from, to, tz, now, excludeUid ? [excludeUid] : []);
 }
 
+async function sharedDistributionCounts(et: typeof eventTypes.$inferSelect, transaction?: Awaited<ReturnType<typeof getDb>>) {
+  const db = transaction ?? await getDb();
+  return db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.status, "confirmed"), gte(bookings.createdAt, et.sharedRoundRobinResetAt)));
+}
+async function sharedDistributionHosts(et: typeof eventTypes.$inferSelect, hosts: Host[], transaction?: Awaited<ReturnType<typeof getDb>>): Promise<Host[]> {
+  if (et.rrMode !== "even") return hosts;
+  const rows: typeof bookings.$inferSelect[] = await sharedDistributionCounts(et, transaction);
+  const count = (id: string) => rows.filter(b => b.hostId === id).length;
+  const least = Math.min(...hosts.map(h => count(h.user.id)));
+  return hosts.filter(h => count(h.user.id) < least + 3);
+}
+
 /** Round robin: pick the host. even = fewest bookings of this type in the last 30 days and upcoming; priority = highest priority first, then even. */
 export async function pickHost(et: any, hosts: Host[], candidates: string[], transaction?: any) {
   const db = transaction ?? await getDb();
+  if (et.sharedWorkspaceId) {
+    const rows: typeof bookings.$inferSelect[] = await sharedDistributionCounts(et, db);
+    const count = (id: string) => rows.filter(b => b.hostId === id).length;
+    const last = (id: string) => Math.max(0, ...rows.filter(b => b.hostId === id).map(b => +b.createdAt));
+    const priority = (id: string) => hosts.find(h => h.user.id === id)?.priority ?? 2;
+    const rank = (a: string, b: string) => (et.rrMode === "even" ? count(a) - count(b) : priority(b) - priority(a)) || last(a) - last(b);
+    const ordered = [...candidates].sort(rank), ties = ordered.filter(id => rank(id, ordered[0]) === 0);
+    return ties[randomInt(ties.length)];
+  }
   const since = DateTime.utc().minus({ days: 30 }).toJSDate();
   const rows = await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.status, "confirmed"), gte(bookings.start, since)));
   const count = (id: string) => rows.filter((b: any) => b.hostId === id).length;
@@ -192,23 +224,39 @@ export async function createBooking(input: BookingInput) {
   let rows: any[] = [], hostUsers: any[] = [];
   try {
     await db.transaction(async (tx: any) => {
+      if (et.sharedWorkspaceId) {
+        const [workspace] = await tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, et.sharedWorkspaceId)).for("update");
+        if (!workspace) throw new Error("slot_unavailable");
+      }
       const lockType = () => tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
         active: eventTypes.active, deletedAt: eventTypes.deletedAt, maxPerDay: eventTypes.maxPerDay,
         maxPerWeek: eventTypes.maxPerWeek, maxPerMonth: eventTypes.maxPerMonth, startIntervalMin: eventTypes.startIntervalMin, lockedTimezone: eventTypes.lockedTimezone,
-        rangeDays: eventTypes.rangeDays, dateRange: eventTypes.dateRange }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId ? "update" : "share");
+        rangeDays: eventTypes.rangeDays, dateRange: eventTypes.dateRange, sharedVersion: eventTypes.sharedVersion }).from(eventTypes).where(eq(eventTypes.id, et.id)).for(et.teamId || et.sharedWorkspaceId ? "update" : "share");
       // Serialize team-wide allowances even if membership changed between two
       // preflights. Team host editors also lock the event before touching hosts.
-      let currentType = et.teamId ? (await lockType())[0] : undefined;
+      let currentType = et.teamId || et.sharedWorkspaceId ? (await lockType())[0] : undefined;
       // Lock hosts in a consistent order, including the old hosts of a move.
       // Read committed gives the following checks a fresh snapshot after waiting.
-      const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
+      const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId), ...(et.sharedWorkspaceId ? [et.userId] : [])])].sort();
       const currentHosts = await tx.select().from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
-      if (!et.teamId) currentType = (await lockType())[0];
+      if (!et.teamId && !et.sharedWorkspaceId) currentType = (await lockType())[0];
       // A group template may have changed after the availability preflight but
       // before its first reservation. Never commit that stale session definition.
       if (!currentType || !currentType.active || currentType.deletedAt || ((et.kind === "group" || currentType.kind === "group") &&
         (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin || currentType.location !== et.location))) {
         throw new Error("slot_unavailable");
+      }
+      let bookingHosts = r.ev.hosts;
+      if (et.sharedWorkspaceId) {
+        if (currentType.sharedVersion !== et.sharedVersion) throw new Error("slot_unavailable");
+        const freshHosts = await loadSharedHosts(tx, et, true);
+        if (!freshHosts || JSON.stringify(freshHosts.map(h => [h.user.id, h.schedule])) !== JSON.stringify(r.ev.hosts.map(h => [h.user.id, h.schedule]))) throw new Error("slot_unavailable");
+        const [limitSchedule] = await tx.select().from(schedules).where(and(eq(schedules.userId, et.userId), eq(schedules.isDefault, true))).orderBy(schedules.id).for("share");
+        const limitZone = limitSchedule?.timezone ?? currentHosts.find((u: typeof users.$inferSelect) => u.id === et.userId)?.timezone ?? "UTC";
+        if (limitZone !== r.ev.limitsTimezone) throw new Error("slot_unavailable");
+        bookingHosts = freshHosts;
+        if (et.kind === "round_robin") bookingHosts = old && et.sharedReschedule === "same"
+          ? freshHosts.filter(h => oldGroup.some(b => b.hostId === h.user.id)) : await sharedDistributionHosts(et, freshHosts, tx);
       }
       if (et.kind === "one_off") {
         const consumed = await tx.update(eventTypes).set({ usedAt: new Date() })
@@ -218,7 +266,7 @@ export async function createBooking(input: BookingInput) {
       const eligible: string[] = [];
       const currentZone = currentType.lockedTimezone ?? input.tz, currentDay = startDt.setZone(currentZone).toISODate()!;
       base.inviteeTz = currentZone;
-      for (const host of r.ev.hosts) {
+      for (const host of bookingHosts) {
         if (!free.includes(host.user.id)) continue;
         const currentHost = currentHosts.find((u: typeof users.$inferSelect) => u.id === host.user.id);
         if (!currentHost) continue;

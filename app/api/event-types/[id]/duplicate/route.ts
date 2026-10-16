@@ -4,6 +4,8 @@ import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 import { insertEventWithLink } from "@/lib/event-type-links";
 
+import { duplicateSharedEvent } from "@/lib/shared-events";
+import { SharedEventError } from "@/lib/shared-event-validation";
 export const runtime = "nodejs";
 const COPY_FIELDS = ["description", "durationMin", "startIntervalMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
   "minNoticeMin", "rangeDays", "dateRange", "active", "secret", "lockedTimezone", "kind", "questions", "maxPerDay", "maxPerWeek", "maxPerMonth", "seats", "rrMode",
@@ -14,6 +16,8 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params, db = await getDb(), E = schema.eventTypes;
   try {
+    const [probe] = await db.select().from(E).where(eq(E.id, id));
+    if (probe?.sharedWorkspaceId) return NextResponse.json(await duplicateSharedEvent(user.id, id), { status: 201 });
     return await db.transaction(async (tx: typeof db) => {
       const [candidate] = await tx.select().from(E).where(and(eq(E.id, id), isNull(E.deletedAt)));
       if (!candidate) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -41,5 +45,5 @@ export async function POST(_: NextRequest, { params }: { params: Promise<{ id: s
       }
       return NextResponse.json({ ...copy, groupSettingsLocked: false }, { status: 201 });
     }, { isolationLevel: "read committed" });
-  } catch { return NextResponse.json({ error: "duplicate_failed" }, { status: 500 }); }
+  } catch (error) { return NextResponse.json({ error: error instanceof SharedEventError ? error.message : "duplicate_failed" }, { status: error instanceof SharedEventError ? error.status : 500 }); }
 }

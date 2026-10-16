@@ -90,3 +90,12 @@
 .cs-event-menu button[role=menuitemcheckbox]{display:flex;justify-content:space-between;border-top:1px solid #e8ebee;margin-top:4px}
 .cs-event-menu .cs-menu-danger,.cs-board-error{color:#a32626}
 @media(max-width:900px){.cs-et-menu{grid-column:4;grid-row:1;align-self:start}}
+
+/* Original diagrams drawn from simple geometric shapes; no target artwork. */
+.cs-menu.cs-create-menu{width:360px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 100px);overflow:auto}
+.cs-create-menu>button{display:flex;align-items:center;gap:12px;padding:12px;text-align:left;white-space:normal}
+.cs-create-menu>button>span{display:grid;gap:5px}.cs-create-menu small{font-size:12px;line-height:1.4;color:var(--muted,#52647a)}
+.create-kind-art{flex:none;fill:#e9e3fa;stroke:#7455ad;stroke-width:1.5}.create-kind-group{fill:#e0edff;stroke:#2767b2}.create-kind-round_robin{fill:#f8e3de;stroke:#bc5138}.create-kind-collective{fill:#dff1e6;stroke:#237b51}
+.cs-menu-label{padding:12px 14px 6px;color:#52647a;font-size:12px;font-weight:600;border-top:1px solid #e7ebef}
+.shared-events-heading{margin:30px 0 16px;font-size:16px}.shared-host{margin:12px 0;padding:12px;border:1px solid #dce2e9;border-radius:6px}.shared-host-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.shared-host-choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+@media(max-width:600px){.cs-create-menu .create-kind-art{width:64px}.cs-menu.cs-create-menu{right:0;left:auto}}

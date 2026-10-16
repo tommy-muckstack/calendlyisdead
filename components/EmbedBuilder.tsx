@@ -1,10 +1,10 @@
 "use client";
 import { BP } from "@/lib/basepath";
 import { useState } from "react";
-export function EmbedBuilder({ base, username, types, initialSlug }: { base: string; username: string; types: { slug: string; title: string; active: boolean }[]; initialSlug?: string }) {
+export function EmbedBuilder({ base, username, types, initialSlug }: { base: string; username: string; types: { slug: string; title: string; active: boolean; bookingPath?: string }[]; initialSlug?: string }) {
   const [kind, setKind] = useState<"inline" | "widget" | "text">("inline");
   const [slug, setSlug] = useState(initialSlug ?? types[0]?.slug ?? ""), [color, setColor] = useState("#0E7C66"), [text, setText] = useState("Schedule time with me");
-  const url = `${base}/${username}${slug ? `/${slug}` : ""}`;
+  const url = `${base}${types.find(type => type.slug === slug)?.bookingPath ?? `/${username}${slug ? `/${slug}` : ""}`}`;
   const script = `<script src="${base}/embed.js" async></script>`;
   const code = kind === "inline" ? `<div class="cid-inline" data-url="${url}" data-color="${color}" style="min-width:320px;height:700px"></div>\n${script}`
     : kind === "widget" ? `${script}\n<script>\n  window.addEventListener("load", () => CalendlyIsDead.initPopupWidget({ url: "${url}", text: ${JSON.stringify(text)}, color: "${color}" }));\n</script>`
