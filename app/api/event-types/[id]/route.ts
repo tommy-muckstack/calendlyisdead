@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
@@ -20,7 +20,7 @@ const Patch = z.object({ title: z.string().min(1).max(120), slug: z.string().reg
 /** Who may edit: the owner of a personal type, or a team owner/admin for team types. */
 async function load(id: string, userId: string) {
   const db = await getDb();
-  const [et] = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.id, id));
+  const [et] = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.id, id), isNull(schema.eventTypes.deletedAt)));
   if (!et) return null;
   if (et.teamId) return (await isAdmin(userId, et.teamId)) ? et : null;
   return et.userId === userId ? et : null;
@@ -57,8 +57,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 });
     }
     const [saved] = Object.keys(data).length
-      ? await connection.update(schema.eventTypes).set(data).where(eq(schema.eventTypes.id, id)).returning()
+      ? await connection.update(schema.eventTypes).set(data).where(and(eq(schema.eventTypes.id, id), isNull(schema.eventTypes.deletedAt))).returning()
       : [current];
+    if (!saved) return NextResponse.json({ error: "not_found" }, { status: 404 });
     return NextResponse.json({ ...saved, groupSettingsLocked });
   };
   try {
@@ -68,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       await tx.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.id, u.id)).for("update");
       const [current] = await tx.select().from(schema.eventTypes)
         .where(and(eq(schema.eventTypes.id, id), eq(schema.eventTypes.userId, u.id)));
-      if (!current || current.teamId) return NextResponse.json({ error: "not_found" }, { status: 404 });
+      if (!current || current.teamId || current.deletedAt) return NextResponse.json({ error: "not_found" }, { status: 404 });
       return apply(current, tx);
     }, { isolationLevel: "read committed" });
     if (response.ok && et.kind === "managed") await propagateManaged(id);
@@ -80,7 +81,14 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params; const et = await load(id, u.id); if (!et) return NextResponse.json({ error: "not_found" }, { status: 404 });
   if (et.managedParentId) return NextResponse.json({ error: "managed" }, { status: 403 });
   const db = await getDb();
-  if (et.kind === "managed") await db.delete(schema.eventTypes).where(eq(schema.eventTypes.managedParentId, id));
-  await db.delete(schema.eventTypes).where(eq(schema.eventTypes.id, id));
-  return NextResponse.json({ ok: true });
+  const removed = await db.transaction(async (tx: typeof db) => {
+    // Serialize with managed assignments and reservations, then take a fresh
+    // snapshot of the assigned copies. Retain booking/reminder/provider records.
+    const [current] = await tx.select().from(schema.eventTypes).where(eq(schema.eventTypes.id, id)).for("update");
+    if (!current || current.deletedAt) return false;
+    await tx.update(schema.eventTypes).set({ active: false, deletedAt: new Date() }).where(and(isNull(schema.eventTypes.deletedAt),
+      current.kind === "managed" ? or(eq(schema.eventTypes.id, id), eq(schema.eventTypes.managedParentId, id)) : eq(schema.eventTypes.id, id)));
+    return true;
+  }, { isolationLevel: "read committed" });
+  return removed ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "not_found" }, { status: 404 });
 }

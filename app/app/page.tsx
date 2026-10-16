@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
 import { EventTypesBoard } from "@/components/EventTypesBoard";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const u = await requireUser(); if (!u) redirect("/login"); const db = await getDb();
   const [types, scs, lockedGroups] = await Promise.all([
-    db.select().from(schema.eventTypes).where(eq(schema.eventTypes.userId, u.id)),
+    db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.userId, u.id), isNull(schema.eventTypes.deletedAt))),
     db.select({ id: schema.schedules.id, name: schema.schedules.name }).from(schema.schedules).where(eq(schema.schedules.userId, u.id)),
     getLockedGroupEventIds(u.id),
   ]);

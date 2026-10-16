@@ -75,7 +75,9 @@ describe("teams, invites and team event types", () => {
     expect((await B.availability("sam", "demo-call", tue, tue, tz))!.slots[tue]?.length).toBeGreaterThan(0);
     expect(await B.loadEvent("team:acme", "demo-call")).toBeNull(); // the template itself isn't bookable
     await T.assignManaged("tpl", [A], teamId);
-    expect(await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.managedParentId, "tpl"))).toHaveLength(1);
+    const retained = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.managedParentId, "tpl"));
+    expect(retained).toHaveLength(2);
+    expect(retained.filter((e: typeof schema.eventTypes.$inferSelect) => !e.deletedAt)).toHaveLength(1);
   });
 });
 

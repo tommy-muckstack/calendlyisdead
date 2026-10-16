@@ -1,5 +1,5 @@
 import { BP } from "./basepath";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
 import { sendMail } from "./email";
@@ -46,32 +46,34 @@ export async function acceptInvite(token: string, user: { id: string; email: str
 /** Managed event types: copy the template into each member's own account. Locked fields follow the template; the rest the member may edit. */
 export async function assignManaged(templateId: string, userIds: string[], teamId?: string) {
   const db = await getDb();
-  const [tpl] = await db.select().from(eventTypes).where(eq(eventTypes.id, templateId));
-  if (!tpl || tpl.kind !== "managed" || (teamId && tpl.teamId !== teamId)) throw new Error("not_managed");
-  const members = (await db.select().from(tm).where(eq(tm.teamId, tpl.teamId))).map((m: any) => m.userId);
-  const targets = userIds.filter(u => members.includes(u));
-  const children = await db.select().from(eventTypes).where(eq(eventTypes.managedParentId, templateId));
-  for (const uid of targets) {
-    if (children.some((c: any) => c.userId === uid)) continue;
-    const mine = await db.select().from(eventTypes).where(eq(eventTypes.userId, uid));
-    let slug = tpl.slug, n = 1; while (mine.some((e: any) => e.slug === slug)) slug = `${tpl.slug}-${++n}`;
-    const copy: any = { id: crypto.randomUUID(), userId: uid, slug, kind: "one_on_one", managedParentId: templateId, lockedFields: tpl.lockedFields };
-    for (const f of LOCKABLE) copy[f] = tpl[f];
-    await db.insert(eventTypes).values(copy);
-  }
-  // unassign anyone no longer listed
-  const drop = children.filter((c: any) => !targets.includes(c.userId)).map((c: any) => c.id);
-  if (drop.length) await db.delete(eventTypes).where(inArray(eventTypes.id, drop));
-  return targets.length;
+  return db.transaction(async (tx: typeof db) => {
+    const [tpl] = await tx.select().from(eventTypes).where(and(eq(eventTypes.id, templateId), isNull(eventTypes.deletedAt))).for("update");
+    if (!tpl || tpl.kind !== "managed" || (teamId && tpl.teamId !== teamId)) throw new Error("not_managed");
+    const members = (await tx.select().from(tm).where(eq(tm.teamId, tpl.teamId))).map((m: any) => m.userId);
+    const targets = userIds.filter(u => members.includes(u));
+    const children = await tx.select().from(eventTypes).where(and(eq(eventTypes.managedParentId, templateId), isNull(eventTypes.deletedAt)));
+    for (const uid of targets) {
+      if (children.some((c: any) => c.userId === uid)) continue;
+      const mine = await tx.select().from(eventTypes).where(and(eq(eventTypes.userId, uid), isNull(eventTypes.deletedAt)));
+      let slug = tpl.slug, n = 1; while (mine.some((e: any) => e.slug === slug)) slug = `${tpl.slug}-${++n}`;
+      const copy: any = { id: crypto.randomUUID(), userId: uid, slug, kind: "one_on_one", managedParentId: templateId, lockedFields: tpl.lockedFields };
+      for (const f of LOCKABLE) copy[f] = tpl[f];
+      await tx.insert(eventTypes).values(copy);
+    }
+    // unassign anyone no longer listed
+    const drop = children.filter((c: any) => !targets.includes(c.userId)).map((c: any) => c.id);
+    if (drop.length) await tx.update(eventTypes).set({ active: false, deletedAt: new Date() }).where(inArray(eventTypes.id, drop));
+    return targets.length;
+  }, { isolationLevel: "read committed" });
 }
 
 export async function propagateManaged(templateId: string) {
   const db = await getDb();
-  const [tpl] = await db.select().from(eventTypes).where(eq(eventTypes.id, templateId));
+  const [tpl] = await db.select().from(eventTypes).where(and(eq(eventTypes.id, templateId), isNull(eventTypes.deletedAt)));
   if (!tpl || tpl.kind !== "managed") return 0;
   const patch: any = { lockedFields: tpl.lockedFields };
   for (const f of tpl.lockedFields as string[]) if ((LOCKABLE as readonly string[]).includes(f)) patch[f] = tpl[f];
-  const r = await db.update(eventTypes).set(patch).where(eq(eventTypes.managedParentId, templateId)).returning();
+  const r = await db.update(eventTypes).set(patch).where(and(eq(eventTypes.managedParentId, templateId), isNull(eventTypes.deletedAt))).returning();
   return r.length;
 }
 

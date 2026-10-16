@@ -24,11 +24,11 @@ export async function loadEvent(owner: string, slug: string): Promise<Loaded | n
   if (owner.startsWith("team:")) {
     [team] = await db.select().from(teams).where(eq(teams.slug, owner.slice(5)));
     if (!team) return null;
-    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.teamId, team.id), eq(eventTypes.slug, slug)));
+    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.teamId, team.id), eq(eventTypes.slug, slug), isNull(eventTypes.deletedAt)));
   } else {
     [ownerUser] = await db.select().from(users).where(eq(users.username, owner));
     if (!ownerUser) return null;
-    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.userId, ownerUser.id), eq(eventTypes.slug, slug)));
+    [et] = await db.select().from(eventTypes).where(and(eq(eventTypes.userId, ownerUser.id), eq(eventTypes.slug, slug), isNull(eventTypes.deletedAt)));
     if (et?.teamId) et = null; // team types are only bookable under the team URL
   }
   if (!et || !et.active || et.kind === "managed" || et.kind === "poll" || (et.kind === "one_off" && et.usedAt)) return null;
@@ -156,6 +156,9 @@ export async function createBooking(input: BookingInput) {
   if (!r) throw new Error("not_found");
   if (!(r.slots[day] ?? []).includes(startIso)) throw new Error("slot_unavailable");
   const et = r.ev.eventType;
+  // A deleted event's slug may now belong to a different template. A reschedule
+  // token must never silently move its booking to that replacement event.
+  if (old && old.eventTypeId !== et.id) throw new Error("not_found");
   const answers = validateAnswers(et.questions ?? [], input.answers ?? {});
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
@@ -170,11 +173,11 @@ export async function createBooking(input: BookingInput) {
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId)])].sort();
       await tx.select({ id: users.id }).from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
-      const [currentType] = await tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location })
-        .from(eventTypes).where(eq(eventTypes.id, et.id));
+      const [currentType] = await tx.select({ kind: eventTypes.kind, durationMin: eventTypes.durationMin, location: eventTypes.location,
+        active: eventTypes.active, deletedAt: eventTypes.deletedAt }).from(eventTypes).where(eq(eventTypes.id, et.id)).for("share");
       // A group template may have changed after the availability preflight but
       // before its first reservation. Never commit that stale session definition.
-      if (!currentType || ((et.kind === "group" || currentType.kind === "group") &&
+      if (!currentType || !currentType.active || currentType.deletedAt || ((et.kind === "group" || currentType.kind === "group") &&
         (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin || currentType.location !== et.location))) {
         throw new Error("slot_unavailable");
       }

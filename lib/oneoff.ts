@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { shortId } from "./polls";
 const { eventTypes, schedules } = schema;
@@ -6,7 +6,7 @@ const { eventTypes, schedules } = schema;
 export async function createOneOff(userId: string, o: { title: string; durationMin: number; location?: string; fromEventTypeId?: string }) {
   const db = await getDb();
   let base: any = null;
-  if (o.fromEventTypeId) [base] = await db.select().from(eventTypes).where(and(eq(eventTypes.id, o.fromEventTypeId), eq(eventTypes.userId, userId)));
+  if (o.fromEventTypeId) [base] = await db.select().from(eventTypes).where(and(eq(eventTypes.id, o.fromEventTypeId), eq(eventTypes.userId, userId), isNull(eventTypes.deletedAt)));
   const [sc] = await db.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
   const id = crypto.randomUUID(), slug = `o-${shortId()}`;
   const [et] = await db.insert(eventTypes).values({ id, userId, scheduleId: base?.scheduleId ?? sc?.id, slug, kind: "one_off",
@@ -17,5 +17,5 @@ export async function createOneOff(userId: string, o: { title: string; durationM
 }
 export async function listOneOffs(userId: string) {
   const db = await getDb();
-  return (await db.select().from(eventTypes).where(and(eq(eventTypes.userId, userId), eq(eventTypes.kind, "one_off"))));
+  return (await db.select().from(eventTypes).where(and(eq(eventTypes.userId, userId), eq(eventTypes.kind, "one_off"), isNull(eventTypes.deletedAt))));
 }
