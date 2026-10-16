@@ -27,6 +27,7 @@ export default async function ContactDetail({ params, searchParams }: { params: 
     <dl className="contact-properties">{(Object.keys(CONTACT_LABELS) as (keyof ContactDraft)[]).filter(field => field !== "name" && field !== "email").map(field => <div key={field}>
       <dt>{CONTACT_LABELS[field]}</dt><dd>{field === "linkedIn" && contact.linkedIn ? <a href={contact.linkedIn} target="_blank" rel="noopener noreferrer">{contact.linkedIn}</a> : contact[field] || "Not set"}</dd>
     </div>)}</dl>
+    <Link className="btn" href={`/app/opportunities?contactId=${id}`}>View opportunities</Link>
     <ContactCustomValues key={`${custom.version}:${custom.fields.map(field => `${field.id}-${field.version}`).join()}`} contactId={id} initial={custom} />
     <div className="contacts-heading"><h3>Timeline</h3><ContactNoteComposer contactId={id} emailAvailable={emailAvailable} /><Link href="/app/contacts/reminders">Reminders</Link></div>
     <nav className="contact-timeline-tabs" aria-label="Contact timeline"><Link aria-current={tab === "all" ? "page" : undefined} href={`/app/contacts/${id}?tab=all`}>All</Link><Link aria-current={tab === "notes" ? "page" : undefined} href={`/app/contacts/${id}?tab=notes`}>Notes</Link><Link aria-current={tab === "meetings" ? "page" : undefined} href={`/app/contacts/${id}?tab=meetings`}>Meetings</Link></nav>

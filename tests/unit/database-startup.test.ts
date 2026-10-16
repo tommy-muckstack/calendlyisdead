@@ -21,6 +21,15 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds opportunity storage and retains records, stage history and deletion receipts across startup", async () => {
+    await setup(); await client!.exec('DROP TABLE opportunity_moves; DROP TABLE opportunities; DROP TABLE opportunity_deletions;'); await client!.exec(ddl);
+    await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('client', 'host', 'Client', 'qa@example.invalid');
+      INSERT INTO opportunities (id, "userId", "contactId", name, stage, amount, notes, version) VALUES ('deal', 'host', 'client', 'Consulting', 'completed', '123456789012345.123456', 'Saved notes', 3);
+      INSERT INTO opportunity_moves (id, "opportunityId", "from", "to") VALUES ('move', 'deal', 'proposal_sent', 'completed');
+      INSERT INTO opportunity_deletions (id, "userId", version) VALUES ('deleted', 'host', 4);`);
+    await client!.exec(ddl); expect((await client!.query('SELECT name, stage, amount, notes, version FROM opportunities')).rows).toEqual([{ name: "Consulting", stage: "completed", amount: "123456789012345.123456", notes: "Saved notes", version: 3 }]); expect((await client!.query('SELECT "from", "to" FROM opportunity_moves')).rows).toEqual([{ from: "proposal_sent", to: "completed" }]); expect((await client!.query('SELECT id, version FROM opportunity_deletions')).rows).toEqual([{ id: "deleted", version: 4 }]);
+    await client!.exec(`DELETE FROM opportunities WHERE id = 'deal';`); expect((await client!.query('SELECT * FROM opportunity_moves')).rows).toEqual([]); expect((await client!.query('SELECT id FROM contacts')).rows).toEqual([{ id: "client" }]);
+  });
   it("adopts a single legacy question mapping without populating or changing contact values", async () => {
     await setup(); await client!.exec(`DROP TABLE contact_question_automations;
       INSERT INTO contacts (id, "userId", name, email) VALUES ('person', 'host', 'Legacy', 'legacy@example.invalid');
@@ -117,7 +126,7 @@ describe("database startup and booking migrations", () => {
   });
   it("adds contact records and history without changing meetings, and preserves deleted contacts on replay", async () => {
     await setup(); await seat("retained", 0);
-    await client!.exec('DROP TABLE contact_list_members; DROP TABLE contact_notes; DROP TABLE contact_field_values; DROP TABLE contact_meetings; DROP TABLE contacts;'); await client!.exec(ddl);
+    await client!.exec('DROP TABLE contact_list_members; DROP TABLE contact_notes; DROP TABLE contact_field_values; DROP TABLE contact_meetings; DROP TABLE opportunity_moves; DROP TABLE opportunities; DROP TABLE contacts;'); await client!.exec(ddl);
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('contact', 'host', 'QA', 'qa@example.invalid');
       INSERT INTO contact_meetings ("contactId", "bookingUid") VALUES ('contact', 'retained');
       UPDATE contacts SET "deletedAt" = now(), version = 2;`); await client!.exec(ddl);

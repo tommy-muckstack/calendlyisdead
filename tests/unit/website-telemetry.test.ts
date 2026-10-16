@@ -22,6 +22,8 @@ describe("website route privacy", () => {
     ["/calendlyisdead/login?to=/secret#token", "/login", "auth"],
     ["/calendlyisdead/app/meetings/private-id", "/app/meetings/[uid]", "app"],
     ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
+    ["/calendlyisdead/app/opportunities?contactId=private&q=deal", "/app/opportunities", "app"],
+    ["/calendlyisdead/app/opportunities/private-id?historyPage=2#private", "/app/opportunities/[id]", "app"],
     ["/calendlyisdead/app/contacts?q=private@example.invalid", "/app/contacts", "app"],
     ["/calendlyisdead/app/contacts/reminders?bucket=due#private", "/app/contacts/reminders", "app"],
     ["/calendlyisdead/app/contacts/automations?event=private-event#private-list", "/app/contacts/automations", "app"],

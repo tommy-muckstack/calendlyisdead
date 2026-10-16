@@ -253,3 +253,17 @@ export const contactQuestionAutomations = pgTable("contact_question_automations"
   enabled: boolean("enabled").notNull().default(false), legacyConflict: boolean("legacyConflict").notNull().default(false), version: integer("version").notNull().default(1),
   deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
 }, a => [primaryKey({ columns: [a.userId, a.eventTypeId] })]);
+export const opportunities = pgTable("opportunities", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), contactId: text("contactId").references(() => contacts.id, { onDelete: "set null" }),
+  name: text("name").notNull(), stage: text("stage").notNull(), amount: text("amount").notNull().default(""), currency: text("currency").notNull().default("USD"), closeDate: text("closeDate").notNull().default(""),
+  source: text("source").notNull().default(""), notes: text("notes").notNull().default(""), version: integer("version").notNull().default(1),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, o => [index("opportunity_owner_stage").on(o.userId, o.stage, o.updatedAt)]);
+export const opportunityMoves = pgTable("opportunity_moves", {
+  id: text("id").primaryKey(), opportunityId: text("opportunityId").notNull().references(() => opportunities.id, { onDelete: "cascade" }), revision: integer("revision").notNull().default(1), from: text("from"), to: text("to").notNull(),
+  at: timestamp("at", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, m => [index("opportunity_move_history").on(m.opportunityId, m.at)]);
+// Only a minimal receipt survives permanent deletion; no deal details or notes.
+export const opportunityDeletions = pgTable("opportunity_deletions", {
+  id: text("id").primaryKey(), userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), version: integer("version").notNull(),
+});
