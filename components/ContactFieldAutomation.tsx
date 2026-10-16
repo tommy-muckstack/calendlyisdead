@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { BP } from "@/lib/basepath";
 import { AUTOMATION_FIELD_TYPES, FieldAutomationState, SaveFieldAutomation, fieldActionProblem, normalizeFieldAction, sameFieldActions, type ContactFieldAction, type FieldAutomationChange, type FieldAutomationData } from "@/lib/contact-field-automation-validation";
 import { FIELD_TYPES, type ContactField } from "@/lib/contact-field-validation";
+import { ContactQuestionAutomationPanel } from "./ContactQuestionAutomation";
+import type { QuestionAutomationData } from "@/lib/contact-question-automation-validation";
 import { ContactFieldEditor } from "./ContactFieldEditor";
 import { AutomationResponseError, useAutomationOperation } from "./useContactAutomationOperation";
 import "@/app/app/contacts/contacts.css";
@@ -84,4 +86,11 @@ export function ContactFieldAutomationPanel({ eventId, initial }: { eventId: str
     {broken && <p className="contact-error" role="status">Needs attention: review unavailable or changed fields.</p>}{message && <p role="status">{message}</p>}
     {open && <ContactFieldAutomationEditor initial={state} onClose={() => setOpen(false)} onSaved={(value, closeAfter) => { setState(value); setMessage(!value.automation.configured ? "Field automation deleted. Existing values are kept." : value.automation.enabled ? "Field automation enabled." : "Field automation paused."); if (closeAfter) setOpen(false); }} />}
   </div>;
+}
+
+export function ContactCustomFieldAutomations({ eventId, initial, questionInitial }: { eventId: string; initial?: FieldAutomationData; questionInitial?: QuestionAutomationData }) {
+  const [mode, setMode] = useState("fields");
+  return <section aria-label="Add custom field automations"><label>Custom field source<select className="input" value={mode} onChange={event => setMode(event.target.value)}><option value="fields">Fixed values</option><option value="question">Invitee question</option></select></label>
+    <div hidden={mode !== "fields"}><ContactFieldAutomationPanel eventId={eventId} initial={initial} /></div><div hidden={mode !== "question"}><ContactQuestionAutomationPanel eventId={eventId} initial={questionInitial} /></div>
+  </section>;
 }

@@ -1,0 +1,43 @@
+import { expect, test } from "@playwright/test";
+import { DateTime } from "luxon";
+import type { QuestionAutomationData } from "../lib/contact-question-automation-validation";
+for (const width of [1440, 390]) {
+  test.describe(`question mappings at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } }); let event: { id: string; slug: string }, fields: string[], bookings: string[], contacts: string[];
+    test.beforeEach(async ({ page }) => {
+      fields = []; bookings = []; contacts = []; await page.goto("login"); await page.getByRole("button", { name: "Use the demo account" }).click();
+      const created = await page.request.post("api/event-types"); expect(created.ok()).toBeTruthy(); event = await created.json(); expect((await page.request.patch(`api/event-types/${event.id}`, { data: { title: `Question mapping ${event.id}`, questions: [{ id: "purpose", label: "Purpose?", type: "text", required: false }, { id: "notes", label: "Notes?", type: "text", required: false }] } })).ok()).toBeTruthy();
+      await page.goto(`app/contacts/automations?event=${event.id}`); await page.getByLabel("Custom field source").selectOption("question");
+    });
+    test.afterEach(async ({ page }) => {
+      await page.unrouteAll({ behavior: "ignoreErrors" }); for (const uid of bookings) await page.request.post(`api/bookings/${uid}/cancel`, { data: { reason: "Local QA cleanup" } });
+      for (const id of contacts) { const current = await page.request.get(`api/contacts/${id}`); if (current.ok()) await page.request.delete(`api/contacts/${id}`, { data: { version: (await current.json()).version } }); }
+      for (const id of fields) { const current = await page.request.get(`api/contact-fields/${id}`); if (current.ok()) await page.request.delete(`api/contact-fields/${id}`, { data: { version: (await current.json()).version } }); }
+      if (event) await page.request.delete(`api/event-types/${event.id}`);
+    });
+    test("enables a mapping, captures a new booking and retains it after pause/delete", async ({ page }, info) => {
+      await page.getByRole("button", { name: "+ Map a question", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Map an invitee question", exact: true }); await editor.getByLabel("Question to map").selectOption("purpose");
+      const saved = page.waitForResponse(response => response.request().method() === "PATCH" && response.url().endsWith("/contact-automations/questions")); await editor.getByRole("button", { name: "Enable", exact: true }).click(); const state: QuestionAutomationData = await (await saved).json(); fields.push(state.field!.id); await expect(editor).toHaveCount(0);
+      const email = `${event.id}@example.invalid`, from = DateTime.now().plus({ days: 2 }).toISODate()!, to = DateTime.now().plus({ days: 12 }).toISODate()!, slots = await (await page.request.get(`api/slots?${new URLSearchParams({ user: "demo", slug: event.slug, from, to, tz: "America/New_York" })}`)).json(), start = Object.values(slots.slots).flat()[0]; expect(start).toBeTruthy();
+      const reservation = await page.request.post("api/bookings", { data: { username: "demo", slug: event.slug, start, name: "Mapping QA", email, tz: "America/New_York", answers: { purpose: "Future answer" } } }); expect(reservation.ok()).toBeTruthy(); bookings.push((await reservation.json()).uid);
+      const people = await (await page.request.get(`api/contacts?q=${email}`)).json(), id = people.rows[0].contact.id; contacts.push(id); expect((await (await page.request.get(`api/contacts/${id}/custom-fields`)).json()).values[state.field!.id]).toBe("Future answer");
+      await page.getByRole("button", { name: "Edit question mapping", exact: true }).click(); await editor.getByRole("switch").uncheck(); await expect(editor.getByRole("switch")).not.toBeChecked(); await page.screenshot({ path: info.outputPath("question-mapping-paused.png") });
+      page.once("dialog", dialog => dialog.accept()); await editor.getByRole("button", { name: "Delete question mapping", exact: true }).click(); await expect(editor).toHaveCount(0); expect((await (await page.request.get(`api/contacts/${id}/custom-fields`)).json()).values[state.field!.id]).toBe("Future answer");
+    });
+    test("keeps an uncertain draft and reuses the same field identity on retry", async ({ page }) => {
+      await page.getByRole("button", { name: "+ Map a question", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Map an invitee question", exact: true }); await editor.getByLabel("Question to map").selectOption("notes");
+      const requests: string[] = []; await page.route("**/contact-automations/questions", async route => { if (route.request().method() !== "PATCH") return route.continue(); requests.push(route.request().postData()!); if (requests.length === 1) return route.abort(); return route.continue(); });
+      await editor.getByRole("button", { name: "Enable", exact: true }).click(); await expect(editor.getByRole("alert")).toBeFocused(); await expect(editor.getByLabel("Question to map")).toHaveValue("notes"); const saved = page.waitForResponse(response => response.request().method() === "PATCH" && response.url().endsWith("/contact-automations/questions")); await editor.getByRole("button", { name: "Enable", exact: true }).click(); fields.push((await (await saved).json()).field.id); expect(requests[0]).toBe(requests[1]);
+    });
+    test("preserves the latest state when switching field modes and repairs a deleted target", async ({ page }) => {
+      const endpoint = `api/event-types/${event.id}/contact-automations/questions`, fieldId = crypto.randomUUID(); fields.push(fieldId); expect((await page.request.patch(endpoint, { data: { action: "save", questionId: "purpose", fieldId, enabled: true, version: 0 } })).ok()).toBeTruthy(); await page.reload(); await page.getByLabel("Custom field source").selectOption("question"); await page.getByRole("button", { name: "Edit question mapping", exact: true }).click(); const editor = page.getByRole("dialog", { name: "Map an invitee question", exact: true }); await editor.getByRole("switch").uncheck(); await expect(editor.getByRole("switch")).not.toBeChecked(); await editor.getByRole("button", { name: "Close question mapping", exact: true }).click();
+      await page.getByLabel("Custom field source").selectOption("fields"); await page.getByLabel("Custom field source").selectOption("question"); await page.getByRole("button", { name: "Edit question mapping", exact: true }).click(); await expect(editor.getByRole("switch")).not.toBeChecked(); await editor.getByRole("button", { name: "Close question mapping", exact: true }).click();
+      expect((await page.request.delete(`api/contact-fields/${fieldId}`, { data: { version: 1 } })).status()).toBe(204); await page.reload(); await page.getByLabel("Custom field source").selectOption("question"); await page.getByRole("button", { name: "Edit question mapping", exact: true }).click(); const saved = page.waitForResponse(response => response.request().method() === "PATCH" && response.url().endsWith("/contact-automations/questions")); await editor.getByRole("button", { name: "Save changes", exact: true }).click(); const replacement = (await (await saved).json()).field.id; fields.push(replacement); expect(replacement).not.toBe(fieldId);
+    });
+    test("keeps focus inside the event's mapping dialog and fits the viewport", async ({ page }, info) => {
+      await page.goto("app"); await page.getByRole("button", { name: `Edit Question mapping ${event.id}`, exact: true }).click(); const parent = page.getByRole("dialog", { name: "Edit event type", exact: true }); await parent.getByRole("button", { name: /^Contact automations/ }).click(); await parent.getByLabel("Custom field source").selectOption("question"); const trigger = parent.getByRole("button", { name: "+ Map a question", exact: true }); await trigger.click(); const editor = page.getByRole("dialog", { name: "Map an invitee question", exact: true });
+      await expect(editor.getByRole("heading", { name: "Map an invitee question", exact: true })).toBeFocused(); for (let index = 0; index < 10; index++) { await page.keyboard.press("Tab"); expect(await editor.evaluate(element => element.contains(document.activeElement))).toBe(true); }
+      await page.screenshot({ path: info.outputPath("question-mapping-editor.png") }); const box = await editor.boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(width); expect(box!.height).toBeLessThanOrEqual(900); await page.keyboard.press("Escape"); await expect(editor).toHaveCount(0); await expect(parent).toBeVisible(); await expect(trigger).toBeFocused();
+    });
+  });
+}

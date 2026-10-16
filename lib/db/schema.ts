@@ -247,3 +247,9 @@ export const contactFieldAutomations = pgTable("contact_field_automations", {
   actions: jsonb("actions").$type<import("../contact-field-automation-validation").ContactFieldAction[]>().notNull(), enabled: boolean("enabled").notNull().default(false), version: integer("version").notNull().default(1),
   deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
 }, a => [primaryKey({ columns: [a.userId, a.eventTypeId] })]);
+export const contactQuestionAutomations = pgTable("contact_question_automations", {
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }), eventTypeId: text("eventTypeId").notNull().references(() => eventTypes.id, { onDelete: "cascade" }),
+  fieldId: text("fieldId").references(() => contactFields.id, { onDelete: "set null" }), questionId: text("questionId"),
+  enabled: boolean("enabled").notNull().default(false), legacyConflict: boolean("legacyConflict").notNull().default(false), version: integer("version").notNull().default(1),
+  deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
+}, a => [primaryKey({ columns: [a.userId, a.eventTypeId] })]);

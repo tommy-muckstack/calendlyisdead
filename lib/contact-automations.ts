@@ -5,6 +5,7 @@ import { CollectionData } from "./contact-list-validation";
 import { ChangeListAutomation, ContactListAutomation, emptyListAutomation, type ListAutomationChange } from "./contact-automation-validation";
 import { ContactAutomationError, contactAutomationEvent, availableAutomationEvents } from "./contact-automation-store";
 import { applyContactFieldAutomation } from "./contact-field-automations";
+import { applyContactQuestionAutomation } from "./contact-question-automations";
 const { eventTypes: E, contactListAutomations: A, contactListAutomationRuns: R, contactCollections: L, contactListMembers: M, contacts: C, bookings: B } = schema;
 export { ContactAutomationError } from "./contact-automation-store";
 const owned = (userId: string, eventTypeId: string) => and(eq(A.userId, userId), eq(A.eventTypeId, eventTypeId));
@@ -55,10 +56,11 @@ export async function deleteContactAutomation(userId: string, eventTypeId: strin
 export async function runContactAutomations(db: ContactDB, booking: { hostId: string; uid: string; eventTypeId: string; inviteeEmail: string }, contactId: string) {
   const [contact] = await db.select({ id: C.id }).from(C).where(and(eq(C.id, contactId), eq(C.userId, booking.hostId), isNull(C.deletedAt)));
   if (!contact) return;
-  const [reservation] = await db.select({ uid: B.uid }).from(B).where(and(eq(B.uid, booking.uid), eq(B.hostId, booking.hostId), eq(B.eventTypeId, booking.eventTypeId), eq(B.status, "confirmed"), isNull(B.rescheduledFrom)));
+  const [reservation] = await db.select({ uid: B.uid, answers: B.answers }).from(B).where(and(eq(B.uid, booking.uid), eq(B.hostId, booking.hostId), eq(B.eventTypeId, booking.eventTypeId), eq(B.status, "confirmed"), isNull(B.rescheduledFrom)));
   if (!reservation) return;
   const claimed = await db.insert(R).values({ userId: booking.hostId, bookingUid: booking.uid, inviteeEmail: booking.inviteeEmail.trim().toLowerCase() }).onConflictDoNothing().returning({ uid: R.bookingUid }); if (!claimed.length) return;
   await applyContactFieldAutomation(db, booking, contactId);
+  await applyContactQuestionAutomation(db, { ...booking, answers: reservation.answers }, contactId);
   const [automation] = await db.select().from(A).where(and(owned(booking.hostId, booking.eventTypeId), eq(A.enabled, true), isNull(A.deletedAt)));
   if (!automation?.listIds.length) return;
   const targets = await db.select({ id: L.id }).from(L).where(and(eq(L.userId, booking.hostId), eq(L.kind, "list"), isNull(L.deletedAt), inArray(L.id, automation.listIds)));
