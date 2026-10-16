@@ -6,8 +6,9 @@ import { readContactSettings } from "./contact-settings";
 import { lockContactOwner, type ContactDB } from "./contact-store";
 import type { Question } from "./db/schema";
 import { captureContactAnswers } from "./contact-custom-fields";
+import { runContactListAutomation } from "./contact-automations";
 const { contacts: C, contactMeetings: CM, bookings: B, contactSettings: S } = schema;
-export type BookingContact = { hostId: string; uid: string; eventTypeId: string; inviteeName: string; inviteeEmail: string; answers?: Record<string, string> };
+export type BookingContact = { hostId: string; uid: string; eventTypeId: string; inviteeName: string; inviteeEmail: string; answers?: Record<string, string>; rescheduledFrom?: string | null };
 
 // Called inside the reservation transaction after its host locks. Existing
 // standard details stay unchanged; explicitly mapped answers can update below.
@@ -26,6 +27,7 @@ export async function recordBookingContact(db: ContactDB, booking: BookingContac
   }
   await db.insert(CM).values({ contactId: contact.id, bookingUid: booking.uid, inviteeEmail: booking.inviteeEmail }).onConflictDoNothing();
   await captureContactAnswers(db, booking.hostId, contact.id, booking.eventTypeId, booking.answers ?? {}, historical);
+  if (!historical && !booking.rescheduledFrom) await runContactListAutomation(db, booking, contact.id);
 }
 
 // One-time migration of pre-feature booking history, bounded to 200 rows per

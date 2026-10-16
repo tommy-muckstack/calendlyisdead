@@ -9,6 +9,7 @@ import { setEventVisibility } from "@/lib/event-visibility-client";
 import { BOOKING_TIMEZONES } from "@/lib/booking-timezone";
 import { dateRangeSummary, effectiveDateRange, withDateRangeLocks, type BookingDateRange } from "@/lib/booking-date-range";
 import { BookingDateRangeFields } from "./BookingDateRangeFields";
+import { ContactListAutomationPanel } from "./ContactListAutomation";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; startIntervalMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; dateRange: BookingDateRange | null; active: boolean; secret: boolean; lockedTimezone: string | null;
@@ -230,7 +231,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
     {sect === id && <div style={{ paddingBottom: 16 }}>{children}</div>}
   </div>;
   return <dialog ref={dialog} className="pane" aria-label="Edit event type" aria-modal="true"
-    onCancel={event => { event.preventDefault(); requestClose(); }} onClick={event => {
+    onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose(); }} onClick={event => {
       if (event.target !== event.currentTarget) return;
       const bounds = event.currentTarget.getBoundingClientRect();
       if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) requestClose();
@@ -308,6 +309,7 @@ export function EventTypeEditor({ et, username, schedules, defaultTimezone = "UT
                 value={(q.options ?? []).join(", ")} onChange={e => up({ options: e.target.value.split(",").map(x => x.trim()) })} />}
             </div>; })}
           <button className="btn" onClick={() => setD({ ...d, questions: [...(d.questions ?? []), { id: `q${Date.now().toString(36)}`, label: "", type: "text", required: false }] })}>+ Add question</button></> })}
+        {S({ id: "contact-automations", title: "Contact automations", summary: "Organize contacts when they book", children: <ContactListAutomationPanel eventId={et.id} /> })}
         {S({ id: "pay", title: "Payment and confirmation", summary: `${d.priceCents ? `${(d.priceCents / 100).toFixed(2)} ${d.currency.toUpperCase()}` : "Free"}${d.redirectUrl ? " · redirects after booking" : ""}`, children: <>
           <label className="f" htmlFor="et-price">Price (0 = free)</label>
           <input id="et-price" className="input" type="number" min={0} step="0.01" value={(d.priceCents ?? 0) / 100} onChange={e => setD({ ...d, priceCents: Math.round(Number(e.target.value || 0) * 100) })} />

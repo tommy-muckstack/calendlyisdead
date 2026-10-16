@@ -24,6 +24,7 @@ describe("website route privacy", () => {
     ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
     ["/calendlyisdead/app/contacts?q=private@example.invalid", "/app/contacts", "app"],
     ["/calendlyisdead/app/contacts/reminders?bucket=due#private", "/app/contacts/reminders", "app"],
+    ["/calendlyisdead/app/contacts/automations?event=private-event#private-list", "/app/contacts/automations", "app"],
     ["/calendlyisdead/app/contacts/private?tab=notes&note=private-note#note-private-note", "/app/contacts/[id]", "app"],
     ["/calendlyisdead/app/contact-settings?exclusions=private@example.invalid", "/app/contact-settings", "app"],
     ["/calendlyisdead/app/contacts/private-id?email=private@example.invalid", "/app/contacts/[id]", "app"],

@@ -30,7 +30,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
   const url = (page: number) => `/app/contacts?${new URLSearchParams({ q: filters.q, sort: filters.sort, page: String(page), ...(filters.collection ? { collection: filters.collection } : {}), ...(filters.rules ? { rules: JSON.stringify(filters.rules) } : {}) })}`;
   return <section className="contacts" aria-labelledby="contacts-title">
     <div className="contacts-heading"><h2 id="contacts-title">{current?.name ?? "All contacts"}</h2><ContactAddMenu fields={fields} sources={sources} /></div>
-    <Link href="/app/contact-settings">Contacts settings</Link>{" · "}<Link href="/app/contacts/reminders">Reminders</Link>
+    <Link href="/app/contact-settings">Contacts settings</Link>{" · "}<Link href="/app/contacts/reminders">Reminders</Link>{" · "}<Link href="/app/contacts/automations">Contact automations</Link>
     <ContactFieldControl sources={sources} />
     <ContactLists key={`${current?.id}:${current?.version}:${JSON.stringify(rules)}`} collections={collections} current={current} rules={rules} fields={fields} timezone={zone} q={filters.q} sort={filters.sort} />
     <form className="contacts-filters" action={`${BP}/app/contacts`} method="get">
