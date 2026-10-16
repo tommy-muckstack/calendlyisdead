@@ -3,7 +3,7 @@ import { DateTime, Interval } from "luxon";
 export type Range = { start: string; end: string }; // "HH:mm"
 export type Weekly = Record<number, Range[]>; // 1=Mon ... 7=Sun (Luxon weekday)
 export type Schedule = { timezone: string; weekly: Weekly; overrides: Record<string, Range[]> }; // override date "yyyy-MM-dd" in host tz; [] = unavailable
-export type Busy = { start: string; end: string }; // ISO instants
+export type Busy = { start: string; end: string; joinableAt?: string }; // ISO instants; only this same group session may ignore its own interval
 
 export type SlotInput = {
   schedule: Schedule;
@@ -22,6 +22,7 @@ export type SlotInput = {
   limits?: { perDay?: number | null; perWeek?: number | null };
   existing?: string[]; // ISO starts of confirmed bookings of THIS event type (for limits)
   joinableStarts?: string[]; // Existing group sessions may accept seats without consuming another meeting allowance.
+  sessionBuffers?: Record<string, { beforeMin: number; afterMin: number }>; // Saved buffers for an existing group session, keyed by UTC start.
 };
 
 /** Returns invitee-local date -> sorted ISO (UTC) slot starts. */
@@ -34,7 +35,8 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
   const latest = i.rangeDays != null ? now.setZone(hostTz).startOf("day").plus({ days: i.rangeDays + 1 }) : null;
   const winStart = DateTime.fromISO(i.from, { zone: i.inviteeTz }).startOf("day");
   const winEnd = DateTime.fromISO(i.to, { zone: i.inviteeTz }).endOf("day");
-  const busy = (i.busy ?? []).map(b => Interval.fromDateTimes(DateTime.fromISO(b.start), DateTime.fromISO(b.end)));
+  const busy = (i.busy ?? []).map(b => ({ interval: Interval.fromDateTimes(DateTime.fromISO(b.start), DateTime.fromISO(b.end)),
+    joinableAt: b.joinableAt ? DateTime.fromISO(b.joinableAt).toUTC().toISO() : null }));
   const out: Record<string, string[]> = {};
   const blocked = new Set(i.blockedDates ?? []);
   const joinable = new Set<string>(), joinableDays = new Set<string>();
@@ -67,13 +69,15 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
         : DateTime.fromObject({ year: day.year, month: day.month, day: day.day, hour: eh, minute: em }, { zone: hostTz });
       for (let s = rs; s.plus({ minutes: i.durationMin }) <= re; s = s.plus({ minutes: interval })) {
         const e = s.plus({ minutes: i.durationMin });
-        if (full && !joinable.has(s.toUTC().toISO()!)) continue;
+        const startIso = s.toUTC().toISO()!;
+        if (full && !joinable.has(startIso)) continue;
         if (s < earliest || s < winStart || s > winEnd) continue;
         if (latest && s >= latest) continue;
-        const blocked = Interval.fromDateTimes(s.minus({ minutes: bb }), e.plus({ minutes: ba }));
-        if (busy.some(b => b.overlaps(blocked))) continue;
+        const saved = i.sessionBuffers?.[startIso];
+        const blocked = Interval.fromDateTimes(s.minus({ minutes: saved?.beforeMin ?? bb }), e.plus({ minutes: saved?.afterMin ?? ba }));
+        if (busy.some(b => b.joinableAt !== startIso && b.interval.overlaps(blocked))) continue;
         const local = s.setZone(i.inviteeTz).toFormat("yyyy-MM-dd");
-        (out[local] ??= []).push(s.toUTC().toISO()!);
+        (out[local] ??= []).push(startIso);
       }
     }
     day = day.plus({ days: 1 });

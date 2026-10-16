@@ -11,6 +11,7 @@ import { onBooked, onCancelled } from "./workflows";
 import type { Question } from "./db/schema";
 import { confFor, meetingUrlFor } from "./conferencing";
 import { HOLD_MIN } from "./payments";
+import { confirmedReservations, reservationBusy } from "./booking-busy";
 const { users, eventTypes, schedules, bookings, teams, eventTypeHosts } = schema;
 
 export type Host = { user: any; schedule: any; priority: number };
@@ -51,17 +52,19 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
   const db = transaction ?? await getDb();
   const lo = DateTime.fromISO(from, { zone: tz }).minus({ days: 2 }).toJSDate();
   const hi = DateTime.fromISO(to, { zone: tz }).plus({ days: 2 }).toJSDate();
-  const existing = (await db.select().from(bookings).where(and(eq(bookings.hostId, h.user.id), eq(bookings.status, "confirmed"), gte(bookings.start, lo), lte(bookings.start, hi))))
+  const existing = (await confirmedReservations(db, h.user.id, lo, hi))
     .filter((b: any) => !exclude.has(b.uid));
   const isGroup = et.kind === "group";
-  const busyRows = isGroup ? existing.filter((b: any) => b.eventTypeId !== et.id) : existing;
   // Reservation rechecks use only local state under the host lock. Provider I/O
   // was checked in the preflight; never hold database locks during network I/O.
   const ext = transaction ? { busy: [], errors: [] } : await externalBusy(h.user.id, lo, hi);
   // a group session that already exists is shown on the host's external calendar too; don't let that hide its own open seats
   const ownStarts = new Set<string>(existing.filter((b: any) => b.eventTypeId === et.id).map((b: any) => b.start.toISOString()));
   const extBusy = isGroup ? ext.busy.filter(b => !ownStarts.has(new Date(b.start).toISOString())) : ext.busy;
-  const busy = [...busyRows.map((b: any) => ({ start: b.start.toISOString(), end: b.end.toISOString() })), ...extBusy];
+  const busy = [...existing.map((b: any) => ({ ...reservationBusy(b),
+    joinableAt: isGroup && b.eventTypeId === et.id ? b.start.toISOString() : undefined })), ...extBusy];
+  const sessionBuffers = isGroup ? Object.fromEntries(existing.filter((b: any) => b.eventTypeId === et.id)
+    .map((b: any) => [b.start.toISOString(), { beforeMin: b.bufferBeforeMin, afterMin: b.bufferAfterMin }])) : undefined;
   const wLo = DateTime.fromJSDate(lo).startOf("week").minus({ days: 1 }).toJSDate(), wHi = DateTime.fromJSDate(hi).endOf("week").plus({ days: 1 }).toJSDate();
   const forLimits = (et.maxPerDay || et.maxPerWeek)
     ? [...new Set((await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.hostId, h.user.id), eq(bookings.status, "confirmed"), gte(bookings.start, wLo), lte(bookings.start, wHi))))
@@ -73,7 +76,7 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
     durationMin: et.durationMin, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin, minNoticeMin: et.minNoticeMin,
     rangeDays: et.rangeDays, now, from, to, inviteeTz: tz, busy, blockedDates: holidayDates(sc.holidayCountry, y0, y1),
     limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek }, existing: forLimits,
-    joinableStarts: isGroup ? [...ownStarts] : [] });
+    joinableStarts: isGroup ? [...ownStarts] : [], sessionBuffers });
   if (isGroup) {
     const taken = new Map<string, number>();
     for (const b of existing) if (b.eventTypeId === et.id) taken.set(b.start.toISOString(), (taken.get(b.start.toISOString()) ?? 0) + 1);
@@ -154,6 +157,7 @@ export async function createBooking(input: BookingInput) {
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
+    bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeTz: input.tz, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
   try {
@@ -185,6 +189,11 @@ export async function createBooking(input: BookingInput) {
         if (moved.length !== oldGroup.length) throw new Error("slot_unavailable");
       }
       if (et.kind === "group") {
+        // New seats share the session's original buffers even after its type is edited.
+        const [session] = await tx.select({ bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin }).from(bookings)
+          .where(and(eq(bookings.hostId, rows[0].hostId), eq(bookings.eventTypeId, et.id), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")))
+          .orderBy(bookings.createdAt, bookings.uid).limit(1);
+        if (session) Object.assign(rows[0], session);
         let reserved = false;
         for (let seat = 0; seat < et.seats && !reserved; seat++) {
           const inserted = await tx.insert(bookings).values({ ...rows[0], seat }).onConflictDoNothing().returning({ uid: bookings.uid });

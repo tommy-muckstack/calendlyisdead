@@ -56,7 +56,9 @@ describe("one-off links", () => {
     const et = await O.createOneOff(A, { title: "", durationMin: 0, fromEventTypeId: "demo-30" });
     expect(et.title).toBe("Quick chat"); expect(et.kind).toBe("one_off");
     expect(await B.loadEvent("demo", et.slug)).not.toBeNull();
-    await B.createBooking({ username: "demo", slug: et.slug, start: at("11:00"), name: "Once", email: "once@example.com", tz });
+    // The earlier 10-11 Zoom fixture retains its 15-minute after-buffer.
+    await expect(B.createBooking({ username: "demo", slug: et.slug, start: at("11:00"), name: "Once", email: "once@example.com", tz })).rejects.toThrow("slot_unavailable");
+    await B.createBooking({ username: "demo", slug: et.slug, start: at("11:30"), name: "Once", email: "once@example.com", tz });
     expect(await B.loadEvent("demo", et.slug)).toBeNull();
   });
 });

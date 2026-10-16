@@ -53,3 +53,12 @@ CREATE TABLE IF NOT EXISTS polls (id text PRIMARY KEY, "userId" text NOT NULL RE
 CREATE TABLE IF NOT EXISTS poll_votes (id text PRIMARY KEY, "pollId" text NOT NULL REFERENCES polls(id) ON DELETE CASCADE, name text NOT NULL, email text NOT NULL, picks jsonb NOT NULL DEFAULT '[]', "createdAt" timestamptz NOT NULL DEFAULT now());
 ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid text;
 CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid_key ON users (firebase_uid);
+-- Old bookings did not record buffers. Freeze their current event settings once;
+-- historical values from before this migration cannot be reconstructed.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "bufferBeforeMin" integer;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "bufferAfterMin" integer;
+UPDATE bookings b SET "bufferBeforeMin" = COALESCE(b."bufferBeforeMin", e."bufferBeforeMin"), "bufferAfterMin" = COALESCE(b."bufferAfterMin", e."bufferAfterMin") FROM event_types e WHERE b."eventTypeId" = e.id AND (b."bufferBeforeMin" IS NULL OR b."bufferAfterMin" IS NULL);
+ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET DEFAULT 0;
+ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET DEFAULT 0;
+ALTER TABLE bookings ALTER COLUMN "bufferBeforeMin" SET NOT NULL;
+ALTER TABLE bookings ALTER COLUMN "bufferAfterMin" SET NOT NULL;

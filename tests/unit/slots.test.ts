@@ -52,6 +52,15 @@ describe("generateSlots", () => {
     expect(s["2026-11-01"][0]).toBe("2026-11-01T14:00:00.000Z");
     expect(s["2026-11-01"]).toHaveLength(16);
   });
+  it("keeps a group's buffer through the repeated DST hour without hiding that session's seats", () => {
+    const schedule: Schedule = { ...ny, weekly: { 7: [{ start: "01:00", end: "03:00" }] } };
+    const s = generateSlots({ ...base, schedule, durationMin: 15, from: "2026-11-01", to: "2026-11-01",
+      busy: [{ start: "2026-11-01T05:30:00Z", end: "2026-11-01T06:45:00Z", joinableAt: "2026-11-01T01:30:00-04:00" }],
+      sessionBuffers: { "2026-11-01T05:30:00.000Z": { beforeMin: 0, afterMin: 60 } } });
+    expect(s["2026-11-01"]).toContain("2026-11-01T05:30:00.000Z"); // Original 1:30 EDT session.
+    expect(s["2026-11-01"]).not.toContain("2026-11-01T06:30:00.000Z"); // Different 1:30 EST session.
+    expect(s["2026-11-01"]).toContain("2026-11-01T06:45:00.000Z"); // Exact end of the protected buffer.
+  });
   it("invitee in a zone without DST during host DST change (UTC)", () => {
     const s = generateSlots({ ...base, inviteeTz: "UTC", now: "2026-01-01T00:00:00Z", from: "2026-03-06", to: "2026-03-09" });
     expect(s["2026-03-06"][0]).toBe("2026-03-06T14:00:00.000Z");
