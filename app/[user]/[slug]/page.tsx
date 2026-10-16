@@ -13,5 +13,5 @@ export default async function Page({ params, searchParams }: { params: Promise<{
   const brandUser = ev.ownerUser ?? ev.hosts[0]?.user;
   return <BrandFrame user={brandUser} embed={embed === "1"} primary={primary}><BookingWidget embed={embed === "1"} price={ev.eventType.priceCents > 0 ? formatMoney(ev.eventType.priceCents, ev.eventType.currency) : undefined} username={user} slug={slug} host={ev.ownerName} kindLabel={ev.eventType.kind === "group" ? `Group, up to ${ev.eventType.seats}` : undefined} title={ev.eventType.title} durationMin={ev.eventType.durationMin}
     hostImage={ev.ownerUser?.image} location={ev.eventType.location} description={ev.eventType.description} color={ev.eventType.color} questions={ev.eventType.questions ?? []} lockedTimezone={ev.eventType.lockedTimezone}
-    reschedule={prior && prior.booking.status === "confirmed" ? { uid: prior.booking.uid, name: prior.booking.inviteeName, email: prior.booking.inviteeEmail, start: prior.booking.start.toISOString() } : undefined} /></BrandFrame>;
+    reschedule={prior && prior.booking.eventTypeId === ev.eventType.id && prior.booking.status === "confirmed" ? { uid: prior.booking.uid, name: prior.booking.inviteeName, email: prior.booking.inviteeEmail, start: prior.booking.start.toISOString() } : undefined} /></BrandFrame>;
 }

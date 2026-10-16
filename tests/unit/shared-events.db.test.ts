@@ -109,6 +109,39 @@ describe("shared event creation and access", () => {
     const input = draft(); input.shared!.hosts = input.shared!.hosts.slice(1); const event = await publish(input); expect(event.isHost).toBe(false); const { contactAutomationEvent } = await import("../../lib/contact-automation-store"); await expect(contactAutomationEvent(db, "demo-user", event.id)).rejects.toThrow(); await expect(contactAutomationEvent(db, "demo-mate", event.id)).resolves.toMatchObject({ id: event.id });
   });
 });
+describe("shared rescheduling links", () => {
+  const redirectPage = async (uid: string) => (await import("../../app/booking/[uid]/reschedule/page")).default({ params: Promise.resolve({ uid }) });
+  it.each(["collective", "round_robin"] as const)("uses the creator's scheduling URL for a %s meeting hosted by a cohost", async kind => {
+    const input = draft(kind); if (kind === "round_robin") input.shared!.hosts = input.shared!.hosts.slice(1);
+    await publish(input); const meeting = await book(); expect(meeting.hostId).toBe("demo-mate");
+    await expect(redirectPage(meeting.uid)).rejects.toMatchObject({ digest: expect.stringContaining(`/demo/shared?reschedule=${meeting.uid}&tz=America%2FNew_York`) });
+  });
+  it("uses the creator's latest username and event slug while retaining the actual host", async () => {
+    const input = draft("round_robin"); input.shared!.hosts = input.shared!.hosts.slice(1); const event = await publish(input); const meeting = await book();
+    await db.update(S.eventTypes).set({ slug: "updated-shared-link" }).where(eq(S.eventTypes.id, event.id));
+    await db.update(S.users).set({ username: "new-creator-link" }).where(eq(S.users.id, "demo-user"));
+    try { expect((await booking.getBooking(meeting.uid))?.user.id).toBe("demo-mate"); await expect(redirectPage(meeting.uid)).rejects.toMatchObject({ digest: expect.stringContaining(`/new-creator-link/updated-shared-link?reschedule=${meeting.uid}`) }); }
+    finally { await db.update(S.users).set({ username: "demo" }).where(eq(S.users.id, "demo-user")); }
+  });
+  it.each([false, true])("retains the existing personal/team redirect when team=%s", async team => {
+    if (team) await db.insert(S.teams).values({ id: "redirect-team", slug: "redirect-team", name: "Redirect team" }).onConflictDoNothing();
+    await db.insert(S.eventTypes).values({ id: "redirect-event", userId: "demo-user", title: "Redirect", slug: "redirect-event", kind: team ? "collective" : "one_on_one", teamId: team ? "redirect-team" : null, minNoticeMin: 0 });
+    if (team) await db.insert(S.eventTypeHosts).values({ eventTypeId: "redirect-event", userId: "demo-mate", priority: 2 });
+    const meeting = await book(11, { username: team ? "team:redirect-team" : "demo", slug: "redirect-event" });
+    await expect(redirectPage(meeting.uid)).rejects.toMatchObject({ digest: expect.stringContaining(`${team ? "/team/redirect-team" : "/demo"}/redirect-event?reschedule=${meeting.uid}`) });
+  });
+  it("does not prefill a booking on an unrelated event or team scheduling page", async () => {
+    await publish(); const meeting = await book();
+    await db.insert(S.eventTypes).values({ id: "another-event", userId: "demo-user", title: "Unrelated event", slug: "another-event", minNoticeMin: 0 });
+    const page = await (await import("../../app/[user]/[slug]/page")).default({ params: Promise.resolve({ user: "demo", slug: "another-event" }), searchParams: Promise.resolve({ reschedule: meeting.uid }) });
+    expect(page.props.children.props.reschedule).toBeUndefined();
+    await db.insert(S.teams).values({ id: "redirect-team", slug: "redirect-team", name: "Redirect team" }).onConflictDoNothing();
+    await db.update(S.eventTypes).set({ teamId: "redirect-team", kind: "collective" }).where(eq(S.eventTypes.id, "another-event"));
+    await db.insert(S.eventTypeHosts).values({ eventTypeId: "another-event", userId: "demo-user", priority: 2 });
+    const teamPage = await (await import("../../app/team/[team]/[slug]/page")).default({ params: Promise.resolve({ team: "redirect-team", slug: "another-event" }), searchParams: Promise.resolve({ reschedule: meeting.uid }) });
+    expect(teamPage.props.children.props.reschedule).toBeUndefined();
+  });
+});
 describe("shared reservations", () => {
   it("intersects all collective schedules, writes all hosts and cancels the whole meeting", async () => {
     await publish(); await db.update(S.schedules).set({ timezone: "America/Chicago" }).where(eq(S.schedules.id, "sam-schedule"));
