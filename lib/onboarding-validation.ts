@@ -32,7 +32,7 @@ export function loginDestination(callback: string | undefined, basePath: string)
   if (!relative || /[\\\x00-\x20]/.test(relative)) return "/app";
   try {
     const url = new URL(relative, "https://local.invalid");
-    if (!relative.startsWith("/") || url.origin !== "https://local.invalid" || !(url.pathname === "/app" || url.pathname.startsWith("/app/") || /^\/invite\/[^/]+$/.test(url.pathname))) return "/app";
+    if (!relative.startsWith("/") || url.origin !== "https://local.invalid" || !(url.pathname === "/app" || url.pathname.startsWith("/app/") || /^\/invite\/[^/]+$/.test(url.pathname) || /^\/invite\/workspace\/[a-f0-9]{64}$/.test(url.pathname))) return "/app";
     return url.pathname + url.search + url.hash;
   } catch { return "/app"; }
 }

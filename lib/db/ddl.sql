@@ -228,3 +228,25 @@ CREATE TABLE IF NOT EXISTS opportunity_bookings (
   "bookingUid" text REFERENCES bookings(uid) ON DELETE SET NULL, "originalBookingUid" text REFERENCES bookings(uid) ON DELETE SET NULL,
   "automationId" text NOT NULL, "automationName" text NOT NULL, "eventTitle" text NOT NULL
 );
+
+-- Organization membership is separate from existing team landing pages.
+CREATE TABLE IF NOT EXISTS workspaces (
+  id text PRIMARY KEY, name text NOT NULL, version integer NOT NULL DEFAULT 1, "createdAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, role text NOT NULL, "joinedAt" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT workspace_member_role CHECK (role IN ('owner', 'admin', 'user'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_one_membership ON workspace_members ("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_one_owner ON workspace_members ("workspaceId") WHERE role = 'owner';
+CREATE TABLE IF NOT EXISTS workspace_invitations (
+  id text PRIMARY KEY, "workspaceId" text NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  email text NOT NULL, role text NOT NULL, "invitedBy" text NOT NULL REFERENCES users(id), "tokenHash" text NOT NULL UNIQUE, "requestHash" text NOT NULL,
+  "expiresAt" timestamptz NOT NULL, "acceptedMembershipId" text, "revokedAt" timestamptz, delivery text NOT NULL DEFAULT 'pending',
+  CONSTRAINT workspace_invitation_role CHECK (role IN ('admin', 'user'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS workspace_pending_email ON workspace_invitations ("workspaceId", email) WHERE "acceptedMembershipId" IS NULL AND "revokedAt" IS NULL;
+CREATE TABLE IF NOT EXISTS workspace_creations (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "requestHash" text NOT NULL
+);

@@ -9,12 +9,12 @@ import { cmSans, cmSerif } from "@/components/mk/fonts";
 import { Banner, Nav } from "@/components/mk/chrome";
 import { LoginForm } from "@/components/LoginForm";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Log in | CalendlyIsDead" };
+export const metadata = { title: "Log in | CalendlyIsDead", referrer: "no-referrer" as const };
 export default async function Login({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; as?: string }> }) {
   const { callbackUrl, as } = await searchParams;
   const destination = loginDestination(callbackUrl, BP);
   const user = await requireUser();
-  if (user) redirect(await onboardingRequired(user.id) ? "/onboarding" : destination);
+  if (user) redirect(!destination.startsWith("/invite/") && await onboardingRequired(user.id) ? "/onboarding" : destination);
   const to = BP + destination;
   return <div className={`cm ${cmSans.variable} ${cmSerif.variable}`}><Banner /><Nav variant="login" />
     <section className="cm-authsec"><div className="cm-auth"><div className="cm-acard">
