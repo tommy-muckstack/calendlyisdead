@@ -1,5 +1,6 @@
 import { DateTime, Interval } from "luxon";
 import { DEFAULT_START_INTERVAL_MIN, validStartInterval } from "./start-increments";
+import { dateRangeBounds, effectiveDateRange, type BookingDateRange } from "./booking-date-range";
 
 export type Range = { start: string; end: string }; // "HH:mm"
 export type Weekly = Record<number, Range[]>; // 1=Mon ... 7=Sun (Luxon weekday)
@@ -14,6 +15,8 @@ export type SlotInput = {
   bufferAfterMin?: number;
   minNoticeMin?: number;
   rangeDays?: number; // rolling days into the future, from now
+  dateRange?: BookingDateRange | null;
+  dateRangeTimezone?: string; // One calendar for explicit team event ranges.
   now: DateTime | string;
   from: string; // yyyy-MM-dd, in invitee tz (inclusive)
   to: string;   // yyyy-MM-dd, in invitee tz (inclusive)
@@ -35,7 +38,7 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
   if (!validStartInterval(interval)) throw new RangeError("invalid_start_interval");
   const bb = i.bufferBeforeMin ?? 0, ba = i.bufferAfterMin ?? 0;
   const earliest = now.plus({ minutes: i.minNoticeMin ?? 0 });
-  const latest = i.rangeDays != null ? now.setZone(hostTz).startOf("day").plus({ days: i.rangeDays + 1 }) : null;
+  const range = dateRangeBounds(effectiveDateRange(i), now, i.dateRange ? i.dateRangeTimezone ?? hostTz : hostTz);
   const winStart = DateTime.fromISO(i.from, { zone: i.inviteeTz }).startOf("day");
   const winEnd = DateTime.fromISO(i.to, { zone: i.inviteeTz }).endOf("day");
   const busy = (i.busy ?? []).map(b => ({ interval: Interval.fromDateTimes(DateTime.fromISO(b.start), DateTime.fromISO(b.end)),
@@ -83,7 +86,7 @@ export function generateSlots(i: SlotInput): Record<string, string[]> {
         const startIso = s.toUTC().toISO()!;
         if ((limitTz === hostTz ? full : atLimit(s)) && !joinable.has(startIso)) continue;
         if (s < earliest || s < winStart || s > winEnd) continue;
-        if (latest && s >= latest) continue;
+        if ((range.start && s < range.start) || (range.end && s >= range.end)) continue;
         const saved = i.sessionBuffers?.[startIso];
         const blocked = Interval.fromDateTimes(s.minus({ minutes: saved?.beforeMin ?? bb }), e.plus({ minutes: saved?.afterMin ?? ba }));
         if (busy.some(b => b.joinableAt !== startIso && b.interval.overlaps(blocked))) continue;

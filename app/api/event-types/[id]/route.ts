@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { isAdmin, propagateManaged, LOCKABLE } from "@/lib/teams";
 import { EventTypePatch } from "@/lib/event-type-validation";
 import { isEventLinkConflict } from "@/lib/event-type-links";
+import { BookingDateRangeSchema, withDateRangeLocks } from "@/lib/booking-date-range";
 export const runtime = "nodejs";
 const Patch = EventTypePatch.extend({ lockedFields: z.array(z.enum(LOCKABLE)).optional() });
 
@@ -21,15 +22,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const u = await requireUser(); if (!u) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const { id } = await params; const p = Patch.safeParse(await req.json());
   if (!p.success) return NextResponse.json({ error: "invalid", issues: p.error.issues }, { status: 400 });
+  if (p.data.rangeDays !== undefined && p.data.dateRange !== undefined)
+    return NextResponse.json({ error: "ambiguous_date_range" }, { status: 400 });
   const et = await load(id, u.id); if (!et) return NextResponse.json({ error: "not_found" }, { status: 404 });
   const db = await getDb();
   const apply = async (current: typeof schema.eventTypes.$inferSelect, connection: typeof db) => {
     const data: Record<string, unknown> = { ...p.data };
+    // Older clients still set a rolling calendar count. Clear an explicit range
+    // only for an intentional legacy range edit, never for unrelated saves.
+    if (p.data.rangeDays !== undefined) data.dateRange = null;
+    if (p.data.lockedFields) data.lockedFields = withDateRangeLocks(p.data.lockedFields);
     // Visibility belongs to each assigned event, not the managed template.
     if (current.kind === "managed" && "secret" in data)
       return NextResponse.json({ error: "managed_template_visibility" }, { status: 400 });
     if (current.managedParentId) {
-      const locked = (current.lockedFields ?? []).filter(f => f in data && JSON.stringify(data[f]) !== JSON.stringify(current[f]));
+      const locked = withDateRangeLocks(current.lockedFields ?? []).filter(f => {
+        if (!(f in data)) return false;
+        // jsonb may reorder keys; compare the validated range representation.
+        const value = f === "dateRange" && current.dateRange ? BookingDateRangeSchema.parse(current.dateRange) : current[f as keyof typeof current];
+        return JSON.stringify(data[f]) !== JSON.stringify(value);
+      });
       if (locked.length) return NextResponse.json({ error: "locked", fields: locked }, { status: 403 });
       delete data.lockedFields;
     }

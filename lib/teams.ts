@@ -4,8 +4,9 @@ import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
 import { sendMail } from "./email";
 import { insertEventWithLink } from "./event-type-links";
+import { withDateRangeLocks } from "./booking-date-range";
 const { teams, teamMembers: tm, teamInvites: ti, eventTypes, eventTypeHosts: eth, users } = schema;
-export const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"] as const;
+export const LOCKABLE = ["title", "description", "durationMin", "startIntervalMin", "lockedTimezone", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "dateRange", "maxPerDay", "maxPerWeek", "maxPerMonth"] as const;
 const appUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
 export async function role(userId: string, teamId: string): Promise<string | null> {
@@ -69,8 +70,8 @@ export async function propagateManaged(templateId: string) {
   const db = await getDb();
   const [tpl] = await db.select().from(eventTypes).where(and(eq(eventTypes.id, templateId), isNull(eventTypes.deletedAt)));
   if (!tpl || tpl.kind !== "managed") return 0;
-  const patch: any = { lockedFields: tpl.lockedFields };
-  for (const f of tpl.lockedFields as string[]) if ((LOCKABLE as readonly string[]).includes(f)) patch[f] = tpl[f];
+  const patch: any = { lockedFields: withDateRangeLocks(tpl.lockedFields) };
+  for (const f of patch.lockedFields as string[]) if ((LOCKABLE as readonly string[]).includes(f)) patch[f] = tpl[f];
   const r = await db.update(eventTypes).set(patch).where(and(eq(eventTypes.managedParentId, templateId), isNull(eventTypes.deletedAt))).returning();
   return r.length;
 }

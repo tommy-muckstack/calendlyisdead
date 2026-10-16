@@ -1,6 +1,7 @@
 import { pgTable, text, integer, timestamp, jsonb, primaryKey, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { Weekly } from "../slots";
+import type { BookingDateRange } from "../booking-date-range";
 export type Question = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 export const users = pgTable("users", {
@@ -61,6 +62,7 @@ export const eventTypes = pgTable("event_types", {
   bufferAfterMin: integer("bufferAfterMin").notNull().default(0),
   minNoticeMin: integer("minNoticeMin").notNull().default(240),
   rangeDays: integer("rangeDays").notNull().default(60),
+  dateRange: jsonb("dateRange").$type<BookingDateRange>(),
   active: boolean("active").notNull().default(true),
   secret: boolean("secret").notNull().default(false),
   lockedTimezone: text("lockedTimezone"),
