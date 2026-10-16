@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "./db";
 import { finalize } from "./booking";
@@ -14,13 +14,16 @@ export async function createPoll(userId: string, p: { title: string; durationMin
 }
 export async function vote(pollId: string, v: { name: string; email: string; picks: string[] }) {
   const db = await getDb();
-  const [p] = await db.select().from(polls).where(eq(polls.id, pollId));
-  if (!p) throw new Error("not_found"); if (p.status !== "open") throw new Error("closed");
-  const picks = v.picks.filter(x => p.options.includes(x));
-  // one vote per email: re-voting replaces it
-  await db.delete(pollVotes).where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.email, v.email.toLowerCase())));
-  await db.insert(pollVotes).values({ id: shortId(), pollId, name: v.name, email: v.email.toLowerCase(), picks });
-  return picks;
+  return db.transaction(async (tx: any) => {
+    const [p] = await tx.select().from(polls).where(eq(polls.id, pollId)).for("update");
+    if (!p) throw new Error("not_found"); if (p.status !== "open") throw new Error("closed");
+    const picks = [...new Set(v.picks.filter(x => p.options.includes(x)))];
+    // Re-voting and poll closure share the poll lock, so a vote is replaced once
+    // and cannot arrive after the booking's attendee list has been finalized.
+    await tx.delete(pollVotes).where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.email, v.email.toLowerCase())));
+    await tx.insert(pollVotes).values({ id: shortId(), pollId, name: v.name, email: v.email.toLowerCase(), picks });
+    return picks;
+  }, { isolationLevel: "read committed" });
 }
 export function tally(options: string[], votes: { name: string; picks: string[] }[]) {
   const rows = options.map(o => ({ option: o, count: votes.filter(v => v.picks.includes(o)).length, names: votes.filter(v => v.picks.includes(o)).map(v => v.name) }));
@@ -37,21 +40,37 @@ export async function getPoll(id: string) {
 /** Host picks a time: one booking with every voter who can make it (others are not invited). */
 export async function bookPoll(userId: string, pollId: string, option: string) {
   const db = await getDb();
-  const g = await getPoll(pollId);
-  if (!g || g.poll.userId !== userId) throw new Error("not_found");
-  if (g.poll.status !== "open") throw new Error("closed");
-  if (!g.poll.options.includes(option)) throw new Error("bad_option");
-  const attendees = g.votes.filter((v: any) => v.picks.includes(option));
-  if (!attendees.length) throw new Error("no_votes");
-  const [sc] = await db.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
-  const etId = `poll-${pollId}`;
-  await db.insert(eventTypes).values({ id: etId, userId, scheduleId: sc?.id, slug: etId, title: g.poll.title, durationMin: g.poll.durationMin, location: g.poll.location, kind: "poll", active: false }).onConflictDoNothing();
-  const [et] = await db.select().from(eventTypes).where(eq(eventTypes.id, etId));
-  const start = new Date(option), end = new Date(+start + g.poll.durationMin * 60_000);
-  const row: any = { uid: shortId() + "pl", eventTypeId: etId, hostId: userId, start, end, inviteeName: attendees[0].name, inviteeEmail: attendees[0].email,
-    inviteeTz: g.host.timezone, notes: `Booked from meeting poll "${g.poll.title}"`, guests: attendees.slice(1).map((a: any) => a.email), answers: {}, seat: 0, groupUid: null };
-  try { await db.insert(bookings).values(row); } catch { throw new Error("slot_unavailable"); }
-  await db.update(polls).set({ status: "booked", chosen: option, bookingUid: row.uid }).where(eq(polls.id, pollId));
-  await finalize([{ ...row, paymentStatus: "none" }], et, [g.host], false);
-  return row.uid as string;
+  let reserved: { row: any; et: any; host: any };
+  try {
+    reserved = await db.transaction(async (tx: any) => {
+      // Use the same host lock as event-type reservations, then lock the poll.
+      const [host] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+      const [p] = await tx.select().from(polls).where(and(eq(polls.id, pollId), eq(polls.userId, userId))).for("update");
+      if (!host || !p) throw new Error("not_found");
+      if (p.status !== "open") throw new Error("closed");
+      if (!p.options.includes(option)) throw new Error("bad_option");
+      const votes = await tx.select().from(pollVotes).where(eq(pollVotes.pollId, pollId));
+      const attendees = votes.filter((v: any) => v.picks.includes(option));
+      if (!attendees.length) throw new Error("no_votes");
+      const start = new Date(option), end = new Date(+start + p.durationMin * 60_000);
+      const conflicts = await tx.select({ uid: bookings.uid }).from(bookings).where(and(eq(bookings.hostId, userId),
+        eq(bookings.status, "confirmed"), lt(bookings.start, end), gt(bookings.end, start))).limit(1);
+      if (conflicts.length) throw new Error("slot_unavailable");
+
+      const [sc] = await tx.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
+      const etId = `poll-${pollId}`;
+      await tx.insert(eventTypes).values({ id: etId, userId, scheduleId: sc?.id, slug: etId, title: p.title, durationMin: p.durationMin, location: p.location, kind: "poll", active: false }).onConflictDoNothing();
+      const [et] = await tx.select().from(eventTypes).where(eq(eventTypes.id, etId));
+      const row = { uid: shortId() + "pl", eventTypeId: etId, hostId: userId, start, end, inviteeName: attendees[0].name, inviteeEmail: attendees[0].email,
+        inviteeTz: host.timezone, notes: `Booked from meeting poll "${p.title}"`, guests: attendees.slice(1).map((a: any) => a.email), answers: {}, seat: 0, groupUid: null };
+      await tx.insert(bookings).values(row);
+      await tx.update(polls).set({ status: "booked", chosen: option, bookingUid: row.uid }).where(eq(polls.id, pollId));
+      return { row, et, host };
+    }, { isolationLevel: "read committed" });
+  } catch (error) {
+    if (error instanceof Error && ["not_found", "closed", "bad_option", "no_votes", "slot_unavailable"].includes(error.message)) throw error;
+    throw new Error("slot_unavailable");
+  }
+  await finalize([{ ...reserved.row, paymentStatus: "none" }], reserved.et, [reserved.host], false);
+  return reserved.row.uid as string;
 }
