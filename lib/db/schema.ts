@@ -6,6 +6,7 @@ export type Question = { id: string; label: string; type: "text" | "textarea" | 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name"),
+  welcomeMessage: text("welcomeMessage").notNull().default("Pick a meeting type to see open times."),
   email: text("email").unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
