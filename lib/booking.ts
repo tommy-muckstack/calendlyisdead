@@ -78,9 +78,12 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
     limits: { perDay: et.maxPerDay, perWeek: et.maxPerWeek }, existing: forLimits,
     joinableStarts: isGroup ? [...ownStarts] : [], sessionBuffers });
   if (isGroup) {
-    const taken = new Map<string, number>();
-    for (const b of existing) if (b.eventTypeId === et.id) taken.set(b.start.toISOString(), (taken.get(b.start.toISOString()) ?? 0) + 1);
-    slots = Object.fromEntries(Object.entries(slots).map(([d, ss]) => [d, ss.filter(s => (taken.get(s) ?? 0) < et.seats)]).filter(([, ss]) => ss.length));
+    const taken = new Map<string, number>(), limits = new Map<string, number>();
+    for (const b of existing) if (b.eventTypeId === et.id) {
+      const start = b.start.toISOString();
+      taken.set(start, (taken.get(start) ?? 0) + 1); limits.set(start, b.inviteeLimit);
+    }
+    slots = Object.fromEntries(Object.entries(slots).map(([d, ss]) => [d, ss.filter(s => (taken.get(s) ?? 0) < (limits.get(s) ?? et.seats))]).filter(([, ss]) => ss.length));
   }
   return { slots, errors: ext.errors };
 }
@@ -158,6 +161,7 @@ export async function createBooking(input: BookingInput) {
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
     bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
+    inviteeLimit: et.kind === "group" ? et.seats : 1,
     inviteeTz: input.tz, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
   try {
@@ -190,16 +194,18 @@ export async function createBooking(input: BookingInput) {
       }
       if (et.kind === "group") {
         // New seats share the session's original buffers even after its type is edited.
-        const [session] = await tx.select({ bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin }).from(bookings)
+        const attendees = await tx.select({ bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
           .where(and(eq(bookings.hostId, rows[0].hostId), eq(bookings.eventTypeId, et.id), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")))
-          .orderBy(bookings.createdAt, bookings.uid).limit(1);
-        if (session) Object.assign(rows[0], session);
-        let reserved = false;
-        for (let seat = 0; seat < et.seats && !reserved; seat++) {
-          const inserted = await tx.insert(bookings).values({ ...rows[0], seat }).onConflictDoNothing().returning({ uid: bookings.uid });
-          if (inserted.length) { rows[0].seat = seat; reserved = true; }
+          .orderBy(bookings.createdAt, bookings.uid);
+        if (attendees.length) {
+          const { seat: _, ...session } = attendees[0]; Object.assign(rows[0], session);
         }
-        if (!reserved) throw new Error("slot_unavailable");
+        if (attendees.length >= rows[0].inviteeLimit) throw new Error("slot_unavailable");
+        const occupied = new Set(attendees.map((a: any) => a.seat));
+        let seat = 0; while (occupied.has(seat)) seat++;
+        const inserted = await tx.insert(bookings).values({ ...rows[0], seat }).onConflictDoNothing().returning({ uid: bookings.uid });
+        if (!inserted.length) throw new Error("slot_unavailable");
+        rows[0].seat = seat;
       } else {
         for (const row of rows) await tx.insert(bookings).values(row);
       }

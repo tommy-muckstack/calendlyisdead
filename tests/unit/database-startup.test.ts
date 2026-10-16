@@ -21,6 +21,14 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("backfills legacy group limits above attendance and preserves them on later startup", async () => {
+    await setup(); await seat("first", 0); await seat("second", 1); await seat("third", 2);
+    await client!.exec('ALTER TABLE bookings DROP COLUMN "inviteeLimit"; UPDATE event_types SET seats = 2;');
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT DISTINCT "inviteeLimit" FROM bookings')).rows).toEqual([{ inviteeLimit: 3 }]);
+    await client!.exec('UPDATE event_types SET seats = 5;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT DISTINCT "inviteeLimit" FROM bookings')).rows).toEqual([{ inviteeLimit: 3 }]);
+  });
   it("backfills legacy buffers once and preserves snapshots when startup is replayed", async () => {
     await setup(); await seat("legacy", 0);
     await client!.exec(`ALTER TABLE bookings DROP COLUMN "bufferBeforeMin", DROP COLUMN "bufferAfterMin";

@@ -3,10 +3,14 @@ import { notFound, redirect } from "next/navigation";
 import { DateTime } from "luxon";
 import { requireUser } from "@/auth";
 import { getHostMeeting, meetingZone } from "@/lib/meetings";
+import { getGroupInviteeLimit } from "@/lib/group-sessions";
+import { GroupInviteeLimit } from "@/components/GroupInviteeLimit";
 import "../meetings.css";
 export default async function Meeting({ params }: { params: Promise<{ uid: string }> }) {
   const user = await requireUser(); if (!user) redirect("/login");
-  const { uid } = await params, meeting = await getHostMeeting(user.id, uid); if (!meeting) notFound();
+  const { uid } = await params;
+  const [meeting, group] = await Promise.all([getHostMeeting(user.id, uid), getGroupInviteeLimit(user.id, uid)]);
+  if (!meeting) notFound();
   const zone = meetingZone(user.timezone), start = DateTime.fromJSDate(meeting.start).setZone(zone), end = DateTime.fromJSDate(meeting.end).setZone(zone);
   return <section className="meetings" aria-labelledby="meeting-title">
     <Link href="/app/meetings?status=all">← Your meetings</Link>
@@ -22,6 +26,7 @@ export default async function Meeting({ params }: { params: Promise<{ uid: strin
       {Object.entries(meeting.answers).map(([key, answer]) => <div className="meeting-answer" key={key}><dt>{meeting.questions.find(q => q.id === key)?.label || key}</dt><dd className="meeting-text">{answer}</dd></div>)}
       {meeting.cancelReason && <><dt>Cancellation reason</dt><dd className="meeting-text">{meeting.cancelReason}</dd></>}
     </dl>
+    {group && <GroupInviteeLimit key={uid} uid={uid} initial={group} />}
     {meeting.status !== "cancelled" && <div className="meetings-actions"><Link className="btn" href={`/booking/${encodeURIComponent(uid)}/reschedule`}>Reschedule</Link><Link className="btn danger" href={`/booking/${encodeURIComponent(uid)}/cancel`}>Cancel meeting</Link></div>}
   </section>;
 }
