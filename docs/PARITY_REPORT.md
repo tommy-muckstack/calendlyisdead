@@ -122,6 +122,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | T07 | Existing-booking buffers across event types | differs | P1 | Source review: busy intervals contain raw start/end, so a new event with zero buffers can consume the buffer belonging to an earlier event. Group sessions also omit same-event busy rows. Add sequential and concurrent boundary reproductions. | pending B2 |
 | T08 | Group-session daily/weekly limits | differs | P1 | Six failing local reproductions fixed: distinct sessions now count toward limits while existing sessions retain their remaining seats. Cancellation, weekly reset, other invitee timezones, repeated DST times and concurrent creation are covered. Original group-limit edge behavior and browser parity remain unverified. | pending B2 |
 | T09 | Single-use link customization and One-off meeting distinction | differs | P2 | Original single-use links support personalized contact/details and link management; One-off meetings have a separate explicit-time flow. Current source uses one one_off kind and lacks the full customization/management distinction. Verify original rescheduling rules for each flow before changing them. | pending B2 |
+| T10 | Database startup after group reservations | differs | P0 | Reopening a persisted database with two attendees failed when startup recreated an obsolete host/start unique index. Local fix retains only the seat-aware index. Restart, legacy upgrade, preserved reservations and cancelled-seat reuse pass in PGlite; deployed PostgreSQL verification remains pending. | nonvisual regression; browser flows pending B2 |
 
 ## Constraints and potential exceptions
 
@@ -161,7 +162,8 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Atomic event reservations and rescheduling | [Draft PR #9](https://github.com/tommy-muckstack/calendlyisdead/pull/9) | Four pre-change race failures reproduced; all 144 tests, standalone TypeScript and production build pass, including ten focused PGlite regressions. Lint remains missing. Poll/one-off follow-up and multi-connection PostgreSQL/browser checks remain. |
 | Single-use reservation consumption | [Draft PR #10](https://github.com/tommy-muckstack/calendlyisdead/pull/10) | Pre-change concurrent double consumption reproduced. All 146 tests, TypeScript and production build pass. Two new tests cover concurrent consumption and rollback/retry. Browser/PostgreSQL checks and lint remain blocked. |
 | Poll reservations, closure and vote replacement | [Draft PR #11](https://github.com/tommy-muckstack/calendlyisdead/pull/11) | Six new assertions failed before the fix. All 157 tests, TypeScript and build pass, including eleven poll regressions. Lint/browser/PostgreSQL contention checks remain blocked. |
-| Group session meeting limits | `fix/group-session-limits` / local only | Six pre-change failures reproduced. All 168 tests, TypeScript and production build pass, including eleven new database/slot regressions. Original behavior, browser evidence, PostgreSQL contention and lint remain unverified/blocked. |
+| Group session meeting limits | [Draft PR #12](https://github.com/tommy-muckstack/calendlyisdead/pull/12) | Six pre-change failures reproduced. All 168 tests, TypeScript and production build pass, including eleven new database/slot regressions. Original behavior, browser evidence, PostgreSQL contention and lint remain unverified/blocked. |
+| Database startup with group attendees | `fix/group-booking-startup` / local only | Persisted-database restart failure reproduced and fixed. All 171 tests, TypeScript and production build pass, including three migration/constraint cases. Lint and deployed PostgreSQL/browser verification remain pending. |
 
 ## Capturing evidence with other workers
 
@@ -242,6 +244,14 @@ After: distinct confirmed sessions count toward the cap; remaining seats at the 
 
 All 168 unit/integration tests pass, including eleven new cases. An initial focused run timed out in one case; that case passed in isolation and the subsequent full suite passed without changing timeouts. A TypeScript inference error was corrected before the final standalone typecheck and production build passed. Lint remains unavailable. Browser and multi-connection PostgreSQL checks remain pending. Tests use isolated local PGlite and stub delivery effects. The fix remains local, with no remote build or deployment.
 
+### Database startup with group attendees
+
+Before: after two attendees booked one group session, replaying the startup DDL attempted to create the obsolete unique index on host/start before dropping it. The duplicate start times caused `could not create unique index "bookings_no_double"`, preventing database initialization. A regression test reproduced this by closing and reopening a persisted local database.
+
+After: startup no longer recreates that obsolete index. Existing legacy indexes are still removed by the upgrade, and the current host/start/seat index still prevents duplicate confirmed seats. Three database tests cover persisted restart and repeated DDL replay, upgrading the old schema while preserving reservations, fresh initialization, duplicate rejection and reuse of cancelled seats. No booking data is removed by the fix.
+
+All 171 unit/integration tests, standalone TypeScript and the production build pass. Lint remains unavailable. Tests use isolated local PGlite; no production migration, cloud database or provider was accessed. Deployed PostgreSQL and browser flow verification remain pending. The change remains local and unpublished.
+
 ### QA #40 — publication verification, October 16
 
 The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
@@ -283,3 +293,9 @@ The product files are unchanged from local source commit `ec68cbd3a47591ed37025c
 Fresh isolated checkout: 168 unit/database tests in 17 files, production build and standalone TypeScript pass. Eleven new database/slot cases cover counting group sessions once, keeping existing seats joinable at daily/weekly caps, cancellation, timezone boundaries, competing new sessions and unchanged one-on-one counting. npm run lint was attempted and fails because this historical base has no lint script; tooling is a later pending change. Dependencies were reused locally. Original cap edge rules, real PostgreSQL contention and browser comparison remain unverified. Saved session capacity and booked buffer ownership are separate later fixes.
 
 The product files are unchanged from local source commit `11645e1b6359f571e7fc68735227dd64537f946b`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
+
+### Database restart with group bookings — publication verification, October 16
+
+Fresh isolated checkout: 171 unit/database tests in 18 files, production build and standalone TypeScript pass. Three startup cases verify replaying the real DDL over saved group attendees, upgrading a legacy index and retaining one-on-one uniqueness. No production migration was run. npm run lint was attempted and fails because this historical base lacks the script; tooling is a later pending change. Dependencies were reused locally. Browser/original comparison and deployed PostgreSQL validation remain unverified.
+
+The product files are unchanged from local source commit `53842ee162c86f3bc9269242ffaa86df05de866b`. Only contributor/report publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
