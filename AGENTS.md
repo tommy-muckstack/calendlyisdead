@@ -9,6 +9,8 @@
 
 ## Parity workflow
 
+- QA priority (2026-10-16): the user supplied `CALENDLYISDEAD_FIX_PROMPT.md` with 50 numbered findings from October 15. Maintain the numbered tracking table in `docs/PARITY_REPORT.md`, address high-severity findings first, and identify the finding numbers in review descriptions. Do not mark newer local implementations as visual matches without the missing reference captures.
+
 - Publication resumed (2026-10-16): the new CALENDLYISDEAD_FIX_PROMPT.md explicitly requests small PRs, superseding the earlier inferred hold. Publish scoped draft PRs with verification gaps stated; never merge. Keep test data and credentials local. Existing GitHub/Vercel automation may run on publication; do not provision paid services or claim hosting/AI use is cost-free.
 
 - Current scope (user-confirmed 2026-10-15): marketing comparison covers the **homepage and login page only**. Pricing and other marketing pages are excluded. All logged-in functionality remains in scope, including original paid capabilities. Keep end-to-end invitee booking, confirmation, cancellation and rescheduling checks as core scheduling verification.

@@ -22,6 +22,16 @@ export const users = pgTable("users", {
   hideBranding: boolean("hideBranding").notNull().default(false),
   firebaseUid: text("firebase_uid").unique(),
 });
+export const accountOnboarding = pgTable("account_onboarding", {
+  userId: text("userId").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  step: text("step").notNull().default("role"),
+  role: text("role"), timezone: text("timezone"),
+  weekly: jsonb("weekly").$type<Weekly>().notNull(),
+  calendarSkipped: boolean("calendarSkipped"),
+  version: integer("version").notNull().default(1),
+  lastRequest: jsonb("lastRequest"),
+  completedAt: timestamp("completedAt", { mode: "date", withTimezone: true }),
+});
 export const accounts = pgTable("accounts", {
   userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), provider: text("provider").notNull(), providerAccountId: text("providerAccountId").notNull(),

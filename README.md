@@ -25,6 +25,14 @@ Env: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_P
 `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`, `FIREBASE_SERVICE_ACCOUNT_JSON` (whole JSON key), optional `ISDEAD_COOKIE_DOMAIN`.
 Without them the login page says "Sign-in not configured" (demo button still works with `DEMO_MODE=1`).
 
+## New account setup
+
+A newly created app account starts at `/onboarding`: choose a role, optionally connect a Google or Outlook calendar, then confirm your time zone and weekly hours. The first visit detects the browser time zone; a saved choice survives later sign-ins. Each Continue saves progress. Finish setup atomically creates a default schedule and a linked 30 Minute Meeting; an interrupted request can be retried without duplication. No initial public event exists before completion.
+
+Existing accounts, demo accounts and verified-email links to legacy accounts retain their existing setup. Signed-in login/signup visits return to setup or the app. Calendar authorization returns to unfinished setup, and unavailable provider configuration does not block skipping. Roles are stored preferences; they do not gate features. All features remain free. Exact original choices, copy and layout still need browser comparison.
+
+For isolated onboarding browser scenarios, run `npx playwright test --config playwright.onboarding.config.ts`. The config seeds only synthetic accounts in a fresh `.data/onboarding-e2e/` database, disables external mail and analytics, and avoids deleting the normal demo database/outbox. Fixtures use demo sessions; real Firebase signup and provider consent must be checked separately. These scenarios have been authored but cannot execute in the current browser environment.
+
 ## Profile
 
 Settings → Profile (`/app/profile`) edits your display name, scheduling-page welcome message, photo and account time zone. Use **Save changes** to persist the draft; a failed save retains your edits for retry. Changing the account time zone updates meeting filters and account-limit boundaries without changing existing availability schedules or booking instants.
