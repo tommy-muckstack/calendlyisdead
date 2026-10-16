@@ -22,7 +22,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
       <div className="card" style={{ padding: 18, textAlign: "left", marginTop: 16 }}>
         <b>{et.title}</b> with {hosts.map((h: any) => h.name).join(", ")}
         <div className="muted" style={{ marginTop: 6 }}>{s.toFormat("cccc, LLLL d, yyyy")} · {s.toFormat("h:mm a")} – {e.toFormat("h:mm a")} ({b.inviteeTz})</div>
-        {b.meetingUrl ? <div><a href={b.meetingUrl} data-testid="meeting-url">{b.meetingUrl}</a></div> : et.location && <div className="muted">{et.location}</div>}
+        {b.meetingUrl ? <div><a href={b.meetingUrl} data-testid="meeting-url">{b.meetingUrl}</a></div> : b.location && <div className="muted">{b.location}</div>}
       </div>
       {!cancelled && <div className="row" style={{ justifyContent: "center", marginTop: 20 }}>
         <Link className="btn" href={`/booking/${uid}/reschedule`}>Reschedule</Link>

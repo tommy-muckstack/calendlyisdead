@@ -25,7 +25,7 @@ export function meetingZone(zone: string) {
 }
 const B = schema.bookings, E = schema.eventTypes;
 const summary = { uid: B.uid, title: E.title, eventTypeId: B.eventTypeId, start: B.start, end: B.end,
-  inviteeName: B.inviteeName, inviteeEmail: B.inviteeEmail, inviteeTz: B.inviteeTz, status: B.status, location: E.location };
+  inviteeName: B.inviteeName, inviteeEmail: B.inviteeEmail, inviteeTz: B.inviteeTz, status: B.status, location: B.location };
 export type HostMeeting = { uid: string; title: string; eventTypeId: string; start: Date; end: Date;
   inviteeName: string; inviteeEmail: string; inviteeTz: string; status: string; location: string };
 function whereMeetings(userId: string, timezone: string, filters: MeetingFilter, now: Date) {

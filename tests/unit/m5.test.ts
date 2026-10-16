@@ -28,7 +28,7 @@ describe("routing rules", () => {
 });
 
 describe("workflow templates", () => {
-  const ctx = { booking: { uid: "u1", inviteeName: "Ada Lovelace", inviteeEmail: "ada@x.com", inviteeTz: "Europe/London", start: "2026-10-20T14:00:00Z", answers: { co: "Acme" }, meetingUrl: null },
+  const ctx = { booking: { uid: "u1", inviteeName: "Ada Lovelace", inviteeEmail: "ada@x.com", inviteeTz: "Europe/London", start: "2026-10-20T14:00:00Z", answers: { co: "Acme" }, location: "Zoom", meetingUrl: null },
     eventType: { title: "Quick chat", durationMin: 30, location: "Zoom" }, host: { name: "Demo Host", email: "h@x.com" } };
   it("fills variables in the invitee's time zone", () => {
     expect(render("Hi {{invitee.first_name}}, {{event.name}} on {{event.date}} at {{ event.time }} with {{host.name}} ({{event.location}})", ctx))

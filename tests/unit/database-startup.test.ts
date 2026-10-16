@@ -21,6 +21,26 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("freezes available legacy locations once without changing conference links", async () => {
+    await setup(); await seat("legacy-location", 0); await seat("cancelled-location", 1, "cancelled");
+    await client!.exec(`ALTER TABLE bookings DROP COLUMN location; UPDATE event_types SET location = 'Old room';
+      UPDATE bookings SET "meetingUrl" = 'https://meet.example.invalid/kept' WHERE uid = 'legacy-location';`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT DISTINCT location FROM bookings')).rows).toEqual([{ location: "Old room" }]);
+    await client!.exec("UPDATE event_types SET location = 'New room'"); await client!.exec(ddl);
+    expect((await client!.query('SELECT DISTINCT location FROM bookings')).rows).toEqual([{ location: "Old room" }]);
+    expect((await client!.query(`SELECT "meetingUrl" FROM bookings WHERE uid = 'legacy-location'`)).rows).toEqual([{ meetingUrl: "https://meet.example.invalid/kept" }]);
+  });
+  it("resumes a partial location backfill without replacing a saved empty location", async () => {
+    await setup(); await seat("blank-location", 0); await seat("missing-location", 1);
+    await client!.exec(`ALTER TABLE bookings ALTER COLUMN location DROP NOT NULL;
+      UPDATE bookings SET location = NULL WHERE uid = 'missing-location'; UPDATE event_types SET location = 'Current room';`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT uid, location FROM bookings ORDER BY uid')).rows).toEqual([
+      { uid: "blank-location", location: "" }, { uid: "missing-location", location: "Current room" },
+    ]);
+    await expect(client!.exec("UPDATE bookings SET location = NULL")).rejects.toMatchObject({ code: "23502" });
+  });
   it("adds event creation receipts without changing existing events and retains them after event deletion", async () => {
     await setup(); await client!.exec('DROP TABLE event_type_creations;'); await client!.exec(ddl);
     expect((await client!.query('SELECT * FROM event_type_creations')).rows).toEqual([]);

@@ -184,13 +184,13 @@ export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b:
   const when = DateTime.fromJSDate(b.start).setZone(b.inviteeTz).toFormat("cccc, LLLL d, yyyy 'at' h:mm a ZZZZ");
   const hostNames = hostUsers.map(h => h.name).join(", ");
   const ics = buildIcs({ uid: `${b.uid}@calendlyisdead`, start: b.start, end: b.end, title: `${et.title} with ${hostNames}`,
-    description: describe(b, et), location: b.meetingUrl || et.location, organizer: { name: hostUsers[0].name, email: hostUsers[0].email }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
+    description: describe(b, et), location: b.meetingUrl || b.location, organizer: { name: hostUsers[0].name, email: hostUsers[0].email }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
     cancelled: kind === "cancelled", sequence: kind === "confirmed" ? 0 : 1 });
   const manage = `${baseUrl()}/booking/${b.uid}`;
   const verb = { confirmed: "is booked", cancelled: "was cancelled", rescheduled: "moved" }[kind];
   for (const to of [b.inviteeEmail, ...hostUsers.map(h => h.email), ...(b.guests ?? [])]) {
     await sendMail({ to, subject: `${et.title} ${verb}: ${when}`, ics,
-      text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || et.location || "TBD"}${answersText(b, et)}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` });
+      text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || b.location || "TBD"}${answersText(b, et)}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` });
   }
 }
 
@@ -218,7 +218,7 @@ export async function createBooking(input: BookingInput) {
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
-    bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
+    location: et.location, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeLimit: et.kind === "group" ? et.seats : 1,
     inviteeTz: r.timezone, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
@@ -240,10 +240,10 @@ export async function createBooking(input: BookingInput) {
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId), ...(et.sharedWorkspaceId ? [et.userId] : [])])].sort();
       const currentHosts = await tx.select().from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
       if (!et.teamId && !et.sharedWorkspaceId) currentType = (await lockType())[0];
-      // A group template may have changed after the availability preflight but
-      // before its first reservation. Never commit that stale session definition.
-      if (!currentType || !currentType.active || currentType.deletedAt || ((et.kind === "group" || currentType.kind === "group") &&
-        (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin || currentType.location !== et.location))) {
+      // Never reserve a location that changed during the availability preflight.
+      // Group reservations also require a consistent session definition.
+      if (!currentType || !currentType.active || currentType.deletedAt || currentType.location !== et.location || ((et.kind === "group" || currentType.kind === "group") &&
+        (currentType.kind !== et.kind || currentType.durationMin !== et.durationMin))) {
         throw new Error("slot_unavailable");
       }
       let bookingHosts = r.ev.hosts;
@@ -287,8 +287,8 @@ export async function createBooking(input: BookingInput) {
         if (moved.length !== oldGroup.length) throw new Error("slot_unavailable");
       }
       if (et.kind === "group") {
-        // New seats share the session's original buffers even after its type is edited.
-        const attendees = await tx.select({ bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
+        // New seats share the session's original location and buffers.
+        const attendees = await tx.select({ location: bookings.location, bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
           .where(and(eq(bookings.hostId, rows[0].hostId), eq(bookings.eventTypeId, et.id), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")))
           .orderBy(bookings.createdAt, bookings.uid);
         if (attendees.length) {
@@ -332,9 +332,9 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
   for (const row of rows) {
     if (et.kind === "group" && row.seat > 0) continue;
     const host = hostUsers.find(u => u.id === row.hostId);
-    const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: et.location, start: row.start, end: row.end,
+    const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: row.location, start: row.start, end: row.end,
       organizer: { name: host.name ?? "", email: host.email ?? "" }, attendees: [{ name: row.inviteeName, email: row.inviteeEmail }, ...row.guests.map((g: string) => ({ name: g, email: g }))],
-      wantsMeet: confFor(et.location) === "meet" });
+      wantsMeet: confFor(row.location) === "meet" });
     if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null });
       await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId }).where(eq(bookings.uid, row.uid)); }
   }
@@ -342,7 +342,7 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
   const fromCal = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
   // a group seat reuses the session's existing link
   const [sibling] = et.kind === "group" ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.start, main.start), eq(bookings.status, "confirmed")))).filter((b: any) => b.meetingUrl && b.uid !== main.uid) : [];
-  main.meetingUrl = sibling?.meetingUrl ?? await meetingUrlFor(et.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal);
+  main.meetingUrl = sibling?.meetingUrl ?? await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal);
   if (main.meetingUrl) await db.update(bookings).set({ meetingUrl: main.meetingUrl }).where(inArray(bookings.uid, rows.map(r => r.uid)));
   await notify(rescheduled ? "rescheduled" : "confirmed", main, et, hostUsers);
   await onBooked(main.uid);
