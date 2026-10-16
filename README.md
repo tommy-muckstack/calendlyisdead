@@ -90,6 +90,18 @@ Delivery attempts share a provider idempotency key and immutable payload. Failed
 - **Demo calendar**: keyless mock (dev or `DEMO_MODE=1`), busy 12-1pm ET on weekdays.
 - Each user can connect several accounts, choose which calendars are checked for conflicts, and one calendar new bookings are added to. If a provider fails, its busy times are skipped and the connection is flagged.
 
+## Opportunities
+
+**Opportunities** opens a private board with five fixed stages: New lead, Intro call scheduled, Proposal sent, Completed and Check in later. **+ Add opportunity** saves a name, stage and contact, with optional amount, close date, source and notes. Search existing contacts or create one in the editor; a new contact is saved immediately even if you cancel the opportunity. Multiple opportunities can belong to one contact. Contact details links to that person's opportunities.
+
+Drag a card into another stage, or use **Move to stage → Move** with a keyboard or touch device. Moves appear only after the server confirms them. Open a card to view/edit its details and stage history. Completed records stay on the board, and moves back to earlier stages remain in history. Search names or contact details, and page through each stage independently. There is no paid tier or opportunity-count cap; each stage displays 25 records per page.
+
+Amounts preserve decimal precision (up to 15 whole digits and six decimal places); the currency selector labels the amount without charging or processing payments. Close dates use `YYYY-MM-DD`. Notes allow 10,000 characters and source text allows 500. Exact original currency/input behavior remains unverified. All records are private to their owner. Deleted contacts leave their opportunity records available and can be replaced through Edit.
+
+Opportunity deletion permanently removes its details and stage history while preserving the contact and meetings. A minimal owner/ID/revision receipt confirms retries and prevents a lost creation request from recreating the deleted record. Conflicting edits/moves require a reviewed reload, and uncertain requests retain drafts. Stage history uses record revisions to preserve the sequence even when timestamps are identical. The UI displays history times in the account timezone.
+
+Booking-triggered opportunity creation, automation names, default names/dynamic variables and event-editor automation controls are still required under O02 in the parity report. This board change does not add a placeholder automation control. Original screenshots, native drag/drop and keyboard checks remain blocked by the browser environment.
+
 ## Teams and automations
 - Teams at `/team/<slug>`: collective (everyone must be free), round robin (spread evenly, or by priority then evenly), managed event types (copied into each member's account; locked fields follow the template). Invites go out by email and must be accepted by the invited address.
 - Group event types: several invitees per time, up to the seat limit.

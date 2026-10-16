@@ -194,3 +194,15 @@ WHERE f.type = 'invitee_question' AND f."deletedAt" IS NULL AND e."deletedAt" IS
   AND ((e."teamId" IS NULL AND e."userId" = f."userId") OR EXISTS (SELECT 1 FROM event_type_hosts h WHERE h."eventTypeId" = e.id AND h."userId" = f."userId"))
 GROUP BY f."userId", f."eventTypeId"
 ON CONFLICT ("userId", "eventTypeId") DO NOTHING;
+CREATE TABLE IF NOT EXISTS opportunities (
+  id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, "contactId" text REFERENCES contacts(id) ON DELETE SET NULL,
+  name text NOT NULL, stage text NOT NULL, amount text NOT NULL DEFAULT '', currency text NOT NULL DEFAULT 'USD', "closeDate" text NOT NULL DEFAULT '',
+  source text NOT NULL DEFAULT '', notes text NOT NULL DEFAULT '', version integer NOT NULL DEFAULT 1, "createdAt" timestamptz NOT NULL DEFAULT now(), "updatedAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS opportunity_owner_stage ON opportunities ("userId", stage, "updatedAt");
+CREATE TABLE IF NOT EXISTS opportunity_moves (
+  id text PRIMARY KEY, "opportunityId" text NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE, revision integer NOT NULL DEFAULT 1, "from" text, "to" text NOT NULL, at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS opportunity_move_history ON opportunity_moves ("opportunityId", at);
+CREATE TABLE IF NOT EXISTS opportunity_deletions (id text PRIMARY KEY, "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, version integer NOT NULL);
+ALTER TABLE opportunity_moves ADD COLUMN IF NOT EXISTS revision integer NOT NULL DEFAULT 1;

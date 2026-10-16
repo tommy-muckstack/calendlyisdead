@@ -9,3 +9,5 @@ Source file URLs and Git blob hashes are recorded in `sources.json` for reproduc
 The `auto_awesome` source uses a native 24 × 24 coordinate system. Its React
 wrapper uses `0 0 24 24`; the other bundled symbols use `0 -960 960 960`.
 Preserving each source's coordinates prevents clipping when sizing the SVG.
+
+The `work` symbol was added for Opportunities on 2026-10-16, from the official Google repository using its recorded blob hash.

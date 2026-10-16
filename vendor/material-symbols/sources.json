@@ -118,5 +118,10 @@
     "name": "groups",
     "sha": "998ff03729bd58e8ba6e90c24bcbf99f99bb59b2",
     "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/groups/materialsymbolsoutlined/groups_24px.svg"
+  },
+  {
+    "name": "work",
+    "sha": "acfa493ba036edd8b4a6a38661c77921e849ed51",
+    "url": "https://github.com/google/material-design-icons/blob/master/symbols/web/work/materialsymbolsoutlined/work_24px.svg"
   }
 ]
