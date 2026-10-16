@@ -52,7 +52,8 @@ describe("shared Firebase session", () => {
     const u = await A.requireUser();
     expect(u).toMatchObject({ firebaseUid: "fb-new", email: "new@example.com", username: "new", name: "New Person" });
     const { getDb, schema } = await import("../../lib/db"); const { eq } = await import("drizzle-orm"); const db = await getDb();
-    expect((await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.userId, u!.id))).length).toBe(1);
+    expect((await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.userId, u!.id))).length).toBe(0);
+    expect((await db.select().from(schema.accountOnboarding).where(eq(schema.accountOnboarding.userId, u!.id)))[0]).toMatchObject({ step: "role", version: 1 });
     // second sign-in maps to the same row
     expect((await R.POST(post({ idToken: "tok-new" }))).status).toBe(204); expect((await A.requireUser())!.id).toBe(u!.id);
   });

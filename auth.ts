@@ -3,38 +3,13 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema, DEMO_USER_ID } from "@/lib/db";
-import { defaultWeekly } from "@/lib/slots";
-import { SESSION_COOKIE, DEMO_COOKIE, verifySessionCookie, verifyDemo, revokeSessions, firebaseConfigured, type FirebaseIdentity } from "@/lib/isdead-auth/server";
+import { upsertFirebaseUser } from "@/lib/account-provisioning";
+export { upsertFirebaseUser };
+import { SESSION_COOKIE, DEMO_COOKIE, verifySessionCookie, verifyDemo, revokeSessions, firebaseConfigured } from "@/lib/isdead-auth/server";
 
 export { firebaseConfigured };
 export const demoEnabled = () => process.env.NODE_ENV !== "production" || process.env.DEMO_MODE === "1";
 export type User = typeof schema.users.$inferSelect;
-
-/** Find the app user for a Firebase identity, linking by verified email or creating one. */
-export async function upsertFirebaseUser(id: FirebaseIdentity): Promise<User | { error: string }> {
-  const db = await getDb();
-  const [byUid] = await db.select().from(schema.users).where(eq(schema.users.firebaseUid, id.uid));
-  if (byUid) return byUid;
-  const email = id.email?.toLowerCase() ?? null;
-  if (email) {
-    const [byEmail] = await db.select().from(schema.users).where(eq(schema.users.email, email));
-    if (byEmail) {
-      if (byEmail.firebaseUid) return { error: "This email is linked to a different sign-in." };
-      if (!id.emailVerified) return { error: "Verify your email address (check your inbox), then sign in again." };
-      await db.update(schema.users).set({ firebaseUid: id.uid }).where(eq(schema.users.id, byEmail.id));
-      return { ...byEmail, firebaseUid: id.uid };
-    }
-  }
-  const userId = crypto.randomUUID();
-  const base = (email ?? "user").split("@")[0].replace(/[^a-z0-9-]/g, "-").slice(0, 24) || "user";
-  let username = base, n = 1;
-  while ((await db.select().from(schema.users).where(eq(schema.users.username, username))).length) username = `${base}-${++n}`;
-  await db.insert(schema.users).values({ id: userId, firebaseUid: id.uid, email, name: id.name, image: id.picture, username, emailVerified: id.emailVerified ? new Date() : null });
-  await db.insert(schema.schedules).values({ id: crypto.randomUUID(), userId, timezone: "America/New_York", weekly: defaultWeekly(), overrides: {} });
-  await db.insert(schema.eventTypes).values({ id: crypto.randomUUID(), userId, slug: "30min", title: "30 minute meeting", durationMin: 30 });
-  const [u] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-  return u;
-}
 
 async function currentUserId(): Promise<string | null> {
   const jar = await cookies();

@@ -20,6 +20,7 @@ describe("website route privacy", () => {
   it.each([
     ["/calendlyisdead/", "/", "marketing"],
     ["/calendlyisdead/login?to=/secret#token", "/login", "auth"],
+    ["/calendlyisdead/onboarding?error=private#calendar", "/onboarding", "auth"],
     ["/calendlyisdead/app/meetings/private-id", "/app/meetings/[uid]", "app"],
     ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
     ["/calendlyisdead/app/opportunities/automations?eventId=private&q=private", "/app/opportunities/automations", "app"],

@@ -21,6 +21,15 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds resumable onboarding only for new accounts and retains progress on startup", async () => {
+    await setup(); await client!.exec('DROP TABLE account_onboarding;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT * FROM account_onboarding')).rows).toEqual([]);
+    await client!.query('INSERT INTO account_onboarding ("userId", step, role, timezone, weekly, version) VALUES ($1, $2, $3, $4, $5, $6)', ['host', 'availability', 'Sales', 'UTC', {}, 3]);
+    await client!.exec(ddl); expect((await client!.query('SELECT step, role, timezone, version FROM account_onboarding')).rows).toEqual([{ step: 'availability', role: 'Sales', timezone: 'UTC', version: 3 }]);
+    expect((await client!.query('SELECT id FROM event_types')).rows).toEqual([{ id: 'group' }]);
+    await client!.exec("DELETE FROM users WHERE id = 'host'"); expect((await client!.query('SELECT * FROM account_onboarding')).rows).toEqual([]);
+  });
+
   it("adds booking opportunity automations and preserves origin links through schema replay and source deletion", async () => {
     await setup(); await client!.exec('DROP TABLE opportunity_bookings; DROP TABLE opportunity_automations;'); await client!.exec(ddl); await seat("source", 1);
     await client!.exec(`INSERT INTO contacts (id, "userId", name, email) VALUES ('person', 'host', 'Client', 'qa@example.invalid');

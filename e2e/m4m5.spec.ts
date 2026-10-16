@@ -2,6 +2,7 @@ import { test, expect, Page, Browser } from "@playwright/test";
 import fs from "node:fs";
 const shots = "research/ours";
 const login = async (page: Page, who: "demo" | "mate" = "demo", cb = "") => {
+  await page.context().clearCookies(); // Signed-in login redirects; switching fixtures starts a fresh session.
   const q = new URLSearchParams(); if (cb) q.set("callbackUrl", cb); if (who === "mate") q.set("as", "mate");
   await page.goto(`login${q.size ? `?${q}` : ""}`);
   await page.getByRole("button", { name: "Use the demo account" }).click();

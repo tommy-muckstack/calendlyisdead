@@ -44,6 +44,65 @@ The browser blocker and remaining lint debt are not accepted product exceptions.
 
 Severity: P0 = data loss/double booking; P1 = blocked core task; P2 = feature/interaction mismatch; P3 = visual/detail mismatch. Severity on an unverified row is the priority of the check, not a confirmed defect.
 
+## User QA findings — October 15, received October 16
+
+The local `CALENDLYISDEAD_FIX_PROMPT.md` supplies 50 numbered observations. These are user-reported reference evidence, not screenshots captured by this agent. Its named screenshots have not been located; the screenshot column records requested filenames, **not available artifacts**. Original and clone-before/after captures are still required under B2. The current local stack contains work newer than the QA snapshot, so implemented behavior is explicitly distinguished from remaining comparisons.
+
+Highest-severity findings take priority. Preserve the user's free-product, email/Google-only and no-payment-behavior-change constraints. The file also requests pricing/standalone-signup styling; scope clarification is pending, so the prior homepage/login marketing scope remains in effect. Signup/onboarding functionality is in scope. No reported difference is marked `match` solely because code or tests now exist.
+
+| QA # | Area | User severity | Status | Current disposition | Referenced screenshots (unavailable) |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Homepage signup CTA | MED | differs | Hero auth links were repaired earlier; remaining generic mobile destinations still need review. | 01-landing-* |
+| 2 | Footer destinations and privacy | MED | differs | Footer links still route broadly to home; implement actual destinations. | 01-landing-* |
+| 3 | Integration card destinations | LOW | differs | Audit each advertised destination and connect it to working functionality. | 01-landing-* |
+| 4 | Landing console/network 404s | LOW | unverified | Requires a browser console/network capture. | 01-landing-* |
+| 5 | Sales / Learn more destinations | LOW | differs | Use truthful free-product destinations; paid sales/upgrade behavior is excluded by EX1. | 01-landing-* |
+| 6 | Email signup progression and terms | MED | differs | Email-first name/password flow exists; terms/navigation behavior still needs comparison. Standalone styling follows EX2. | 02-signup-* |
+| 7 | New account onboarding | HIGH | differs | Implemented locally in this change; authenticated Firebase/OAuth and original visual/copy parity remain unverified. | 02-signup-* |
+| 8 | Signed-in login redirect | LOW | unverified | Implemented and verified over local HTTP; real shared-session/browser comparison pending. | 03-login-* |
+| 9 | Dedicated forgot-password page | MED | differs | Current inline reset mode remains; page/confirmation/back-navigation work is pending. | 03-login-* |
+| 10 | Wrong-password inline error and email | LOW | unverified | Read-only email remains visible in current LoginForm; compare actual provider failure. | 03-login-* |
+| 11 | Sidebar navigation and upgrade card | MED | differs | Contacts exists locally. Notetaker/navigation still differ; upgrades are intentionally absent under EX1. | 10-eventtypes-* |
+| 12 | Scheduling content spacing / help icon | MED | differs | Earlier shell work is local; exact geometry and icon placement need paired browser measurement. | 10-eventtypes-* |
+| 13 | Collapsed Get started progress | MED | differs | Collapsed pill/progress presentation pending. | 10-eventtypes-* |
+| 14 | Event card color, menus, reorder and title | LOW | differs | Card/bulk menus exist locally. Purple default stripe, ordering, naming and final spacing need comparison. | 10-eventtypes-* |
+| 15 | Rich Create menu | HIGH | differs | Four-kind diagrams/descriptions and main one-off/poll entry points remain pending. | 11-createmenu-* |
+| 16 | Unsaved new-event draft | HIGH | differs | Create still inserts a record immediately. Draft/Create/Cancel persistence must be changed. | 12-neweventtype-* |
+| 17 | Round robin / Collective in main creation | HIGH | differs | Working team-event paths exist separately; main creation/editor integration remains pending. | 12-neweventtype-clone |
+| 18 | Editor pane, accordion, Save / Preview | MED | differs | Explicit saving is implemented; modal behavior, independent sections and Preview still differ. | 12-*; 13-editevent-orig |
+| 19 | Location tile picker and configuration | HIGH | differs | Current text/datalist input remains; provider/location configuration tiles pending. | 12-neweventtype-orig; 16-location-clone |
+| 20 | Duration presets | LOW | differs | Preset/custom selector pending. | 12-* |
+| 21 | Color dot menu | LOW | differs | Native color input remains. | 12-neweventtype-clone |
+| 22 | Editor availability summary and hours | MED | differs | Date-range behavior exists locally; weekly/date-specific preview and copy remain pending. | 13-editevent-orig |
+| 23 | Limits / buffer controls | LOW | differs | Scheduling rules are implemented; dropdown/Set limit presentation differs. | 14-moreoptions-orig |
+| 24 | Free/busy rules | MED | missing | Title-based/free-busy exceptions remain absent. | 14-moreoptions-orig |
+| 25 | Booking page options | MED | differs | Independent increments and locked timezone are implemented locally; complete section comparison pending. | 14-moreoptions-orig |
+| 26 | Invitee form options and default questions | MED | differs | Name format, autofill, guest setting and original defaults remain pending. | 15-questions-orig |
+| 27 | Notifications and contact automations | MED | differs | Contact list/field/question/opportunity actions exist locally. Event notification configuration remains missing. | 14-moreoptions-orig |
+| 28 | Confirmation section / redirects | LOW | differs | Redirect behavior exists; section placement and complete confirmation options pending. | 14-moreoptions-orig |
+| 29 | Payment developer copy | MED | differs | Remove configuration details from product copy; payment/Stripe behavior remains outside authorized changes. | none provided |
+| 30 | Booking header, menu, copy and ribbon | MED | differs | Header/ribbon presentation pending; use the app tombstone identity, not a Calendly mark. | 20-booking-* |
+| 31 | Booking card / cookie / privacy links | LOW | differs | Geometry and genuine privacy/cookie controls need implementation/comparison. | 20-booking-* |
+| 32 | Calendar copy, day circles, today and focus | LOW | differs | Copy/layout/focus comparison and fixes pending. | 20-booking-* |
+| 33 | Searchable friendly timezone picker | HIGH | differs | Raw IANA selectors remain; friendly regions/current time/12–24h behavior pending. | 20-booking-* |
+| 34 | Full-viewport booking background | LOW | unverified | A body background rule exists locally; all booking states need browser verification. | 20-booking-clone; 22-form-clone; 24-cancel-clone |
+| 35 | Booking troubleshooting | LOW | missing | Host troubleshooting controls remain absent. | 20-booking-orig |
+| 36 | Lowercase slot times | LOW | differs | Formatting comparison/fix pending. | 21-slots-orig (clone capture stale) |
+| 37 | Invitee details form | MED | differs | Copy, required markers, guests reveal, consent and timezone detail pending. | 22-form-* |
+| 38 | Booking confirmation | MED | differs | Confirmation copy/layout/icons/calendar actions need the real original reference flow. | 23-confirm-clone |
+| 39 | Cancellation details and action | MED | differs | Cancellation works locally; original details/copy presentation pending. | 24-cancel-clone |
+| 40 | Calendar / meetings timeline | HIGH | differs | Substantial timeline/filter/detail work already exists locally; reference styling, notes, no-shows and external events remain open. | 30-meetings-* |
+| 41 | Contacts | HIGH | differs | Local CRUD/import/export/fields/lists/notes/reminders/opportunities and booking automations exist; remaining feature rows and comparison are open. | 10-eventtypes-* |
+| 42 | Notetaker navigation and settings | MED | missing | A working free equivalent is still required; a labeled stub alone cannot close full functionality parity. | 10-eventtypes-orig |
+| 43 | Automations integrations/apps grid and tabs | HIGH | differs | Existing calendar/conference integrations need the unified working catalog and tabs; missing integrations need free equivalents. | 60-automations-* |
+| 44 | Routing empty state | LOW | differs | Functional routing builder exists; illustration, copy and CTA presentation pending. | 61-routing-* |
+| 45 | Settings navigation | HIGH | differs | Profile/Contacts settings now exist; complete account/feature/admin hierarchy and missing functionality remain open. | 40-availability-*; 50-profile-* |
+| 46 | Profile and login settings | HIGH | differs | Name, welcome, photo and account timezone work locally. Language, country, date/time format and login/security remain missing. | 50-profile-* |
+| 47 | Availability layout and controls | MED | differs | List/calendar view, tabs, friendly timezone, compact hours and clipping need browser comparison/fixes. | 40-availability-* |
+| 48 | Branding comparison joke | LOW | differs | Replace promotional competitor copy with direct product instructions. | 50-profile-clone |
+| 49 | Branded 404 | MED | differs | Branded error page and working home/contact destinations pending. Prompt severity was malformed; treated as MED. | not identified |
+| 50 | 390px responsive comparison | CHECK | unverified | Previous-run screenshots are referenced; capture live states at the required viewport before judging parity. | 95-*; 96-* |
+
 ## Screen and feature matrix
 
 Every row requires 1440px and 390px checks; in-scope nested states must be expanded into individual evidence entries as they are inspected.
@@ -62,7 +121,7 @@ Every row requires 1440px and 390px checks; in-scope nested states must be expan
 | P03 | Feature comparison rows and responsive table | differs | P2 | EX2: pricing marketing audit removed from scope by user on 2026-10-15. No pricing PR planned. | not required
 | P04 | Pricing FAQ and CTA | differs | P2 | EX2: pricing marketing audit removed from scope by user on 2026-10-15. No pricing PR planned. | not required
 | A01 | Login layout and email flow | unverified | P1 | `LoginForm` now has Firebase email-first/password progression; compare original flow, styles and validation. | pending B2 |
-| A02 | Signup and onboarding | differs | P1 | Dedicated signup exists. Original documentation describes automatic initial timezone detection; current account creation and initial availability use America/New_York. Profile now permits correcting the account zone, but automatic detection and onboarding remain unfinished. Marketing styling excluded by EX2. | source/documentation; browser pending B2 |
+| A02 | Signup and onboarding | differs | P1 | QA #7: resumable role → calendar → availability setup now exists locally for new accounts, detects the browser zone, and creates the first schedule/event only on completion. Existing accounts bypass it. QA #8 redirects signed-in login/signup. Real Firebase/provider flow and original visual/copy comparison remain unverified; signup styling excluded by EX2. | local HTTP, unit/DOM checks; paired screenshots pending B2 |
 | A03 | Forgot password | unverified | P2 | Login form reset mode invokes Firebase resetPassword; compare navigation, validation and error/recovery states. | pending B2 |
 | A04 | Google button/logo/interaction | unverified | P2 | Google control now uses shared Google artwork; verify rendered size, spacing, accessible name and current official guidelines. | pending B2 |
 | A05 | Microsoft and enterprise SSO controls | differs | P2 | EX3: user explicitly limited authentication to email/password and Google. Removed the nonfunctional Microsoft button from shared login/signup and its desktop/mobile homepage promotion, plus unsupported SSO claims. Microsoft calendar connections remain supported. | visual confirmation pending B2 |
@@ -230,12 +289,13 @@ Current main baseline (`d3a85d2`), 2026-10-15:
 | Booking-to-field contact automations | [Draft PR #43](https://github.com/tommy-muckstack/calendlyisdead/pull/43) | Text/Number overwrite, additive Tags, multi-field settings and inline creation; list and field actions share transactional receipts. Legacy tag reads, manual sets, saved filters and CSV retained. All 876 unit/database tests and 200 simulated DOM checks pass; build/typechecks pass; lint zero errors, 260 existing warnings. Eight authored browser scenarios and a passing local production HTTP flow. C14/O01 and browser/original comparisons remain open. |
 | Booking-answer mapping automations | [Draft PR #44](https://github.com/tommy-muckstack/calendlyisdead/pull/44) | Future-only answer capture, one new destination per event/host, mapping lifecycle, legacy adoption and shared retry/transaction protection. All 902 unit/database tests and 214 simulated DOM checks pass. Eight new browser scenarios are authored/discoverable, unexecuted. Browser/original comparison remains open. |
 | Opportunity board and record lifecycle | [Draft PR #45](https://github.com/tommy-muckstack/calendlyisdead/pull/45) | Private contact-linked records, five fixed stages, stage history, explicit edits, permanent deletion, accessible move controls and unlimited paginated records. 934 unit/database tests and 229 simulated DOM checks pass; production HTTP flow passes. Ten browser scenarios authored, not executed. O02 booking automations and original/browser comparison remain open. |
-| Booking-triggered opportunity automations | `feat/booking-opportunity-automations` / local only | Named event/stage/name rules with five variables, both entry points, lifecycle controls and linked contact/booking details. Booking transaction, shared receipts and reschedule links protect existing records. 969 unit/database tests and 247 simulated DOM checks pass; production HTTP, build/typechecks pass; lint zero errors, 260 existing warnings. Ten new authored browser scenarios remain unexecuted. |
+| Booking-triggered opportunity automations | [Draft PR #46](https://github.com/tommy-muckstack/calendlyisdead/pull/46) | Named event/stage/name rules with five variables, both entry points, lifecycle controls and linked contact/booking details. Booking transaction, shared receipts and reschedule links protect existing records. 969 unit/database tests and 247 simulated DOM checks pass; production HTTP, build/typechecks pass; lint zero errors, 260 existing warnings. Ten new authored browser scenarios remain unexecuted. |
 | Assistant Material Symbol viewport | [Draft PR #32](https://github.com/tommy-muckstack/calendlyisdead/pull/32) | Correct 24px viewBox restores a clipped-out sidebar icon. Actual React SVG asset renders checked at 20/28/40px. Build and TypeScript pass; lint zero errors, 261 warnings. Browser/reference comparison remains pending. |
 | User-supplied blue tombstone app mark | [Draft PR #23](https://github.com/tommy-muckstack/calendlyisdead/pull/23) | Shared logo and favicon/Apple/manifest exports implemented under EX4. TypeScript/build pass; lint has zero errors and the same 278 warnings. Local asset/color/transparency and production HTTP checks pass. Browser/device appearance remains pending B2. |
 | Visible independence disclaimer | [Draft PR #34](https://github.com/tommy-muckstack/calendlyisdead/pull/34) | Restores the README statement in the shared marketing footer alongside the blue tombstone identity. Production HTML, build and TypeScript pass; lint zero errors, 260 existing warnings. Browser appearance and broader footer link corrections remain pending. |
 | Contact CSV import/export | [Draft PR #39](https://github.com/tommy-muckstack/calendlyisdead/pull/39) | Fresh publication verification and remaining browser/original limitations are recorded below. |
 | Contact notes, reminders and timeline entries | [Draft PR #40](https://github.com/tommy-muckstack/calendlyisdead/pull/40) | Fresh publication verification and remaining browser/original limitations are recorded below. |
+| New account setup and signed-in redirects (QA #7–#8) | Prepared for scoped draft review | Fresh publication verification and remaining browser/original limitations are recorded below. |
 
 ## Capturing evidence with other workers
 
@@ -851,6 +911,30 @@ Verification:
 
 Screenshots/computed styles and native focus/layout behavior remain blocked by B2. No visual match is claimed. Original naming/limits, configuration multiplicity, lifecycle/inheritance rules, contact-preference overrides, reschedule/round-robin ownership, exact event-editor placement and complete booking-detail presentation remain comparisons to perform. PostgreSQL multi-connection contention and Node/Firebase version support remain pending. No PR, push, deployment, production migration, external email or new service was made; publication remains on hold.
 
+## QA #7–#8 — resumable first-account setup and signed-in login (local implementation, October 16)
+
+Reference: the user's October 15 QA prompt describes role → calendar connection → availability → app, and signed-in login returning to the app. Its `02-signup-*` and `03-login-*` screenshots are not available locally. This change implements that progression independently; it does not establish the original's exact role choices, default hours, copy, layout, provider list or keyboard behavior. A02/#7 remains `differs`; #8 remains `unverified` for original/browser parity.
+
+New Firebase identities now provision the app user and an `account_onboarding` record in one transaction, without immediately publishing an event. Existing app users, demo accounts and verified-email links to legacy users receive no onboarding row and retain their schedules/profile/events. Concurrent first sign-ins retry unique-constraint races, and new public usernames avoid reserved app routes; verified-email ownership checks remain in place. No authentication provider, credential, payment or Stripe behavior changed.
+
+The authenticated `/onboarding` flow saves role and calendar progress, detects the browser timezone on the first visit, retains a saved zone on resumption, and offers seven-day availability with split hours. Hours accept 24-hour values, end-of-day `24:00`, adjacent ranges and unavailable days; malformed, reversed and overlapping ranges are rejected. An entirely unavailable week is allowed with an explicit explanation that it has no bookable times. Role is a stored preference and never gates features. The first event has no meeting-provider location until the user configures one.
+
+Google/Outlook calendar connections use the existing integrations and show actual stored connection status. OAuth returns to unfinished setup; unavailable integrations can be skipped without credentials. A Continue without skipping requires an owned connection marked healthy. This does not remove Outlook calendar integration or reintroduce Microsoft authentication. Completing setup atomically creates the default schedule, linked 30 Minute Meeting and account timezone. Lost-response and concurrent retries reuse the saved result rather than creating duplicate schedules/events. Completed setup cannot be restarted. If another session already created scheduling data, an explicit Keep existing setup action preserves that data instead of overwriting it.
+
+Version checks reject stale-tab changes and expose a reviewed reload. Errors preserve drafts, pending requests block duplicate submission/navigation, saves time out after 15 seconds, and unsaved edits guard home navigation, sign-out and unload. Going Back retains local weekly-hour edits. Errors and new step headings receive focus; hours and controls are labeled. Provider links are removed from keyboard navigation while disabled. These interaction checks are simulated DOM evidence, not native-browser keyboard/layout proof.
+
+App pages route unfinished new users to setup. Signed-in login/signup routes return to setup or the app; safe in-app and invitation callbacks are preserved, while external/auth/API/normalized traversal destinations fall back to the app. The onboarding page uses the existing blue tombstone and independence disclaimer. Its telemetry route is classified as auth, with query data removed; no role, hours, timezone, calendar email or setup payload is added to analytics.
+
+Verification:
+
+- **1,005 unit/database tests in 50 files pass**, including 34 onboarding/provisioning/validation/API cases, schema replay/legacy-account preservation and the new telemetry route. Fault injection verifies atomic user creation and completion rollback. PGlite concurrency covers same-identity provisioning and duplicate finishes; actual PostgreSQL multi-connection contention remains unverified.
+- **18 new simulated DOM checks pass** for role validation, explicit saving, exact response validation, failure retention/retry, pending/dirty guards, real calendar-state display, skipping, range validation/add/remove/back navigation, reviewed conflict reload, keeping existing data, disabled provider links and timeout recovery. This is in addition to earlier recorded DOM suites; it is not a claim that all older DOM suites were rerun here.
+- Production build, standalone TypeScript and E2E TypeScript pass. Lint reports zero errors and the existing 260 warnings. A new static SVG uses unoptimized Next Image, adding no image-transformation service.
+- The built app passed a disposable local HTTP flow: gated SSR for app/login/signup, signed-out 401, established-account 404 for setup APIs, private ownership, role persistence/retry, stale-write 409, OAuth-return routing, failed-connect copy, no-calendar rejection/skip, invalid-zone rejection, concurrent finish idempotence, account-zone persistence, no public event before Finish and a public event afterward, completed-state protection, safe callbacks and existing-account bypass. This uses synthetic demo sessions; real Firebase signup/session exchange, verification emails and Google/Outlook consent remain untested. The server was stopped. No mail was sent.
+- **12 Playwright scenarios at 1440px/390px are authored and discovered, not executed**. `playwright.onboarding.config.ts` uses a new isolated fixture directory, disables outbound mail/analytics and avoids deleting shared demo data/outbox. The existing E2E config excludes this fixture-dependent suite. Captures and computed-style extraction are authored; no screenshots or visual match are claimed.
+
+Remaining checks: original role choices/defaults and full step geometry, real auth/provider consent, native focus and viewport overflow, deployment redirects on both hostnames, and PostgreSQL contention. The supplied QA prompt's other high-priority findings remain open in the numbered table. Files and disposable test data for this change were saved locally; no new PR, push, deployment, production migration or paid service was created.
+
 ### QA #40 — publication verification, October 16
 
 The new QA prompt explicitly requests small PRs, superseding the inferred publication hold above. This draft publishes only the meetings timeline/detail/export area on top of PR #3. All capabilities remain free. The new prompt also identifies missing notes/no-show controls and original filters/empty-state styling; these remain open alongside the documented gaps. No visual match is certified.
@@ -1096,3 +1180,9 @@ The product files are unchanged from local source commit `13e49fbaf6becb60d99ad0
 Fresh isolated publication checks pass: 969 tests in 49 files, production build and standalone TypeScript; lint completes with zero errors and 260 warnings. Existing installed dependencies were reused without a fresh registry install. Independent E2E TypeScript passes and 10 scenarios at 1440px/390px are discoverable but unexecuted. Historical simulated DOM and local HTTP evidence were not rerun for publication. These checks were rerun after local disk-space recovery. Original naming/multiplicity/inheritance, contact-preference and booking lifecycle semantics, full detail presentation, native controls and layout remain unverified. Polls/templates and copying configurations are unresolved. PostgreSQL contention, supported-Node acceptance and configured-provider behavior remain pending.
 
 The product files are unchanged from local source commit `01993de3a125eee7e7fdfab84d8d900de945c255`. Only documentation/publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
+
+### New account setup and signed-in redirects (QA #7–#8) — publication verification, October 16
+
+Fresh isolated publication checks pass: 1005 tests in 50 files, production build and standalone TypeScript; lint completes with zero errors and 260 warnings. Existing installed dependencies were reused without a fresh registry install. Independent E2E TypeScript passes and 12 scenarios at 1440px/390px are discoverable but unexecuted. Historical simulated DOM and local HTTP evidence were not rerun for publication. These checks were rerun after local disk-space recovery. Twelve isolated scenarios use playwright.onboarding.config.ts and synthetic sessions; real Firebase signup/session exchange, verification email and Google/Outlook consent remain untested. Original roles/defaults/copy/layout, native focus/mobile behavior, both deployed redirects, PostgreSQL contention and supported-Node acceptance remain pending. QA #7/#8 are not certified as matches.
+
+The product files are unchanged from local source commit `1a370690c5f037eea8003dcc53c41fcd7c18bf8e`. Only documentation/publication metadata differs. This is a scoped draft on the preceding review branch; no before/after screenshots, native interaction or visual match are claimed. The browser runtime still cannot start. No secrets, test databases, outbox or raw logs are published.
