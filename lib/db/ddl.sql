@@ -120,6 +120,16 @@ CREATE TABLE IF NOT EXISTS contact_fields (
   name text NOT NULL, type text NOT NULL, options jsonb NOT NULL DEFAULT '[]', currency text NOT NULL DEFAULT '',
   "eventTypeId" text, "questionId" text, version integer NOT NULL DEFAULT 1, "deletedAt" timestamptz
 );
+CREATE TABLE IF NOT EXISTS contact_imports (
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, id text NOT NULL,
+  "requestHash" text NOT NULL, result jsonb NOT NULL, "createdAt" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("userId", id)
+);
+CREATE TABLE IF NOT EXISTS contact_exports (
+  "userId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE, id text NOT NULL,
+  "requestHash" text NOT NULL, csv text NOT NULL, count integer NOT NULL, email text NOT NULL DEFAULT 'pending', "expiresAt" timestamptz NOT NULL,
+  PRIMARY KEY ("userId", id)
+);
 CREATE UNIQUE INDEX IF NOT EXISTS contact_fields_owner_name ON contact_fields ("userId", lower(name)) WHERE "deletedAt" IS NULL;
 CREATE TABLE IF NOT EXISTS contact_field_values (
   "contactId" text NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
