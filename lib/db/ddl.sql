@@ -45,6 +45,11 @@ ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "priceCents" integer NOT NULL D
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'usd';
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "redirectUrl" text;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "usedAt" timestamptz;
+-- Retain event definitions for booked meetings when a type is deleted. A new
+-- type may reuse its public link; historical bookings still reference the old ID.
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "deletedAt" timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS event_types_current_user_slug ON event_types ("userId", slug) WHERE "deletedAt" IS NULL;
+ALTER TABLE event_types DROP CONSTRAINT IF EXISTS "event_types_userId_slug_key";
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentStatus" text NOT NULL DEFAULT 'none';
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "paymentRef" text;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "amountCents" integer NOT NULL DEFAULT 0;

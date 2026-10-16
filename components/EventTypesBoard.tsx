@@ -39,16 +39,21 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
     </div>)}
     {open && <Editor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
-      onDelete={async () => { await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" }); setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null); }} />}
+      onDelete={async () => {
+        const response = await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("delete_failed");
+        setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null);
+      }} />}
     {toast && <div className="toast" role="status">{toast}</div>}
   </>;
 }
 
-function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): void }) {
+function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void> }) {
   const [d, setD] = useState(et);
   const [sect, setSect] = useState<string>("basics");
   const [err, setErr] = useState("");
   const [groupLocked, setGroupLocked] = useState(et.groupSettingsLocked ?? false);
+  const [deleting, setDeleting] = useState(false);
   const timer = useRef<any>(null), first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -142,7 +147,13 @@ function Editor({ et, username, schedules, onClose, onChange, onSaved, onDelete 
           <label className="f" htmlFor="et-redirect">Redirect after booking (optional)</label>
           <input id="et-redirect" className="input" placeholder="https://example.com/thanks" value={d.redirectUrl ?? ""} onChange={e => setD({ ...d, redirectUrl: e.target.value.trim() || null })} /></> })}
         <p className="muted" style={{ fontSize: 13 }}>Changes save automatically.</p>
-        {!d.managedParentId && <button className="btn danger" onClick={() => confirm("Delete this event type?") && onDelete()}>Delete event type</button>}
+        {!d.managedParentId && <button className="btn danger" disabled={deleting} onClick={async () => {
+          if (!confirm("Delete this event type? Scheduled meetings will remain unchanged.")) return;
+          setDeleting(true);
+          try { await onDelete(); }
+          catch { setErr("Deletion could not be confirmed. Reload the page before trying again."); }
+          finally { setDeleting(false); }
+        }}>{deleting ? "Deleting…" : "Delete event type"}</button>}
       </div>
     </aside>
   </>;

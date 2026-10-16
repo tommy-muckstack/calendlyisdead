@@ -21,6 +21,21 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("migrates deleted-type link reuse without losing bookings or weakening current-link uniqueness", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec(`DROP INDEX event_types_current_user_slug;
+      ALTER TABLE event_types DROP COLUMN "deletedAt";
+      ALTER TABLE event_types ADD CONSTRAINT "event_types_userId_slug_key" UNIQUE ("userId", slug);`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "deletedAt" FROM event_types')).rows).toEqual([{ deletedAt: null }]);
+    await client!.exec(`UPDATE event_types SET "deletedAt" = now(), active = false WHERE id = 'group';
+      INSERT INTO event_types (id, "userId", slug, title) VALUES ('replacement', 'host', 'group', 'New group');`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT uid, "eventTypeId" FROM bookings')).rows).toEqual([{ uid: "retained", eventTypeId: "group" }]);
+    expect((await client!.query('SELECT count(*)::int AS count FROM event_types')).rows).toEqual([{ count: 2 }]);
+    await expect(client!.exec(`INSERT INTO event_types (id, "userId", slug, title) VALUES ('duplicate', 'host', 'group', 'Duplicate');`))
+      .rejects.toMatchObject({ code: "23505" });
+  });
   it("backfills legacy group limits above attendance and preserves them on later startup", async () => {
     await setup(); await seat("first", 0); await seat("second", 1); await seat("third", 2);
     await client!.exec('ALTER TABLE bookings DROP COLUMN "inviteeLimit"; UPDATE event_types SET seats = 2;');

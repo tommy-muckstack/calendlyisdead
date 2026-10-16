@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params; if (!(await isAdmin(u.id, id))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const p = Body.safeParse(await req.json()); if (!p.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const db = await getDb();
-  const mine = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.teamId, id));
+  const mine = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.teamId, id), isNull(schema.eventTypes.deletedAt)));
   const baseSlug = p.data.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "meeting";
   let slug = baseSlug, n = 1; while (mine.some((e: any) => e.slug === slug)) slug = `${baseSlug}-${++n}`;
   const [et] = await db.insert(schema.eventTypes).values({ id: crypto.randomUUID(), userId: u.id, teamId: id, slug, title: p.data.title, kind: p.data.kind, durationMin: 30,

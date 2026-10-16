@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { requireUser } from "@/auth";
 import { getDb, schema } from "@/lib/db";
@@ -11,7 +11,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id, etId } = await params; if (!(await isAdmin(u.id, id))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const p = Body.safeParse(await req.json()); if (!p.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   const db = await getDb();
-  const [et] = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.id, etId), eq(schema.eventTypes.teamId, id)));
+  const [et] = await db.select().from(schema.eventTypes).where(and(eq(schema.eventTypes.id, etId), eq(schema.eventTypes.teamId, id), isNull(schema.eventTypes.deletedAt)));
   if (!et || et.kind === "managed") return NextResponse.json({ error: "not_found" }, { status: 404 });
   const members = (await teamMembers(id)).map(m => m.userId);
   if (p.data.hosts.some(h => !members.includes(h.userId))) return NextResponse.json({ error: "not_a_member" }, { status: 400 });
