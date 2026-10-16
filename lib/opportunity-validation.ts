@@ -18,7 +18,8 @@ export const OpportunityContact = z.object({ id: z.string().uuid(), name: z.stri
 export const OpportunityRow = z.object({ opportunity: OpportunityData, contact: OpportunityContact.nullable() });
 export const OpportunityList = z.object({ rows: z.array(OpportunityRow), total: z.number().int().nonnegative(), page: z.number().int().positive(), stage: OpportunityStage.nullable() });
 export type OpportunityListData = z.infer<typeof OpportunityList>;
-export const OpportunityDetail = OpportunityRow.extend({ history: z.array(z.object({ id: z.string().uuid(), from: OpportunityStage.nullable(), to: OpportunityStage, at: z.string().datetime() })), historyTotal: z.number().int().nonnegative() });
+export const OpportunityBooking = z.object({ automationName: z.string(), eventTitle: z.string(), bookingUid: z.string().nullable(), start: z.string().datetime().nullable(), end: z.string().datetime().nullable(), status: z.string().nullable(), inviteeName: z.string().nullable() });
+export const OpportunityDetail = OpportunityRow.extend({ booking: OpportunityBooking.nullable().optional(), history: z.array(z.object({ id: z.string().uuid(), from: OpportunityStage.nullable(), to: OpportunityStage, at: z.string().datetime() })), historyTotal: z.number().int().nonnegative() });
 export type OpportunityDetailData = z.infer<typeof OpportunityDetail>;
 export const CreateOpportunity = OpportunityFields.extend({ id: z.string().uuid() }).strict().refine(value => !!value.contactId, { path: ["contactId"], message: "Choose a contact." });
 export const UpdateOpportunity = OpportunityFields.extend({ action: z.literal("edit"), version: z.number().int().positive() }).strict();

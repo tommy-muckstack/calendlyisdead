@@ -4,6 +4,7 @@ import { lockContactOwner, type ContactDB } from "./contact-store";
 import { ChangeOpportunity, OpportunityData, OpportunityDetail, OpportunityFields, OpportunityList, sameOpportunity, type OpportunityDraft } from "./opportunity-validation";
 import type { z } from "zod";
 import type { OpportunityFilters } from "./opportunity-validation";
+import { opportunityBooking } from "./opportunity-bookings";
 const { opportunities: O, opportunityMoves: M, opportunityDeletions: D, contacts: C } = schema;
 export class OpportunityError extends Error { constructor(message: string, public status = 409) { super(message); } }
 const owned = (userId: string, id: string) => and(eq(O.userId, userId), eq(O.id, id));
@@ -20,7 +21,7 @@ export async function getOpportunity(userId: string, id: string, historyPage = 1
   db ??= await getDb(); const [row] = await db.select(select).from(O).leftJoin(C, contactJoin(userId)).where(owned(userId, id));
   if (!row) throw new OpportunityError("This opportunity is no longer available.", 404);
   const [moves, count] = await Promise.all([db.select().from(M).where(eq(M.opportunityId, id)).orderBy(desc(M.revision), desc(M.at), asc(M.id)).limit(50).offset((historyPage - 1) * 50), db.select({ total: sql<number>`count(*)::int` }).from(M).where(eq(M.opportunityId, id))]);
-  return OpportunityDetail.parse({ opportunity: data(row.opportunity), contact: row.contact, history: moves.map(move => ({ id: move.id, from: move.from, to: move.to, at: move.at.toISOString() })), historyTotal: Number(count[0].total) });
+  return OpportunityDetail.parse({ opportunity: data(row.opportunity), contact: row.contact, booking: await opportunityBooking(db, userId, id), history: moves.map(move => ({ id: move.id, from: move.from, to: move.to, at: move.at.toISOString() })), historyTotal: Number(count[0].total) });
 }
 export async function listOpportunities(userId: string, filters: z.infer<typeof OpportunityFilters>, db?: ContactDB) {
   db ??= await getDb(); const query = `%${filters.q.replace(/[\\%_]/g, char => `\\${char}`)}%`;
