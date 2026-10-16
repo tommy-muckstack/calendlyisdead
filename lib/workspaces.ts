@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { BP } from "./basepath";
 import { sendMail, type Mail } from "./email";
@@ -34,7 +34,7 @@ async function data(tx: DB, userId: string): Promise<WorkspaceData | null> {
   const members: WorkspaceData["members"] = await tx.select({ id: M.id, userId: M.userId, role: M.role, name: U.name, email: U.email }).from(M).innerJoin(U, eq(M.userId, U.id)).where(eq(M.workspaceId, workspace.id)).orderBy(M.joinedAt, M.id);
   const invitations: Invitation[] = admin(member) ? await tx.select().from(I).where(and(eq(I.workspaceId, workspace.id), pending)).orderBy(I.email) : [];
   return { id: workspace.id, name: workspace.name, version: workspace.version, role: member.role, members,
-    invitations: invitations.map(inv => ({ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt.toISOString(), delivery: inv.delivery })) };
+    invitations: invitations.map(inv => ({ id: inv.id, email: inv.email, role: inv.role, expiresAt: inv.expiresAt?.toISOString() ?? null, delivery: inv.delivery, reminderDelivery: inv.reminderDelivery })) };
 }
 export async function readWorkspace(userId: string) {
   const db = await getDb(); return db.transaction((tx: DB) => data(tx, userId), { isolationLevel: "read committed" });
@@ -43,10 +43,10 @@ async function lockUser(tx: DB, userId: string) {
   const [user]: (typeof U.$inferSelect)[] = await tx.select().from(U).where(eq(U.id, userId)).for("no key update");
   if (!user) fail(404, "user_missing", "This account is unavailable."); return user;
 }
-function delivery(invitation: Invitation, name: string, token: string) {
+function delivery(invitation: Invitation, name: string, token: string, reminder = false) {
   const origin = (process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`).replace(/\/$/, "");
   const url = `${origin}/invite/workspace/${token}`;
-  const mail: Mail = { to: invitation.email, subject: `Join ${name} on CalendlyIsDead`, text: `You have been invited to join ${name}.\n\nSign in with this email address and accept your invitation:\n${url}\n\nThis link expires in 7 days. If you were not expecting this invitation, you can ignore it.`, idempotencyKey: `workspace-${invitation.id}-${invitation.tokenHash}` };
+  const mail: Mail = { to: invitation.email, subject: `${reminder ? "Reminder: " : ""}Join ${name} on CalendlyIsDead`, text: `${reminder ? "You still have an invitation" : "You have been invited"} to join ${name}.\n\nSign in with this email address and accept your invitation:\n${url}\n\nThis invitation has no expiration date. An admin can revoke or replace it. If you were not expecting this invitation, you can ignore it.`, idempotencyKey: `workspace-${invitation.id}-${reminder ? "reminder" : invitation.tokenHash}` };
   return { invitation, mail, url };
 }
 export async function changeWorkspace(userId: string, raw: unknown) {
@@ -91,7 +91,7 @@ export async function changeWorkspace(userId: string, raw: unknown) {
       const [waiting] = await tx.select().from(I).where(and(eq(I.workspaceId, workspace.id), eq(I.email, input.email), pending));
       if (waiting) fail(409, "already_invited", "This person already has a pending invitation. Resend it from Pending invitations.");
       const token = randomBytes(32).toString("hex");
-      const [invitation]: Invitation[] = await tx.insert(I).values({ id: input.id, workspaceId: workspace.id, email: input.email, role: input.role, invitedBy: userId, tokenHash: hash(token), requestHash: digest, expiresAt: new Date(Date.now() + 7 * 864e5) }).returning();
+      const [invitation]: Invitation[] = await tx.insert(I).values({ id: input.id, workspaceId: workspace.id, email: input.email, role: input.role, invitedBy: userId, tokenHash: hash(token), requestHash: digest }).returning();
       mail = delivery(invitation, workspace.name, token);
     } else if (input.action === "resend" || input.action === "revoke") {
       const [invitation]: Invitation[] = await tx.select().from(I).where(and(eq(I.id, input.invitationId), eq(I.workspaceId, workspace.id), pending));
@@ -99,7 +99,8 @@ export async function changeWorkspace(userId: string, raw: unknown) {
       if (input.action === "revoke") await tx.update(I).set({ revokedAt: new Date() }).where(eq(I.id, invitation.id));
       else {
         const token = randomBytes(32).toString("hex");
-        const [renewed]: Invitation[] = await tx.update(I).set({ tokenHash: hash(token), expiresAt: new Date(Date.now() + 7 * 864e5), invitedBy: userId, delivery: "pending" }).where(eq(I.id, invitation.id)).returning();
+        const [renewed]: Invitation[] = await tx.update(I).set({ tokenHash: hash(token), reminderTokenHash: null, expiresAt: null,
+          ...(invitation.expiresAt ? { createdAt: new Date() } : {}), invitedBy: userId, delivery: "pending" }).where(eq(I.id, invitation.id)).returning();
         mail = delivery(renewed, workspace.name, token);
       }
     } else if (input.action === "disband") {
@@ -140,7 +141,7 @@ export async function changeWorkspace(userId: string, raw: unknown) {
   return { workspace: await readWorkspace(userId), invitationUrl };
 }
 async function invitationFor(tx: DB, userId: string, token: string) {
-  const [invitation]: Invitation[] = await tx.select().from(I).where(eq(I.tokenHash, hash(token)));
+  const [invitation]: Invitation[] = await tx.select().from(I).where(or(eq(I.tokenHash, hash(token)), eq(I.reminderTokenHash, hash(token))));
   if (!invitation || invitation.revokedAt) invalid();
   const [workspace] = await tx.select().from(W).where(eq(W.id, invitation.workspaceId));
   const [user]: (typeof U.$inferSelect)[] = await tx.select().from(U).where(eq(U.id, userId));
@@ -150,7 +151,7 @@ async function invitationFor(tx: DB, userId: string, token: string) {
     if (membership?.id !== invitation.acceptedMembershipId) invalid();
     return { invitation, workspace, alreadyJoined: true };
   }
-  if (invitation.expiresAt.getTime() <= Date.now()) invalid();
+  if (invitation.expiresAt && invitation.expiresAt.getTime() <= Date.now()) invalid();
   const inviter = await memberFor(tx, invitation.invitedBy);
   if (!workspace || inviter?.workspaceId !== workspace.id || !admin(inviter)) invalid();
   return { invitation, workspace, alreadyJoined: false };
@@ -163,7 +164,7 @@ export async function readWorkspaceInvitation(userId: string, raw: unknown) {
 export async function acceptWorkspaceInvitation(userId: string, raw: unknown) {
   const { token } = WorkspaceAcceptance.parse(raw), db = await getDb();
   await db.transaction(async (tx: DB) => {
-    const [probe]: Invitation[] = await tx.select().from(I).where(eq(I.tokenHash, hash(token))); if (!probe) invalid();
+    const [probe]: Invitation[] = await tx.select().from(I).where(or(eq(I.tokenHash, hash(token)), eq(I.reminderTokenHash, hash(token)))); if (!probe) invalid();
     await tx.select().from(W).where(eq(W.id, probe.workspaceId)).for("update");
     await lockUser(tx, userId);
     const result = await invitationFor(tx, userId, token); if (result.alreadyJoined) return;
@@ -174,4 +175,39 @@ export async function acceptWorkspaceInvitation(userId: string, raw: unknown) {
     await tx.update(W).set({ version: result.workspace.version + 1 }).where(eq(W.id, result.workspace.id));
   }, { isolationLevel: "read committed" });
   return { workspace: await readWorkspace(userId) };
+}
+
+/** One automatic reminder attempt after seven days. The original link stays valid.
+ * Only hashes are retained; an interrupted send cannot be safely replayed without
+ * storing its bearer token. Admins can explicitly resend after a failed attempt.
+ */
+export async function processWorkspaceInvitationReminders(now = new Date()) {
+  if (!Number.isFinite(+now)) throw new Error("invalid_time");
+  const db = await getDb(), cutoff = new Date(+now - 7 * 864e5);
+  const due = and(pending, isNull(I.remindedAt), isNull(I.expiresAt), lte(I.createdAt, cutoff));
+  let cursor = "", sent = 0, undelivered = 0;
+  while (true) {
+    const invitations: Invitation[] = await db.select().from(I).where(and(due, gt(I.id, cursor))).orderBy(I.id).limit(100);
+    if (!invitations.length) break;
+    for (const candidate of invitations) {
+      const outbound = await db.transaction(async (tx: DB) => {
+        // Use the same lock as acceptance, resend, revocation and role changes.
+        const [workspace] = await tx.select().from(W).where(eq(W.id, candidate.workspaceId)).for("update");
+        const [current]: Invitation[] = await tx.select().from(I).where(and(eq(I.id, candidate.id), due));
+        if (!workspace || !current) return null;
+        const inviter = await memberFor(tx, current.invitedBy);
+        if (inviter?.workspaceId !== workspace.id || !admin(inviter)) return null;
+        const token = randomBytes(32).toString("hex");
+        const [claimed]: Invitation[] = await tx.update(I).set({ reminderTokenHash: hash(token), remindedAt: now, reminderDelivery: "pending" }).where(eq(I.id, current.id)).returning();
+        return delivery(claimed, workspace.name, token, true);
+      }, { isolationLevel: "read committed" });
+      if (!outbound) continue;
+      let delivered = false; try { delivered = await sendMail(outbound.mail); } catch { /* Keep the attempt visible for an admin's explicit resend. */ }
+      await db.update(I).set({ reminderDelivery: delivered ? "sent" : "undelivered" })
+        .where(and(eq(I.id, outbound.invitation.id), eq(I.reminderTokenHash, outbound.invitation.reminderTokenHash), pending));
+      if (delivered) sent++; else undelivered++;
+    }
+    cursor = invitations[invitations.length - 1].id;
+  }
+  return { sent, undelivered };
 }

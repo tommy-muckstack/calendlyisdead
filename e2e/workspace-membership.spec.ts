@@ -28,6 +28,13 @@ for (const width of [1440, 390]) {
       await page.reload(); await expect(page.getByRole("button", { name: "Active users (1)" })).toBeVisible(); await page.getByRole("button", { name: "Pending invitations (1)" }).click(); await expect(page.getByText("sam@calendlyisdead.local", { exact: true })).toBeVisible();
       await page.getByLabel("Search people").fill("no-such-person"); await expect(page.getByText("No people match your search.")).toBeVisible();
     });
+    test("keeps invitations open and shows one reminder attempt after seven days", async ({ page }, info) => {
+      await create(page); const link = await invite(page); await expect(page.getByText("No expiration", { exact: true })).toBeVisible();
+      const now = new Date(Date.now() + 7 * 864e5 + 1000).toISOString(); const first = await page.request.get(`api/cron/workflows?now=${encodeURIComponent(now)}`); expect(first.ok()).toBe(true); expect((await first.json()).workspaceInvitations).toEqual({ sent: 0, undelivered: 1 });
+      await page.getByRole("button", { name: "Refresh People", exact: true }).click(); await expect(page.getByText("Reminder email not delivered — use Resend to try again", { exact: true })).toBeVisible(); await page.screenshot({ path: info.outputPath("workspace-one-time-reminder.png") });
+      const again = await page.request.get(`api/cron/workflows?now=${encodeURIComponent(now)}`); expect((await again.json()).workspaceInvitations).toEqual({ sent: 0, undelivered: 0 });
+      await page.request.post("api/session/demo?who=mate"); await page.goto(link); await expect(page.getByRole("button", { name: "Accept invitation", exact: true })).toBeVisible(); await page.getByRole("button", { name: "Accept invitation", exact: true }).click(); await expect(page.getByRole("button", { name: "Active users (2)" })).toBeVisible();
+    });
     test("invitation login callback and explicit acceptance add a member without admin controls", async ({ page, browser }, info) => {
       await create(page); const link = await invite(page), context = await browser.newContext({ viewport: { width, height: 900 } }), guest = await context.newPage();
       try {

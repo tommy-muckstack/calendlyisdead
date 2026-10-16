@@ -41,6 +41,14 @@ Failed requests retain the draft. An unchanged retry checks the same creation re
 
 The API persists settings and a minimal creation receipt atomically in the existing database. The older kind-only creation request remains compatible with existing callers. Shared Round robin/Collective creation, the rich four-kind menu, location tiles and original pane styling remain separate parity work; see [the parity report](docs/PARITY_REPORT.md).
 
+## Workspace invitations
+
+Settings → Workspace/People creates a free organization, manages members and invites colleagues. New invitations have no expiry. A recipient must sign in with the invited email and explicitly accept. Admins can revoke or resend an invitation; resend replaces all previous links. Removing a member prevents their old accepted links from restoring access.
+
+The existing workflow cron also attempts one reminder for invitations still pending after seven days. The reminder provides a second link while keeping the original valid. Only token hashes are stored. The reminder is claimed transactionally before delivery and is not automatically retried after a provider failure or interrupted attempt; People shows the delivery status and admins can resend explicitly. Without a mail provider, artifacts stay in the local outbox and the UI reports undelivered mail. No provider is enabled by this change.
+
+Older invitations created with the previous seven-day expiry retain that expiry, so migration cannot reactivate expired links. Resend adopts the non-expiring behavior and starts a new seven-day reminder window for those older invitations. Accepted/revoked invitations do not receive reminders. Production cron and provider delivery still require separate verification.
+
 ## Profile
 
 Settings → Profile (`/app/profile`) edits your display name, scheduling-page welcome message, photo and account time zone. Use **Save changes** to persist the draft; a failed save retains your edits for retry. Changing the account time zone updates meeting filters and account-limit boundaries without changing existing availability schedules or booking instants.
