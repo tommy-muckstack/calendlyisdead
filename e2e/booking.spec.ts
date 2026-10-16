@@ -57,15 +57,16 @@ test("a taken slot disappears for the next invitee", async ({ request }) => {
   expect(s2[day] ?? []).not.toContain(start);
 });
 
-test("host edits an event type in the slide-in editor and it auto-saves", async ({ page }) => {
+test("host explicitly saves changes in the event editor", async ({ page }) => {
   await page.goto("login");
   await page.getByRole("button", { name: "Use the demo account" }).click();
   await expect(page.getByRole("heading", { name: "Scheduling" })).toBeVisible();
   await page.screenshot({ path: `${shots}/07-event-types.png` });
   await page.getByTestId("event-type").first().click();
   await page.getByLabel("Name").fill("Quick chat (edited)");
-  await expect(page.getByRole("status")).toHaveText("Saved");
-  await page.screenshot({ path: `${shots}/08-editor-autosave.png` });
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toBeVisible();
+  await page.screenshot({ path: `${shots}/08-editor-saved.png` });
   await page.reload();
   await expect(page.getByText("Quick chat (edited)")).toBeVisible();
   await page.goto("app/availability");

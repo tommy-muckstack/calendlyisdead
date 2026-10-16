@@ -2,6 +2,7 @@
 import { BP } from "@/lib/basepath";
 import { I } from "@/components/app/icons";
 import { EventTypeMenu, type EventTypeAction } from "./EventTypeMenu";
+import { EventTypePatch } from "@/lib/event-type-validation";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
@@ -10,6 +11,17 @@ export type ET = { id: string; slug: string; title: string; description: string;
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
 type Sch = { id: string; name: string };
+const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
+function draftBody(d: ET) {
+  return Object.fromEntries(EDITABLE_KEYS.filter(key =>
+    !(d.managedParentId && d.lockedFields.includes(key)) &&
+    !(key === "kind" && (d.managedParentId || d.teamId)) && !(key === "scheduleId" && d.teamId)
+  ).map(key => [key, key === "questions" ? d.questions.map(q => q.type === "select" ? q : { ...q, options: undefined }) : d[key]]));
+}
+const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration",
+  location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
+  rangeDays: "Bookable days", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", questions: "Invitee questions",
+  kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
 export function EventTypesBoard({ initial, username, schedules, owner }: { initial: ET[]; username: string; schedules: Sch[]; owner?: string }) {
   const [items, setItems] = useState(initial);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -84,45 +96,85 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
 
 export function EventTypeEditor({ et, username, schedules, onClose, onChange, onSaved, onDelete }: { et: ET; username: string; schedules: Sch[]; onClose(): void; onChange(e: ET): void; onSaved(): void; onDelete(): Promise<void> }) {
   const [d, setD] = useState(et);
-  const nameInput = useRef<HTMLInputElement>(null), closeButton = useRef<HTMLButtonElement>(null);
+  const [baseline, setBaseline] = useState(et);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null), closeButton = useRef<HTMLButtonElement>(null), errorMessage = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     const previous = document.activeElement;
+    const panel = dialog.current;
+    panel?.showModal();
     (nameInput.current?.disabled ? closeButton.current : nameInput.current)?.focus();
-    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+    return () => { panel?.close(); if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
   }, []);
   const [sect, setSect] = useState<string>("basics");
   const [err, setErr] = useState("");
   const [groupLocked, setGroupLocked] = useState(et.groupSettingsLocked ?? false);
   const [deleting, setDeleting] = useState(false);
-  const timer = useRef<any>(null), first = useRef(true);
+  const [saving, setSaving] = useState(false);
+  const [saveCount, setSaveCount] = useState(0);
+  const requestPending = useRef(false);
+  const controller = useRef<AbortController | null>(null);
+  const dirty = JSON.stringify(draftBody(d)) !== JSON.stringify(draftBody(baseline));
+  const pending = saving || deleting;
+  useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
-    if (first.current) { first.current = false; return; }
-    clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      const KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"];
-      const body: any = Object.fromEntries(KEYS.filter(k => k in d && !(d.managedParentId && (d.lockedFields ?? []).includes(k))).map(k => [k, (d as any)[k]]));
-      if (d.managedParentId || d.teamId) delete body.kind;
-      if (d.teamId) delete body.scheduleId;
-      if (body.questions) body.questions = body.questions.filter((q: Q) => q.label.trim()).map((q: Q) => q.type === "select" ? { ...q, options: (q.options ?? []).filter(Boolean) } : { ...q, options: undefined });
-      const r = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (r.ok) {
-        const saved = await r.json();
-        if (saved.groupSettingsLocked) setGroupLocked(true);
-        setErr(""); onChange(saved); onSaved();
-      } else {
-        const j = await r.json();
-        if (j.error === "group_settings_locked" && j.settings) {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    addEventListener("beforeunload", warn);
+    return () => removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  useEffect(() => { if (err && !pending) errorMessage.current?.focus(); }, [err, pending]);
+  useEffect(() => { if (saveCount) closeButton.current?.focus(); }, [saveCount]);
+  function requestClose() {
+    if (requestPending.current) return;
+    if (!dirty || confirm("Discard unsaved changes?")) onClose();
+  }
+  async function save() {
+    if (requestPending.current || !dirty) return;
+    const body = draftBody(d);
+    const parsed = EventTypePatch.safeParse(body);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      setErr(`${FIELD_NAMES[String(issue.path[0])] ?? "Event settings"}: ${issue.message}`);
+      return;
+    }
+    if (d.questions.some(q => !q.label.trim() || (q.type === "select" && !(q.options ?? []).length))) {
+      setSect("questions"); setErr("Enter a label for every question and at least one choice for each choice question."); return;
+    }
+    if (d.kind === "group" && d.seats < 2) { setSect("basics"); setErr("Invitee limit must be at least 2."); return; }
+    requestPending.current = true; setSaving(true); setErr("");
+    const abort = new AbortController(); controller.current = abort;
+    const timeout = setTimeout(() => abort.abort(), 15_000);
+    try {
+      const response = await fetch(`${BP}/api/event-types/${et.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data), signal: abort.signal });
+      const result = await response.json();
+      if (!response.ok) {
+        if (result?.error === "group_settings_locked" && result.settings?.kind === "group" &&
+          typeof result.settings.durationMin === "number" && typeof result.settings.location === "string") {
+          const settings = { kind: "group", durationMin: result.settings.durationMin, location: result.settings.location };
           setGroupLocked(true);
-          // Another invitee may have booked while this editor was open. Restore
-          // only the locked values; the next save retains the user's other edits.
-          setD(current => ({ ...current, ...j.settings }));
-          setErr("This group event was booked. Its duration and location can no longer change.");
-        } else setErr(j.error === "slug_taken" ? "That link is already used" : "Check the highlighted values");
+          // Refresh protected values without discarding unrelated draft edits.
+          setD(current => ({ ...current, ...settings }));
+          setBaseline(current => ({ ...current, ...settings }));
+          setErr("This group event was booked. Its duration and location can no longer change. Your other edits are still here; save again to apply them.");
+        } else if (result?.error === "slug_taken") { setSect("link"); setErr("That link is already used. Choose another link and save again."); }
+        else if (result?.error === "unauthorized") setErr("Your session expired. Your edits have not been saved. Sign in again before saving.");
+        else if (result?.error === "locked") setErr("Your team changed the locked settings. Your edits have not been saved. Copy your changes before reloading.");
+        else if (result?.error === "bad_schedule") { setSect("avail"); setErr("That schedule is no longer available. Choose another schedule and save again."); }
+        else throw new Error("save_failed");
+        return;
       }
-    }, 600);
-    return () => clearTimeout(timer.current);
-  }, [d]);
-  useEffect(() => { const k = (e: KeyboardEvent) => e.key === "Escape" && onClose(); addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, []);
+      if (!result || result.id !== et.id || !Object.keys(body).every(key => Object.hasOwn(result, key)) ||
+        !EventTypePatch.safeParse(Object.fromEntries(Object.keys(body).map(key => [key, result[key]]))).success) throw new Error("invalid_response");
+      const saved: ET = { ...d, ...result };
+      if (saved.groupSettingsLocked) setGroupLocked(true);
+      setD(saved); setBaseline(saved); setSaveCount(count => count + 1); onChange(saved); onSaved();
+    } catch {
+      setErr("Saving could not be confirmed. Your edits are still here. Try saving again.");
+    } finally {
+      clearTimeout(timeout); controller.current = null; requestPending.current = false; setSaving(false);
+    }
+  }
   const L = (k: string) => ((d.lockedFields ?? []).includes(k) && !!d.managedParentId) ||
     (groupLocked && ["durationMin", "location", "kind"].includes(k));
   const set = (k: keyof ET) => (e: any) => setD({ ...d, [k]: e.target.type === "number" ? Number(e.target.value) : e.target.type === "checkbox" ? e.target.checked : e.target.value });
@@ -130,14 +182,18 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
     <button onClick={() => setSect(sect === id ? "" : id)} aria-expanded={sect === id}><span><b>{title}</b><small>{summary}</small></span><span>{sect === id ? "–" : "+"}</span></button>
     {sect === id && <div style={{ paddingBottom: 16 }}>{children}</div>}
   </div>;
-  return <>
-    <div className="scrim" onClick={onClose} />
-    <aside className="pane" role="dialog" aria-label="Edit event type">
-      <header><b>Edit event type</b><button ref={closeButton} className="btn" onClick={onClose} aria-label="Close">✕</button></header>
+  return <dialog ref={dialog} className="pane" aria-label="Edit event type" aria-modal="true"
+    onCancel={event => { event.preventDefault(); requestClose(); }} onClick={event => {
+      if (event.target !== event.currentTarget) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) requestClose();
+    }}>
+      <header><b>Edit event type</b><button ref={closeButton} className="btn" disabled={pending} onClick={requestClose} aria-label="Close">✕</button></header>
       <div className="body">
-        {err && <p role="alert" style={{ color: "var(--warn)" }}>{err}</p>}
+        {err && <p ref={errorMessage} role="alert" tabIndex={-1} style={{ color: "var(--warn)" }}>{err}</p>}
         {groupLocked && <p id="group-settings-lock" className="muted" role="status">This group event has bookings. Duration, location and event type are locked. Create a new event type to use different settings.</p>}
         {d.managedParentId && <p className="card" style={{ padding: 10, background: "var(--brand-soft)", fontSize: 14 }}>Your team manages this event type. Locked: {(d.lockedFields ?? []).join(", ") || "nothing"}.</p>}
+        <fieldset className="editor-fields" disabled={pending} aria-label="Event settings">
         {S({ id: "basics", title: "Basics", summary: `${d.title} · ${d.durationMin} min`, children: <>
           <label className="f" htmlFor="et-title">Name</label><input ref={nameInput} id="et-title" disabled={L("title")} className="input" value={d.title} onChange={set("title")} />
           <label className="f" htmlFor="et-dur">Duration (minutes)</label><input id="et-dur" disabled={L("durationMin")} aria-describedby={groupLocked ? "group-settings-lock" : undefined} className="input" type="number" min={5} value={d.durationMin} onChange={set("durationMin")} />
@@ -187,15 +243,20 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
           <p className="muted" style={{ fontSize: 13 }}>Payments go through Stripe Checkout when STRIPE_SECRET_KEY is set; otherwise a demo checkout is shown.</p>
           <label className="f" htmlFor="et-redirect">Redirect after booking (optional)</label>
           <input id="et-redirect" className="input" placeholder="https://example.com/thanks" value={d.redirectUrl ?? ""} onChange={e => setD({ ...d, redirectUrl: e.target.value.trim() || null })} /></> })}
-        <p className="muted" style={{ fontSize: 13 }}>Changes save automatically.</p>
         {!d.managedParentId && <button className="btn danger" disabled={deleting} onClick={async () => {
+          if (requestPending.current) return;
           if (!confirm("Delete this event type? Scheduled meetings will remain unchanged.")) return;
-          setDeleting(true);
+          requestPending.current = true; setDeleting(true);
           try { await onDelete(); }
           catch { setErr("Deletion could not be confirmed. Reload the page before trying again."); }
-          finally { setDeleting(false); }
+          finally { requestPending.current = false; setDeleting(false); }
         }}>{deleting ? "Deleting…" : "Delete event type"}</button>}
+        </fieldset>
       </div>
-    </aside>
-  </>;
+      <footer className="editor-actions">
+        <span className="muted" role="status">{saving ? "Saving…" : dirty ? "Unsaved changes" : saveCount ? "Changes saved" : ""}</span>
+        <button className="btn" disabled={pending} onClick={requestClose}>Cancel</button>
+        <button className="btn primary" disabled={pending || !dirty} onClick={() => { void save(); }}>Save changes</button>
+      </footer>
+    </dialog>;
 }
