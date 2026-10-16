@@ -3,7 +3,7 @@
 .cs a{color:inherit;text-decoration:none}
 .cs-user{grid-column:1/-1;grid-row:1;display:flex;align-items:center;padding:0 16px 0 16px;gap:18px;position:relative}
 .cs-who{all:unset;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;width:226px;border-radius:8px;height:36px}
-.cs-who b{font-weight:500;flex:1}
+.cs-who b{font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cs-av{width:32px;height:32px;border-radius:50%;background:#e8e3f5;color:#4b3a8f;display:grid;place-items:center;font-size:12px;font-weight:500}
 .cs-ico{all:unset;cursor:pointer;display:grid;place-items:center;width:32px;height:32px;border-radius:8px}.cs-ico:hover{background:#eceef0}
 .cs-side{grid-column:1;grid-row:2;display:flex;flex-direction:column;padding:16px 12px 12px;min-height:0;overflow:auto}
@@ -70,7 +70,7 @@
 .cs-mbody{flex:1;min-width:0;display:flex;flex-direction:column}
 .cs-mh{display:flex;justify-content:space-between;align-items:center;padding:24px 28px 12px 32px}.cs-mh h2{margin:0;font-size:20px;font-weight:600;letter-spacing:0}
 .cs-mc{flex:1;overflow:auto;padding:8px 32px 28px}
-@media (max-width:900px){.cs-mnav{display:none}}
+@media (max-width:900px){.cs-modal{width:100vw;height:100dvh;border-radius:0;flex-direction:column}.cs-mnav{width:100%;flex-direction:row;gap:4px;padding:8px;overflow-x:auto;border-right:0;border-bottom:1px solid var(--bd)}.cs-mnav h4{display:none}.cs-mnav a{flex:none;white-space:nowrap}.cs-mbody{min-height:0}.cs-mc{padding:8px 16px 20px}}
 
 /* Keep the center panel usable on smaller desktop windows. */
 @media(min-width:901px) and (max-width:1279px){.cs-gs{display:none}}

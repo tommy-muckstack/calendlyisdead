@@ -21,6 +21,8 @@ describe("website route privacy", () => {
     ["/calendlyisdead/", "/", "marketing"],
     ["/calendlyisdead/login?to=/secret#token", "/login", "auth"],
     ["/calendlyisdead/app/meetings/private-id", "/app/meetings/[uid]", "app"],
+    ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
+    ["/calendlyisdead/app/availability/advanced?timezone=private", "/app/availability/advanced", "app"],
     ["/calendlyisdead/booking/private-id/cancel?email=person@example.test", "/booking/[uid]/cancel", "booking"],
     ["/calendlyisdead/invite/secret-token", "/invite/[token]", "auth"],
     ["/calendlyisdead/private-host/private-event", "/[user]/[slug]", "booking"],

@@ -21,6 +21,15 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds editable welcome text with the existing page copy and preserves profile fields on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE users DROP COLUMN "welcomeMessage";'); await client!.exec(ddl);
+    expect((await client!.query('SELECT "welcomeMessage" FROM users')).rows).toEqual([{ welcomeMessage: "Pick a meeting type to see open times." }]);
+    await client!.exec(`UPDATE users SET "welcomeMessage" = '', name = 'Saved name', timezone = 'UTC', image = 'https://example.invalid/preserved.png';`); await client!.exec(ddl);
+    expect((await client!.query('SELECT "welcomeMessage", name, timezone, image FROM users')).rows)
+      .toEqual([{ welcomeMessage: "", name: "Saved name", timezone: "UTC", image: "https://example.invalid/preserved.png" }]);
+    expect((await client!.query('SELECT uid FROM bookings')).rows).toEqual([{ uid: "retained" }]);
+  });
   it("adds disabled-by-default account limits and preserves configured values and meetings on replay", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec('ALTER TABLE users DROP COLUMN "meetingLimitPerDay", DROP COLUMN "meetingLimitPerWeek", DROP COLUMN "meetingLimitPerMonth";');

@@ -4,8 +4,9 @@ import { loadSlotCalendar, readBookingQuery, type SlotCalendar } from "@/lib/boo
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { ProfileAvatar } from "./ProfileAvatar";
 
-type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; title: string; durationMin: number; location: string; description: string; color: string;
+type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; hostImage?: string | null; title: string; durationMin: number; location: string; description: string; color: string;
   reschedule?: { uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
 const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
@@ -69,6 +70,7 @@ export function BookingWidget(p: Props) {
   return <div className="card bk">
     <section className="info">
       {invalid && <p role="alert">This link contains an invalid date or time zone. Check the calendar and choose a time.</p>}
+      {p.hostImage && <div style={{ marginBottom: 14 }}><ProfileAvatar name={p.host} image={p.hostImage} size={64} /></div>}
       <div className="muted" style={{ fontWeight: 600 }}>{p.host}</div>
       <h1 style={{ margin: "6px 0 14px", fontSize: 26 }}><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: p.color, marginRight: 10 }} />{p.title}</h1>
       <div className="muted">◷ {p.durationMin} min{p.kindLabel ? ` · ${p.kindLabel}` : ""}</div>

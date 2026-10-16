@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { BP } from "@/lib/basepath";
 import { I } from "./icons";
+import { ProfileAvatar } from "../ProfileAvatar";
 import "./appshell.css";
 
 const SCHED = [{ href: "/app", label: "Event types" }, { href: "/app/one-off", label: "Single-use links" }, { href: "/app/polls", label: "Meeting polls" }, { href: "/app/routing", label: "Routing forms" }];
@@ -57,7 +58,7 @@ function CreateMenu({ id, trigger, onCreate, onClose }: {
   </div>;
 }
 
-export function AppShell({ user, signOut, children }: { user: { name: string; email: string; username: string }; signOut: ReactNode; children: ReactNode }) {
+export function AppShell({ user, signOut, children }: { user: { name: string; image?: string | null; email: string; username: string }; signOut: ReactNode; children: ReactNode }) {
   const path = (usePathname() || "").replace(BP, "") || "/app";
   const [menu, setMenu] = useState<null | "side" | "top" | "user">(null);
   const [gs, setGs] = useState(true);
@@ -69,19 +70,18 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
   }, [menu]);
   useEffect(() => { try { if (localStorage.getItem("cid-gs") === "off") setGs(false); } catch { } }, []);
   useEffect(() => { const f = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setMenu(null); }; addEventListener("mousedown", f); return () => removeEventListener("mousedown", f); }, []);
-  const settings = ["/app/availability", "/app/branding", "/app/embed"].some(x => path.startsWith(x));
+  const settings = ["/app/profile", "/app/availability", "/app/branding", "/app/embed"].some(x => path.startsWith(x));
   const sched = SCHED.find(t => t.href === path) || (settings ? SCHED[0] : undefined);
   const meta = sched ? ["Scheduling", SCHED] as const : (() => { const t = TITLES.find(x => path.startsWith(x[0])); return t ? [t[1], t[2]] as const : ["", undefined] as const; })();
-  const initial = (user.name || user.email || "?").trim()[0]?.toUpperCase();
   const create = (kind: "one_on_one" | "group") => {
     closeCreate(true);
     if (path === "/app") dispatchEvent(new CustomEvent("cid:create-event-type", { detail: kind }));
     else location.href = `${BP}/app?new=${kind}`;
   };
   return <div className="cs" ref={ref}>
-    <div className="cs-user"><button className="cs-who" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Account menu"><span className="cs-av">{initial}</span><b>{user.name || user.email}</b>{I.chev(16)}</button>
+    <div className="cs-user"><button className="cs-who" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Account menu"><ProfileAvatar name={user.name || user.email} image={user.image} size={28} decorative /><b>{user.name || user.email}</b>{I.chev(16)}</button>
       <button className="cs-ico" aria-label="Collapse sidebar">{I.panel(20)}</button>
-      {menu === "user" && <div className="cs-menu cs-menu-user" role="menu"><div className="cs-em">{user.email}</div><a role="menuitem" href={`${BP}/${user.username}`} target="_blank">My booking page</a><Link role="menuitem" href="/app/branding" onClick={() => setMenu(null)}>Settings</Link>
+      {menu === "user" && <div className="cs-menu cs-menu-user" role="menu"><div className="cs-em">{user.email}</div><a role="menuitem" href={`${BP}/${user.username}`} target="_blank">My booking page</a><Link role="menuitem" href="/app/profile" onClick={() => setMenu(null)}>Profile</Link><Link role="menuitem" href="/app/profile" onClick={() => setMenu(null)}>Settings</Link>
         {signOut}</div>}</div>
     <aside className="cs-side">
       <div className="cs-create"><button ref={sideCreate} className="cs-btn cs-outline cs-wide" onClick={() => setMenu(menu === "side" ? null : "side")} onKeyDown={e => { if (e.key === "ArrowDown") { e.preventDefault(); setMenu("side"); } }} aria-haspopup="menu" aria-expanded={menu === "side"} aria-controls="create-side">{I.plus(16)}Create{I.chev(14)}</button>{menu === "side" && <CreateMenu id="create-side" trigger={sideCreate} onCreate={create} onClose={closeCreate} />}</div>
@@ -89,7 +89,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
       <div className="cs-grow" />
       <div className="cs-promo"><div className="cs-promo-art" /><b>Free and open source</b><span>No seats, no gates. Read the code, fork it, self-host it.</span><a href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">View the source →</a></div>
       <a className="cs-btn cs-outline cs-wide" href="https://github.com/tommy-muckstack/calendlyisdead" target="_blank" rel="noreferrer">{I.star(18)}Star on GitHub</a>
-      <Link className={"cs-nav cs-settings" + (path.startsWith("/app/branding") || path.startsWith("/app/embed") ? " on" : "")} href="/app/branding">{I.gear(20)}Settings</Link>
+      <Link className={"cs-nav cs-settings" + (settings ? " on" : "")} href="/app/profile">{I.gear(20)}Settings</Link>
     </aside>
     <div className={"cs-wrap" + (gs && path === "/app" ? " has-gs" : "")}>
       <main className="cs-main">
@@ -109,7 +109,8 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
         <button className="cs-btn cs-outline cs-sm" onClick={() => { setGs(false); try { localStorage.setItem("cid-gs", "off"); } catch { } }}>Don’t show again</button></aside>}
     </div>
     {settings && <div className="cs-scrim"><section className="cs-modal" role="dialog" aria-modal="true" aria-label="Settings">
-      <aside className="cs-mnav"><h4>My account</h4>
+      <nav className="cs-mnav" aria-label="Settings sections"><h4>My account</h4>
+        <Link href="/app/profile" className={path.startsWith("/app/profile") ? "on" : ""}>{I.gear(18)}Profile</Link>
         <Link href="/app/availability" className={path.startsWith("/app/availability") ? "on" : ""}>{I.avail(18)}Scheduling</Link>
         <Link href="/app/branding" className={path.startsWith("/app/branding") ? "on" : ""}>{I.star(18)}Branding</Link>
         <a href={`${BP}/${user.username}`} target="_blank" rel="noreferrer">{I.link(18)}My link</a>
@@ -118,8 +119,8 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
         <Link href="/app/assistant">{I.assist(18)}Assistant</Link>
         <h4>Admin</h4>
         <Link href="/app/teams">{I.team(18)}Teams</Link>
-        <Link href="/app/analytics">{I.chart(18)}Analytics</Link></aside>
-      <div className="cs-mbody"><div className="cs-mh"><h2>{path.startsWith("/app/availability") ? "Scheduling settings" : path.startsWith("/app/branding") ? "Branding" : "Embed"}</h2><Link href="/app" className="cs-ico" aria-label="Close settings">{I.close(22)}</Link></div>
+        <Link href="/app/analytics">{I.chart(18)}Analytics</Link></nav>
+      <div className="cs-mbody"><div className="cs-mh"><h2>{path.startsWith("/app/profile") ? "Profile" : path.startsWith("/app/availability") ? "Scheduling settings" : path.startsWith("/app/branding") ? "Branding" : "Embed"}</h2><Link href="/app" className="cs-ico" aria-label="Close settings">{I.close(22)}</Link></div>
         <div className="cs-mc">{children}</div></div>
     </section></div>}
   </div>;
