@@ -11,7 +11,7 @@ let db: Awaited<ReturnType<typeof import("../../lib/db").getDb>>, schema: typeof
 let duplicate: typeof import("../../app/api/event-types/[id]/duplicate/route").POST;
 const copy = (id = "source") => duplicate(new NextRequest(`http://localhost/api/event-types/${id}/duplicate`, { method: "POST" }), { params: Promise.resolve({ id }) });
 const settings = { description: "Bring a question", durationMin: 45, location: "Room A", color: "#123456", scheduleId: "demo-schedule",
-  bufferBeforeMin: 15, bufferAfterMin: 20, minNoticeMin: 60, rangeDays: 45, maxPerDay: 3, maxPerWeek: 8, active: true,
+  bufferBeforeMin: 15, bufferAfterMin: 20, minNoticeMin: 60, rangeDays: 45, maxPerDay: 3, maxPerWeek: 8, maxPerMonth: 20, active: true,
   questions: [{ id: "topic", label: "Topic", type: "text" as const, required: true }],
   priceCents: 1200, currency: "usd", redirectUrl: "https://example.invalid/thanks" };
 

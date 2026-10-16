@@ -6,7 +6,7 @@ import { insertEventWithLink } from "@/lib/event-type-links";
 
 export const runtime = "nodejs";
 const COPY_FIELDS = ["description", "durationMin", "location", "color", "scheduleId", "bufferBeforeMin", "bufferAfterMin",
-  "minNoticeMin", "rangeDays", "active", "kind", "questions", "maxPerDay", "maxPerWeek", "seats", "rrMode",
+  "minNoticeMin", "rangeDays", "active", "kind", "questions", "maxPerDay", "maxPerWeek", "maxPerMonth", "seats", "rrMode",
   "priceCents", "currency", "redirectUrl"] as const;
 
 export async function POST(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {

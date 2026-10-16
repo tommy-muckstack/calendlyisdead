@@ -21,6 +21,15 @@ async function seat(uid: string, number: number, status = "confirmed") {
 }
 
 describe("database startup and booking migrations", () => {
+  it("adds nullable monthly limits without rewriting meetings and preserves configured limits on replay", async () => {
+    await setup(); await seat("retained", 0);
+    await client!.exec('ALTER TABLE event_types DROP COLUMN "maxPerMonth";');
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "maxPerMonth" FROM event_types')).rows).toEqual([{ maxPerMonth: null }]);
+    await client!.exec('UPDATE event_types SET "maxPerMonth" = 12;'); await client!.exec(ddl);
+    expect((await client!.query('SELECT "maxPerMonth" FROM event_types')).rows).toEqual([{ maxPerMonth: 12 }]);
+    expect((await client!.query('SELECT uid, "eventTypeId" FROM bookings')).rows).toEqual([{ uid: "retained", eventTypeId: "group" }]);
+  });
   it("replaces owner-wide link uniqueness with personal/team namespaces and survives repeated startup", async () => {
     await setup(); await seat("retained", 0);
     await client!.exec(`DROP INDEX event_types_current_personal_slug; DROP INDEX event_types_current_team_slug;

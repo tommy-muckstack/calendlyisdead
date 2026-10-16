@@ -6,7 +6,7 @@ import { EventTypePatch } from "@/lib/event-type-validation";
 import { useEffect, useRef, useState } from "react";
 export type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
   bufferBeforeMin: number; bufferAfterMin: number; minNoticeMin: number; rangeDays: number; active: boolean;
-  scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; questions: Q[];
+  scheduleId: string | null; maxPerDay: number | null; maxPerWeek: number | null; maxPerMonth: number | null; questions: Q[];
   kind: string; seats: number; teamId?: string | null; managedParentId: string | null; lockedFields: string[]; priceCents: number; currency: string; redirectUrl: string | null; groupSettingsLocked?: boolean };
 type Q = { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] };
 
@@ -14,7 +14,7 @@ type Sch = { id: string; name: string };
 type PersonalKind = "one_on_one" | "group";
 const NEW_EVENT_FIELDS = EventTypePatch.omit({ rrMode: true }).required();
 const KIND_LABEL: Record<string, string> = { one_on_one: "One-on-one", group: "Group", collective: "Collective", round_robin: "Round robin", managed: "Managed", one_off: "Single-use link", poll: "Meeting poll" };
-const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
+const EDITABLE_KEYS = ["title", "slug", "description", "durationMin", "location", "color", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "active", "scheduleId", "maxPerDay", "maxPerWeek", "maxPerMonth", "questions", "kind", "seats", "priceCents", "currency", "redirectUrl"] as const;
 function draftBody(d: ET) {
   return Object.fromEntries(EDITABLE_KEYS.filter(key =>
     !(d.managedParentId && d.lockedFields.includes(key)) &&
@@ -23,7 +23,7 @@ function draftBody(d: ET) {
 }
 const FIELD_NAMES: Record<string, string> = { title: "Name", slug: "Link", description: "Description", durationMin: "Duration",
   location: "Location", color: "Color", bufferBeforeMin: "Buffer before", bufferAfterMin: "Buffer after", minNoticeMin: "Minimum notice",
-  rangeDays: "Bookable days", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", questions: "Invitee questions",
+  rangeDays: "Bookable days", scheduleId: "Schedule", maxPerDay: "Daily limit", maxPerWeek: "Weekly limit", maxPerMonth: "Monthly limit", questions: "Invitee questions",
   kind: "Type", seats: "Invitee limit", priceCents: "Price", currency: "Currency", redirectUrl: "Redirect URL" };
 export function EventTypesBoard({ initial, username, schedules, owner }: { initial: ET[]; username: string; schedules: Sch[]; owner?: string }) {
   const [items, setItems] = useState(initial);
@@ -237,19 +237,23 @@ export function EventTypeEditor({ et, username, schedules, onClose, onChange, on
         {S({ id: "link", title: "Link and description", summary: `/${username}/${d.slug}`, children: <>
           <label className="f" htmlFor="et-slug">Link</label><input id="et-slug" className="input" value={d.slug} onChange={e => setD({ ...d, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} />
           <label className="f" htmlFor="et-desc">Description</label><textarea id="et-desc" disabled={L("description")} className="input" rows={4} value={d.description} onChange={set("description")} /></> })}
-        {S({ id: "limits", title: "Limits and buffers", summary: `${d.minNoticeMin / 60}h notice · ${d.rangeDays} days ahead · buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min`, children: <>
+        {S({ id: "limits", title: "Limits and buffers", summary: `${d.minNoticeMin / 60}h notice · ${d.rangeDays} days ahead · buffers ${d.bufferBeforeMin}/${d.bufferAfterMin} min${d.maxPerDay ? ` · ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · ${d.maxPerWeek}/week` : ""}${d.maxPerMonth ? ` · ${d.maxPerMonth}/month` : ""}`, children: <>
           <label className="f" htmlFor="et-bb">Buffer before (min)</label><input id="et-bb" disabled={L("bufferBeforeMin")} className="input" type="number" min={0} value={d.bufferBeforeMin} onChange={set("bufferBeforeMin")} />
           <label className="f" htmlFor="et-ba">Buffer after (min)</label><input id="et-ba" disabled={L("bufferAfterMin")} className="input" type="number" min={0} value={d.bufferAfterMin} onChange={set("bufferAfterMin")} />
           <label className="f" htmlFor="et-mn">Minimum notice (min)</label><input id="et-mn" disabled={L("minNoticeMin")} className="input" type="number" min={0} value={d.minNoticeMin} onChange={set("minNoticeMin")} />
-          <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" disabled={L("rangeDays")} className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} /></> })}
-        {S({ id: "avail", title: "Availability", summary: `${schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule"}${d.maxPerDay ? ` · max ${d.maxPerDay}/day` : ""}${d.maxPerWeek ? ` · max ${d.maxPerWeek}/week` : ""}`, children: <>
-          {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
-          <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
-            <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
+          <label className="f" htmlFor="et-rd">Bookable days into the future</label><input id="et-rd" disabled={L("rangeDays")} className="input" type="number" min={1} value={d.rangeDays} onChange={set("rangeDays")} />
           <label className="f" htmlFor="et-mpd">Max bookings per day (blank = no limit)</label>
           <input id="et-mpd" disabled={L("maxPerDay")} className="input" type="number" min={1} value={d.maxPerDay ?? ""} onChange={e => setD({ ...d, maxPerDay: e.target.value ? Number(e.target.value) : null })} />
           <label className="f" htmlFor="et-mpw">Max bookings per week (blank = no limit)</label>
-          <input id="et-mpw" disabled={L("maxPerWeek")} className="input" type="number" min={1} value={d.maxPerWeek ?? ""} onChange={e => setD({ ...d, maxPerWeek: e.target.value ? Number(e.target.value) : null })} /></> })}
+          <input id="et-mpw" disabled={L("maxPerWeek")} className="input" type="number" min={1} value={d.maxPerWeek ?? ""} onChange={e => setD({ ...d, maxPerWeek: e.target.value ? Number(e.target.value) : null })} />
+          <label className="f" htmlFor="et-mpm">Max bookings per month (blank = no limit)</label>
+          <input id="et-mpm" disabled={L("maxPerMonth")} className="input" type="number" min={1} max={2147483647} value={d.maxPerMonth ?? ""} onChange={e => setD({ ...d, maxPerMonth: e.target.value ? Number(e.target.value) : null })} />
+          <p className="muted">Meeting limits apply across this event type’s hosts. A group session counts once, even when several invitees join.</p></> })}
+        {S({ id: "avail", title: "Availability", summary: schedules.find(x => x.id === d.scheduleId)?.name ?? "Default schedule", children: <>
+          {d.teamId ? <p className="muted">Uses each host&#39;s default availability schedule.</p> : <><label className="f" htmlFor="et-sched">Schedule</label>
+          <select id="et-sched" className="input" value={d.scheduleId ?? ""} onChange={e => setD({ ...d, scheduleId: e.target.value || null })}>
+            <option value="">Default schedule</option>{schedules.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></>}
+        </> })}
         {S({ id: "questions", title: "Invitee questions", summary: `Name, email${(d.questions ?? []).length ? ` + ${(d.questions ?? []).length} more` : ""}`, children: <>
           {(d.questions ?? []).map((q, i) => { const up = (n: Partial<Q>) => setD({ ...d, questions: d.questions.map((x, j) => j === i ? { ...x, ...n } : x) });
             return <div key={q.id} className="card" style={{ padding: 12, marginBottom: 10 }} data-testid="question">

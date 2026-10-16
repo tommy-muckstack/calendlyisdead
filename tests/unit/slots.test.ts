@@ -6,6 +6,36 @@ const ny: Schedule = { timezone: "America/New_York", weekly: defaultWeekly(), ov
 const base = { schedule: ny, durationMin: 30, now: "2026-10-01T00:00:00Z", inviteeTz: "America/New_York" };
 
 describe("generateSlots", () => {
+  it("monthly limits reset at the host's calendar month, including year boundaries", () => {
+    const schedule = { ...ny, weekly: { 4: [{ start: "00:00", end: "02:00" }], 5: [{ start: "00:00", end: "02:00" }] } };
+    const s = generateSlots({ ...base, schedule, now: "2026-12-01T00:00:00Z", existing: ["2026-12-01T14:00:00Z"],
+      limits: { perMonth: 1 }, from: "2026-12-31", to: "2027-01-01" });
+    expect(s["2026-12-31"]).toBeUndefined(); expect(s["2027-01-01"]).toHaveLength(4);
+  });
+  it("counts leap-day meetings in the host's month even when UTC is in March", () => {
+    const schedule = { ...ny, weekly: { 2: [{ start: "20:00", end: "24:00" }], 3: [{ start: "00:00", end: "02:00" }] } };
+    const s = generateSlots({ ...base, schedule, now: "2028-02-01T00:00:00Z", inviteeTz: "UTC", existing: ["2028-03-01T04:00:00Z"],
+      limits: { perMonth: 1 }, from: "2028-03-01", to: "2028-03-01" });
+    expect(s["2028-03-01"][0]).toBe("2028-03-01T05:00:00.000Z");
+  });
+  it("uses one team limit calendar when its midnight falls inside a different host's day", () => {
+    const schedule = { timezone: "America/Los_Angeles", weekly: { 6: [{ start: "20:00", end: "23:00" }] }, overrides: {} };
+    const s = generateSlots({ ...base, schedule, now: "2026-01-01T00:00:00Z", inviteeTz: "America/Los_Angeles",
+      limitsTimezone: "America/New_York", existing: ["2026-01-20T14:00:00Z"], limits: { perMonth: 1 }, from: "2026-01-31", to: "2026-01-31" });
+    expect(s["2026-01-31"][0]).toBe("2026-02-01T05:00:00.000Z"); // 21:00 Pacific, midnight Eastern.
+    expect(s["2026-01-31"]).toHaveLength(4);
+  });
+  it("counts distinct sessions in the repeated DST hour toward the monthly cap", () => {
+    const s = generateSlots({ ...base, existing: ["2026-11-01T05:30:00Z", "2026-11-01T06:30:00Z"],
+      limits: { perMonth: 2 }, from: "2026-11-02", to: "2026-11-02" });
+    expect(s).toEqual({});
+  });
+  it("applies the earliest daily, weekly or monthly cap while preserving joinable group seats", () => {
+    const start = "2026-10-13T13:00:00.000Z";
+    const s = generateSlots({ ...base, existing: [start], limits: { perDay: 3, perWeek: 5, perMonth: 1 },
+      joinableStarts: [start], from: "2026-10-13", to: "2026-10-14" });
+    expect(s).toEqual({ "2026-10-13": [start] });
+  });
   it("weekday 9-5 gives 16 half-hour slots, none on weekends", () => {
     const s = generateSlots({ ...base, from: "2026-10-12", to: "2026-10-18" });
     expect(s["2026-10-12"]).toHaveLength(16);

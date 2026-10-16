@@ -12,6 +12,7 @@ ALTER TABLE schedules ADD COLUMN IF NOT EXISTS "holidayCountry" text;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS questions jsonb NOT NULL DEFAULT '[]';
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerDay" integer;
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerWeek" integer;
+ALTER TABLE event_types ADD COLUMN IF NOT EXISTS "maxPerMonth" integer;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS answers jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalCalendarId" text;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "externalEventId" text;

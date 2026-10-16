@@ -4,15 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventTypeEditor, type ET } from "./EventTypesBoard";
 type Member = { userId: string; role: string; name: string; email: string };
-type TET = { id: string; title: string; slug: string; kind: string; durationMin: number; rrMode: string; lockedFields: string[]; hosts: { userId: string; priority: number }[]; assigned: string[] };
+type TET = ET & { rrMode: string; hosts: { userId: string; priority: number }[]; assigned: string[] };
 type Team = { id: string; name: string; slug: string; role: string; members: Member[]; eventTypes: TET[] };
 const KIND: Record<string, string> = { collective: "Collective", round_robin: "Round robin", managed: "Managed" };
-const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays"];
+const LOCKABLE = ["title", "description", "durationMin", "location", "color", "questions", "bufferBeforeMin", "bufferAfterMin", "minNoticeMin", "rangeDays", "maxPerDay", "maxPerWeek", "maxPerMonth"];
+const LIMIT_LABELS: Record<string, string> = { maxPerDay: "Daily meeting limit", maxPerWeek: "Weekly meeting limit", maxPerMonth: "Monthly meeting limit" };
 
 export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
   const router = useRouter(); const [msg, setMsg] = useState("");
   const [duplicating, setDuplicating] = useState<string | null>(null);
-  const [copyEditor, setCopyEditor] = useState<{ et: ET; teamSlug: string } | null>(null);
+  const [editor, setEditor] = useState<{ et: ET; teamSlug: string } | null>(null);
   async function duplicate(et: TET, teamSlug: string) {
     if (duplicating) return;
     setDuplicating(et.id); setMsg("");
@@ -21,7 +22,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
       if (!response.ok) throw new Error("duplicate_failed");
       const created = await response.json();
       if (!created?.id || typeof created.title !== "string") throw new Error("invalid_response");
-      setCopyEditor({ et: created, teamSlug }); router.refresh();
+      setEditor({ et: created, teamSlug }); router.refresh();
     } catch { setMsg("Duplication could not be confirmed. Reload the page before trying again."); }
     finally { setDuplicating(null); }
   }
@@ -49,6 +50,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
       {t.eventTypes.map(e => <div key={e.id} className="card" style={{ padding: 14, marginBottom: 10 }} data-testid="team-et">
         <div className="row" style={{ justifyContent: "space-between" }}><b>{e.title} <span className="muted" style={{ fontWeight: 400 }}>· {KIND[e.kind]} · {e.durationMin} min</span></b>
           <div className="row">{e.kind !== "managed" && <a className="btn" href={`${BP}/team/${t.slug}/${e.slug}`} target="_blank">View</a>}
+            {admin && <button className="btn" onClick={() => setEditor({ et: e, teamSlug: t.slug })}>Edit</button>}
             {admin && <button className="btn" disabled={!!duplicating} onClick={() => { void duplicate(e, t.slug); }}>
               {duplicating === e.id ? "Duplicating…" : "Duplicate"}</button>}</div></div>
         {admin && e.kind !== "managed" && <>
@@ -68,7 +70,7 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
             onChange={x => call(`/api/teams/${t.id}/event-types/${e.id}/assign`, "POST", { userIds: x.target.checked ? [...e.assigned, m.userId] : e.assigned.filter(y => y !== m.userId) })} /> {m.name}</label>)}
           <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>Locked for members</div>
           <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>{LOCKABLE.map(f => <label key={f}><input type="checkbox" checked={e.lockedFields.includes(f)}
-            onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { lockedFields: x.target.checked ? [...e.lockedFields, f] : e.lockedFields.filter(y => y !== f) })} /> {f}</label>)}</div>
+            onChange={x => call(`/api/event-types/${e.id}`, "PATCH", { lockedFields: x.target.checked ? [...e.lockedFields, f] : e.lockedFields.filter(y => y !== f) })} /> {LIMIT_LABELS[f] ?? f}</label>)}</div>
           <label className="f">Template name <input className="input" aria-label={`Template name for ${e.title}`} defaultValue={e.title} onBlur={x => x.target.value !== e.title && call(`/api/event-types/${e.id}`, "PATCH", { title: x.target.value })} /></label>
           <label className="f">Duration <input className="input" type="number" aria-label={`Template duration for ${e.title}`} defaultValue={e.durationMin} onBlur={x => Number(x.target.value) !== e.durationMin && call(`/api/event-types/${e.id}`, "PATCH", { durationMin: Number(x.target.value) })} /></label>
         </>}
@@ -77,12 +79,12 @@ export function TeamsPanel({ teams, me }: { teams: Team[]; me: string }) {
         {(["collective", "round_robin", "managed"] as const).map(k => <button key={k} className="btn" onClick={() => call(`/api/teams/${t.id}/event-types`, "POST", { kind: k, title: `${KIND[k]} meeting` })}>+ {KIND[k]}</button>)}
       </div>}
     </section>; })}
-    {copyEditor && <EventTypeEditor key={copyEditor.et.id} et={copyEditor.et} username={`team/${copyEditor.teamSlug}`} schedules={[]}
-      onClose={() => setCopyEditor(null)} onChange={et => setCopyEditor(current => current ? { ...current, et } : null)}
+    {editor && <EventTypeEditor key={editor.et.id} et={editor.et} username={`team/${editor.teamSlug}`} schedules={[]}
+      onClose={() => setEditor(null)} onChange={et => setEditor(current => current ? { ...current, et } : null)}
       onSaved={() => { setMsg("Saved"); router.refresh(); }} onDelete={async () => {
-        const response = await fetch(`${BP}/api/event-types/${copyEditor.et.id}`, { method: "DELETE" });
+        const response = await fetch(`${BP}/api/event-types/${editor.et.id}`, { method: "DELETE" });
         if (!response.ok) throw new Error("delete_failed");
-        setCopyEditor(null); router.refresh();
+        setEditor(null); router.refresh();
       }} />}
   </>;
 }
