@@ -1,7 +1,8 @@
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "./db";
 import { finalize } from "./booking";
+import { confirmedReservations } from "./booking-busy";
 const { polls, pollVotes, eventTypes, bookings, users, schedules } = schema;
 export const shortId = customAlphabet("abcdefghijkmnpqrstuvwxyz23456789", 10);
 
@@ -53,8 +54,7 @@ export async function bookPoll(userId: string, pollId: string, option: string) {
       const attendees = votes.filter((v: any) => v.picks.includes(option));
       if (!attendees.length) throw new Error("no_votes");
       const start = new Date(option), end = new Date(+start + p.durationMin * 60_000);
-      const conflicts = await tx.select({ uid: bookings.uid }).from(bookings).where(and(eq(bookings.hostId, userId),
-        eq(bookings.status, "confirmed"), lt(bookings.start, end), gt(bookings.end, start))).limit(1);
+      const conflicts = await confirmedReservations(tx, userId, start, end);
       if (conflicts.length) throw new Error("slot_unavailable");
 
       const [sc] = await tx.select().from(schedules).where(and(eq(schedules.userId, userId), eq(schedules.isDefault, true)));
@@ -62,6 +62,7 @@ export async function bookPoll(userId: string, pollId: string, option: string) {
       await tx.insert(eventTypes).values({ id: etId, userId, scheduleId: sc?.id, slug: etId, title: p.title, durationMin: p.durationMin, location: p.location, kind: "poll", active: false }).onConflictDoNothing();
       const [et] = await tx.select().from(eventTypes).where(eq(eventTypes.id, etId));
       const row = { uid: shortId() + "pl", eventTypeId: etId, hostId: userId, start, end, inviteeName: attendees[0].name, inviteeEmail: attendees[0].email,
+        bufferBeforeMin: 0, bufferAfterMin: 0,
         inviteeTz: host.timezone, notes: `Booked from meeting poll "${p.title}"`, guests: attendees.slice(1).map((a: any) => a.email), answers: {}, seat: 0, groupUid: null };
       await tx.insert(bookings).values(row);
       await tx.update(polls).set({ status: "booked", chosen: option, bookingUid: row.uid }).where(eq(polls.id, pollId));

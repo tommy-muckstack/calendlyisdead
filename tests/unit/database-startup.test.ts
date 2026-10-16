@@ -20,7 +20,27 @@ async function seat(uid: string, number: number, status = "confirmed") {
     [uid, number, status]);
 }
 
-describe("database startup with group bookings", () => {
+describe("database startup and booking migrations", () => {
+  it("backfills legacy buffers once and preserves snapshots when startup is replayed", async () => {
+    await setup(); await seat("legacy", 0);
+    await client!.exec(`ALTER TABLE bookings DROP COLUMN "bufferBeforeMin", DROP COLUMN "bufferAfterMin";
+      UPDATE event_types SET "bufferBeforeMin" = 30, "bufferAfterMin" = 45;`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "bufferBeforeMin", "bufferAfterMin" FROM bookings')).rows)
+      .toEqual([{ bufferBeforeMin: 30, bufferAfterMin: 45 }]);
+    await client!.exec('UPDATE event_types SET "bufferBeforeMin" = 0, "bufferAfterMin" = 0;');
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "bufferBeforeMin", "bufferAfterMin" FROM bookings')).rows)
+      .toEqual([{ bufferBeforeMin: 30, bufferAfterMin: 45 }]);
+  });
+  it("can resume a partial buffer migration without replacing an existing zero snapshot", async () => {
+    await setup(); await seat("partial", 0);
+    await client!.exec(`ALTER TABLE bookings DROP COLUMN "bufferAfterMin";
+      UPDATE event_types SET "bufferBeforeMin" = 30, "bufferAfterMin" = 45;`);
+    await client!.exec(ddl);
+    expect((await client!.query('SELECT "bufferBeforeMin", "bufferAfterMin" FROM bookings')).rows)
+      .toEqual([{ bufferBeforeMin: 0, bufferAfterMin: 45 }]);
+  });
   it("reopens a persisted database containing multiple attendees without losing their bookings", async () => {
     const directory = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "cid-db-restart-")), "db");
     await setup(directory);
