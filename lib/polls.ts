@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { externalBusy } from "./calendars";
 import { PollInvitee, type PollInviteeInput, type PollBookingReview } from "./poll-booking-contract";
+import { PollCreateInput, PollVoteInput, pollStatus } from "./poll-participation";
 import { and, eq } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "./db";
@@ -11,23 +12,32 @@ import { recordBookingContact } from "./automatic-contacts";
 const { polls, pollVotes, eventTypes, bookings, users, schedules } = schema;
 export const shortId = customAlphabet("abcdefghijkmnpqrstuvwxyz23456789", 10);
 
-export async function createPoll(userId: string, p: { title: string; durationMin: number; location?: string; options: string[] }) {
-  const opts = [...new Set(p.options.map(o => new Date(o)).filter(d => !isNaN(+d)).map(d => d.toISOString()))].sort();
-  if (opts.length < 2) throw new Error("need_two_options");
+export async function createPoll(userId: string, input: { title: string; durationMin: number; location?: string; options: string[]; showVotes?: boolean }) {
+  const parsed = PollCreateInput.safeParse(input); if (!parsed.success) throw new Error("invalid");
+  const p = parsed.data, opts = [...new Set(p.options.map(o => new Date(o).toISOString()))].sort();
+  if (opts.length < 2 || opts.some(o => Date.parse(o) <= Date.now())) throw new Error("invalid_options");
   const db = await getDb(); const id = shortId();
-  await db.insert(polls).values({ id, userId, title: p.title, durationMin: p.durationMin, location: p.location ?? "", options: opts });
+  await db.insert(polls).values({ id, userId, title: p.title, durationMin: p.durationMin, location: p.location, options: opts, showVotes: p.showVotes });
   return id;
 }
 export async function vote(pollId: string, v: { name: string; email: string; picks: string[] }) {
+  const parsed = PollVoteInput.safeParse(v); if (!parsed.success) throw new Error("invalid");
+  const input = parsed.data;
   const db = await getDb();
   return db.transaction(async (tx: any) => {
     const [p] = await tx.select().from(polls).where(eq(polls.id, pollId)).for("update");
-    if (!p) throw new Error("not_found"); if (p.status !== "open") throw new Error("closed");
-    const picks = [...new Set(v.picks.filter(x => p.options.includes(x)))];
-    // Re-voting and poll closure share the poll lock, so a vote is replaced once
-    // and cannot arrive after the booking's attendee list has been finalized.
-    await tx.delete(pollVotes).where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.email, v.email.toLowerCase())));
-    await tx.insert(pollVotes).values({ id: shortId(), pollId, name: v.name, email: v.email.toLowerCase(), picks });
+    if (!p) throw new Error("not_found"); if (pollStatus(p) !== "open") throw new Error("closed");
+    const picks = [...new Set(input.picks.map(o => new Date(o).toISOString()))].sort();
+    const votes: typeof pollVotes.$inferSelect[] = await tx.select().from(pollVotes).where(eq(pollVotes.pollId, pollId));
+    const prior = votes.find(row => row.email.trim().toLowerCase() === input.email);
+    // An identical network retry is idempotent; changing a final vote is never allowed.
+    if (prior) {
+      if (prior.name.trim() === input.name && JSON.stringify([...prior.picks].sort()) === JSON.stringify(picks)) return picks;
+      throw new Error("already_voted");
+    }
+    if (new Set(votes.map(row => row.email.trim().toLowerCase())).size >= 40) throw new Error("full");
+    if (picks.some(o => !p.options.includes(o) || Date.parse(o) <= Date.now())) throw new Error("bad_option");
+    await tx.insert(pollVotes).values({ id: shortId(), pollId, name: input.name, email: input.email, picks });
     return picks;
   }, { isolationLevel: "read committed" });
 }
@@ -41,10 +51,28 @@ export async function getPoll(id: string) {
   const [p] = await db.select().from(polls).where(eq(polls.id, id)); if (!p) return null;
   const votes = await db.select().from(pollVotes).where(eq(pollVotes.pollId, id));
   const [host] = await db.select().from(users).where(eq(users.id, p.userId));
-  return { poll: p, votes, host, tally: tally(p.options, votes) };
+  return { poll: { ...p, status: pollStatus(p) }, votes, host, tally: tally(p.options, votes) };
+}
+/** Only this projection crosses the public page boundary; never serialize voter emails. */
+export async function getPublicPoll(id: string) {
+  const g = await getPoll(id); if (!g) return null;
+  const p = g.poll;
+  return { poll: { id: p.id, title: p.title, durationMin: p.durationMin, location: p.location, status: p.status },
+    host: { name: g.host.name, brandColor: g.host.brandColor, logoUrl: g.host.logoUrl, hideBranding: g.host.hideBranding },
+    full: new Set(g.votes.map((row: typeof pollVotes.$inferSelect) => row.email.trim().toLowerCase())).size >= 40,
+    tally: g.tally.map(row => ({ option: row.option, ...(p.showVotes ? { count: row.count, names: row.names } : {}) })) };
+}
+export async function setPollVisibility(userId: string, id: string, showVotes: boolean) {
+  const db = await getDb();
+  return db.transaction(async (tx: any) => {
+    const [p] = await tx.select().from(polls).where(and(eq(polls.id, id), eq(polls.userId, userId))).for("update");
+    if (!p) throw new Error("not_found"); if (pollStatus(p) !== "open") throw new Error("closed");
+    await tx.update(polls).set({ showVotes }).where(eq(polls.id, id));
+    return { showVotes };
+  }, { isolationLevel: "read committed" });
 }
 function selection(p: typeof polls.$inferSelect, votes: typeof pollVotes.$inferSelect[], option: string, extra: PollInviteeInput[]) {
-  if (p.status !== "open") throw new Error("closed");
+  if (pollStatus(p) !== "open") throw new Error("closed");
   if (!p.options.includes(option) || !Number.isFinite(Date.parse(option)) || Date.parse(option) <= Date.now()) throw new Error("bad_option");
   const attendees = new Map<string, PollInviteeInput>();
   for (const vote of [...votes].sort((a, b) => +a.createdAt - +b.createdAt || a.id.localeCompare(b.id))) {

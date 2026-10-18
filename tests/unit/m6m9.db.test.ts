@@ -68,8 +68,8 @@ describe("meeting polls", () => {
     const o1 = at("16:00"), o2 = at("16:30");
     const id = await P.createPoll(A, { title: "Planning", durationMin: 30, location: "Google Meet", options: [o1, o2] });
     await P.vote(id, { name: "Ann", email: "ann@example.com", picks: [o1, o2] });
-    await P.vote(id, { name: "Bo", email: "bo@example.com", picks: [o2, "2099-01-01T00:00:00.000Z"] });
-    await P.vote(id, { name: "Bo", email: "BO@example.com", picks: [o2] }); // re-vote replaces
+    await expect(P.vote(id, { name: "Bo", email: "bo@example.com", picks: [o2, "2099-01-01T00:00:00.000Z"] })).rejects.toThrow("bad_option");
+    await P.vote(id, { name: "Bo", email: "BO@example.com", picks: [o2] });
     const g = await P.getPoll(id); expect(g!.votes).toHaveLength(2); expect(g!.tally.find(t => t.best)!.option).toBe(o2);
     const uid = await P.bookPoll(A, id, o2);
     const bk = await B.getBooking(uid); expect(bk!.booking.guests).toEqual(["bo@example.com"]); expect(bk!.booking.inviteeEmail).toBe("ann@example.com");

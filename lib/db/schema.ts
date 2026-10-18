@@ -229,7 +229,7 @@ export const pageViews = pgTable("page_views", { eventTypeId: text("eventTypeId"
   t => [primaryKey({ columns: [t.eventTypeId, t.day] })]);
 export const polls = pgTable("polls", { id: text("id").primaryKey(), userId: text("userId").notNull(), title: text("title").notNull(), durationMin: integer("durationMin").notNull().default(30),
   location: text("location").notNull().default(""), options: jsonb("options").$type<string[]>().notNull().default([]), status: text("status").notNull().default("open"),
-  chosen: text("chosen"), bookingUid: text("bookingUid"), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
+  showVotes: boolean("showVotes").notNull().default(false), chosen: text("chosen"), bookingUid: text("bookingUid"), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const pollVotes = pgTable("poll_votes", { id: text("id").primaryKey(), pollId: text("pollId").notNull(), name: text("name").notNull(), email: text("email").notNull(),
   picks: jsonb("picks").$type<string[]>().notNull().default([]), createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 
