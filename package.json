@@ -23,6 +23,7 @@
     "nanoid": "^6.0.2",
     "next": "^15",
     "postgres": "^3.4.9",
+    "posthog-js": "^1.438.11",
     "react": "^19",
     "react-dom": "^19",
     "resend": "^6.33.0",

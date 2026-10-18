@@ -1,4 +1,5 @@
 "use client";
+import { track, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { useState } from "react";
 import { DateTime } from "luxon";
@@ -8,7 +9,7 @@ export function PollVote({ id, tally }: { id: string; tally: { option: string; c
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); const fd = new FormData(e.currentTarget);
     const r = await fetch(`${BP}/api/polls/${id}/vote`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: fd.get("name"), email: fd.get("email"), picks }) });
-    if (r.ok) setDone(true); else setErr("Couldn't save your vote.");
+    if (r.ok) { track(EVENTS.app_poll_voted, { options: picks.length }); setDone(true); } else setErr("Couldn't save your vote.");
   }
   if (done) return <p data-testid="voted">Thanks! The organizer will book a time and send an invite.</p>;
   return <form onSubmit={submit}>
