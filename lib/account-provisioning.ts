@@ -11,14 +11,23 @@ function uniqueConflict(error: unknown): boolean {
 }
 
 /** User and resumable setup are atomic. Existing/linked accounts are never reseeded. */
-export async function upsertFirebaseUser(identity: FirebaseIdentity): Promise<User | { error: string }> {
+export async function upsertFirebaseUser(identity: FirebaseIdentity, options: { syncVerifiedEmail?: boolean } = {}): Promise<User | { error: string }> {
   const db = await getDb(), U = schema.users;
   for (let attempt = 0; ; attempt++) {
     try {
       return await db.transaction(async (tx: DB) => {
         const [byUid] = await tx.select().from(U).where(eq(U.firebaseUid, identity.uid));
-        if (byUid) return byUid;
         const email = identity.email?.toLowerCase() ?? null;
+        if (byUid) {
+          // Only a freshly verified sign-in can synchronize login identity.
+          // Reading an older session must never restore an obsolete email.
+          if (!options.syncVerifiedEmail || !identity.emailVerified || !email) return byUid;
+          if (byUid.email === email && byUid.emailVerified) return byUid;
+          const [owner] = await tx.select({ id: U.id }).from(U).where(eq(U.email, email));
+          if (owner && owner.id !== byUid.id) return { error: "This login email is already used by another app account. Contact the site administrator; accounts have not been merged." };
+          const [updated] = await tx.update(U).set({ email, emailVerified: byUid.email === email ? byUid.emailVerified ?? new Date() : new Date() }).where(eq(U.id, byUid.id)).returning();
+          return updated;
+        }
         if (email) {
           const [byEmail] = await tx.select().from(U).where(eq(U.email, email)).for("update");
           if (byEmail) {

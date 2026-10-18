@@ -14,7 +14,7 @@ export type User = typeof schema.users.$inferSelect;
 async function currentUserId(): Promise<string | null> {
   const jar = await cookies();
   if (demoEnabled()) { const d = verifyDemo(jar.get(DEMO_COOKIE)?.value); if (d) return d; }
-  const id = await verifySessionCookie(jar.get(SESSION_COOKIE)?.value);
+  const id = await verifySessionCookie(jar.get(SESSION_COOKIE)?.value, true);
   if (!id) return null;
   const u = await upsertFirebaseUser(id);
   return "error" in u ? null : u.id;
