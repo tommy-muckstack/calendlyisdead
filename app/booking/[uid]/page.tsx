@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 import { getBooking } from "@/lib/booking";
 import { BrandFrame } from "@/components/BrandFrame";
 import { formatMoney } from "@/lib/payments";
+import { conferenceMessage } from "@/lib/conference-status";
 export const dynamic = "force-dynamic";
 export default async function Page({ params, searchParams }: { params: Promise<{ uid: string }>; searchParams: Promise<{ new?: string; embed?: string }> }) {
   const { uid } = await params; const { new: isNew, embed } = await searchParams;
@@ -23,6 +24,7 @@ export default async function Page({ params, searchParams }: { params: Promise<{
         <b>{et.title}</b> with {hosts.map((h: any) => h.name).join(", ")}
         <div className="muted" style={{ marginTop: 6 }}>{s.toFormat("cccc, LLLL d, yyyy")} · {s.toFormat("h:mm a")} – {e.toFormat("h:mm a")} ({b.inviteeTz})</div>
         {b.meetingUrl ? <div><a href={b.meetingUrl} data-testid="meeting-url">{b.meetingUrl}</a></div> : b.location && <div className="muted">{b.location}</div>}
+        {!cancelled && !pending && !b.meetingUrl && conferenceMessage(b.conferenceStatus) && <p role="status">{conferenceMessage(b.conferenceStatus)}</p>}
       </div>
       {!cancelled && <div className="row" style={{ justifyContent: "center", marginTop: 20 }}>
         <Link className="btn" href={`/booking/${uid}/reschedule`}>Reschedule</Link>

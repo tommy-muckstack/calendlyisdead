@@ -3,7 +3,8 @@ export type Tokens = { access_token: string; refresh_token?: string; expires_at?
 export type ExtCalendar = { externalId: string; name: string; isPrimary: boolean; canWrite: boolean };
 export type NewEvent = { uid: string; title: string; description: string; location: string; start: Date; end: Date;
   organizer: { name: string; email: string }; attendees: { name: string; email: string }[]; wantsMeet?: boolean };
-export type Created = { externalEventId: string; meetingUrl?: string };
+export type ConferenceResult = { conferenceStatus: "ready"; meetingUrl: string } | { conferenceStatus: "pending" | "failed"; meetingUrl?: undefined };
+export type Created = { externalEventId: string; meetingUrl?: string; conferenceStatus?: ConferenceResult["conferenceStatus"] };
 export interface CalendarProvider<S = any> {
   id: "google" | "microsoft" | "caldav" | "mock";
   listCalendars(s: S): Promise<ExtCalendar[]>;

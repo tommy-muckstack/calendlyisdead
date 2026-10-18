@@ -60,10 +60,10 @@ export async function hostMeetingTypes(userId: string): Promise<{ id: string; ti
 export async function getHostMeeting(userId: string, uid: string) {
   const db = await getDb();
   const [row] = await db.select({ ...summary, notes: B.notes, guests: B.guests, answers: B.answers,
-    questions: E.questions, cancelReason: B.cancelReason, meetingUrl: B.meetingUrl }).from(B)
+    questions: E.questions, cancelReason: B.cancelReason, meetingUrl: B.meetingUrl, conferenceStatus: B.conferenceStatus }).from(B)
     .innerJoin(E, eq(B.eventTypeId, E.id)).where(and(eq(B.hostId, userId), eq(B.uid, uid)));
   return (row ?? null) as (HostMeeting & { notes: string; guests: string[]; answers: Record<string, string>;
-    questions: typeof schema.eventTypes.$inferSelect.questions; cancelReason: string | null; meetingUrl: string | null }) | null;
+    questions: typeof schema.eventTypes.$inferSelect.questions; cancelReason: string | null; meetingUrl: string | null; conferenceStatus: typeof schema.bookings.$inferSelect.conferenceStatus }) | null;
 }
 
 // Quote CSV text and neutralize formulas from invitee-controlled fields.
