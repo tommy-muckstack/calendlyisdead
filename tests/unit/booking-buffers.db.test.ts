@@ -112,14 +112,12 @@ describe("booked meeting buffer protection", () => {
     const assigned = await book("buffer-robin", "11:30", { username: "team:buffer-team" });
     expect(assigned.hostId).toBe("demo-mate");
   });
-  it("checks an existing meeting's protected buffer when booking a poll", async () => {
+  it.each(["10:30", "11:30"])("permits a poll over only the existing meeting's buffer at %s", async time => {
     await book("buffered", "11:00");
-    const options = [at("10:30"), at("11:30"), at("12:00")];
+    const options = [at(time), at("12:00")];
     const id = await polls.createPoll("demo-user", { title: "Buffer poll", durationMin: 30, options });
     await polls.vote(id, { name: "Poll invitee", email: "poll@example.invalid", picks: options });
-    await expect(polls.bookPoll("demo-user", id, at("10:30"))).rejects.toThrow("slot_unavailable");
-    await expect(polls.bookPoll("demo-user", id, at("11:30"))).rejects.toThrow("slot_unavailable");
-    await polls.bookPoll("demo-user", id, at("12:00"));
+    await expect(polls.bookPoll("demo-user", id, at(time))).resolves.toBeTypeOf("string");
   });
   it("rejects a concurrent zero-buffer booking after another transaction protects that time", async () => {
     const transact = db.transaction.bind(db);

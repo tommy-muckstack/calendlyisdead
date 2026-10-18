@@ -119,7 +119,8 @@ test.describe.serial("M6-M9", () => {
     await v.getByRole("button", { name: "Send my vote" }).click(); await expect(v.getByTestId("voted")).toBeVisible(); await ctx.close();
     await page.reload();
     await expect(poll).toContainText("Val Voter");
-    await poll.getByRole("button", { name: "Book this time" }).click();
+    await poll.getByRole("button", { name: "Book this time" }).nth(1).click();
+    await page.getByRole("dialog", { name: "Book meeting" }).getByRole("button", { name: "Book Meeting", exact: true }).click();
     await expect(page.getByTestId("poll").first()).toContainText("Booked");
   });
 
