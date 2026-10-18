@@ -42,8 +42,14 @@ async function settle(job: Job, result: ConferenceResult, now: Date) {
     const rows = await tx.select({ uid: B.uid }).from(B).where(live(job.id, now)).for("update");
     const status = !rows.length ? "cancelled" : result.conferenceStatus === "pending" && job.attempts >= MAX_ATTEMPTS ? "failed" : result.conferenceStatus;
     await tx.update(J).set({ status, ...(status === "ready" ? { meetingUrl: result.meetingUrl! } : {}) }).where(eq(J.id, job.id));
-    if (rows.length && status !== "pending") await tx.update(B).set({ conferenceStatus: status === "ready" ? "ready" : "failed", ...(status === "ready" ? { meetingUrl: result.meetingUrl! } : {}) })
-      .where(and(inArray(B.uid, rows.map((row: { uid: string }) => row.uid)), eq(B.status, "confirmed"), ne(B.paymentStatus, "pending"), isNull(B.meetingUrl)));
+    if (rows.length && status !== "pending") {
+      const updated = await tx.update(B).set({ conferenceStatus: status === "ready" ? "ready" : "failed", ...(status === "ready" ? { meetingUrl: result.meetingUrl! } : {}) })
+        .where(and(inArray(B.uid, rows.map((row: { uid: string }) => row.uid)), eq(B.status, "confirmed"), ne(B.paymentStatus, "pending"), isNull(B.meetingUrl))).returning();
+      if (status === "ready") {
+        const { enqueueConferenceDeliveries } = await import("./conference-deliveries");
+        await enqueueConferenceDeliveries(tx, job.id, updated, now);
+      }
+    }
     return status;
   });
 }

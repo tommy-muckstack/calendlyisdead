@@ -186,19 +186,24 @@ export async function pickHost(et: any, hosts: Host[], candidates: string[], tra
 
 export const baseUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `http://localhost:3000${BP}`;
 
-export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
+export function bookingInvitation(kind: "confirmed" | "cancelled" | "rescheduled" | "conference_ready", b: typeof bookings.$inferSelect, et: typeof eventTypes.$inferSelect, hostUsers: (typeof users.$inferSelect)[]) {
   const when = DateTime.fromJSDate(b.start).setZone(b.inviteeTz).toFormat("cccc, LLLL d, yyyy 'at' h:mm a ZZZZ");
   const hostNames = hostUsers.map(h => h.name).join(", ");
   const manage = `${baseUrl()}/booking/${b.uid}`;
   const conferenceNote = kind !== "cancelled" ? conferenceMessage(b.conferenceStatus) : "";
   const ics = buildIcs({ uid: `${b.uid}@calendlyisdead`, start: b.start, end: b.end, title: `${et.title} with ${hostNames}`,
-    description: [describe(b, et), conferenceNote && `${conferenceNote}\nBooking details: ${manage}`].filter(Boolean).join("\n\n"), location: b.meetingUrl || b.location, organizer: { name: hostUsers[0].name, email: hostUsers[0].email }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
-    cancelled: kind === "cancelled", sequence: kind === "confirmed" ? 0 : 1 });
-  const verb = { confirmed: "is booked", cancelled: "was cancelled", rescheduled: "moved" }[kind];
-  for (const to of [b.inviteeEmail, ...hostUsers.map(h => h.email), ...(b.guests ?? [])]) {
-    await sendMail({ to, subject: `${et.title} ${verb}: ${when}`, ics,
-      text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || b.location || "TBD"}${answersText(b, et)}${conferenceNote ? `\n\n${conferenceNote}\nBooking details: ${manage}` : ""}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` });
-  }
+    description: [describe(b, et), conferenceNote && `${conferenceNote}\nBooking details: ${manage}`].filter(Boolean).join("\n\n"), location: b.meetingUrl || b.location, organizer: { name: hostUsers[0].name ?? "", email: hostUsers[0].email ?? "" }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
+    // Cancellation must supersede a late link update even if mail arrives out of order.
+    cancelled: kind === "cancelled", sequence: { confirmed: 0, rescheduled: 1, conference_ready: 2, cancelled: 3 }[kind] });
+  const verb = { confirmed: "is booked", cancelled: "was cancelled", rescheduled: "moved", conference_ready: "has a Google Meet link" }[kind];
+  const recipients = [...new Set([b.inviteeEmail, ...hostUsers.map(h => h.email), ...(b.guests ?? [])].filter((email): email is string => !!email).map(email => email.trim().toLowerCase()))];
+  return { recipients, subject: `${et.title} ${verb}: ${when}`, ics,
+    text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || b.location || "TBD"}${answersText(b, et)}${conferenceNote ? `\n\n${conferenceNote}\nBooking details: ${manage}` : ""}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` };
+}
+
+export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
+  const { recipients, ...mail } = bookingInvitation(kind, b, et, hostUsers);
+  for (const to of recipients) await sendMail({ to, ...mail });
 }
 
 export type BookingInput = { username: string; slug: string; start: string; name: string; email: string; tz: string; notes?: string; guests?: string[]; rescheduleUid?: string; answers?: Record<string, string>; locationSelection?: LocationSelection };

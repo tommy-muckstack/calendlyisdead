@@ -17,7 +17,9 @@ for (const width of [1440, 390]) test.describe(`Google conference states at ${wi
     await page.screenshot({ path: info.outputPath(failed ? "conference-failed.png" : "conference-pending.png") });
     await info.attach("conference-status-styles.json", { contentType: "application/json", body: JSON.stringify(await page.getByRole("status").filter({ hasText: "Google Meet" }).evaluate(element => { const style = getComputedStyle(element); return { fontFamily: style.fontFamily, fontSize: style.fontSize, color: style.color, width: style.width, overflow: element.scrollWidth > element.clientWidth }; })) });
     if (!failed) {
-      const run = await page.request.get("api/cron/workflows", { headers: { authorization: "Bearer conference-e2e-only" } }); expect(run.ok()).toBe(true); expect((await run.json()).conferences.ready).toBe(1);
+      const run = await page.request.get("api/cron/workflows", { headers: { authorization: "Bearer conference-e2e-only" } }); expect(run.ok()).toBe(true);
+      const result = await run.json(); expect(result.conferences.ready).toBe(1); expect(result.conferenceDeliveries).toMatchObject({ local: 2, updated: 1 });
+      const retry = await page.request.get("api/cron/workflows", { headers: { authorization: "Bearer conference-e2e-only" } }); expect((await retry.json()).conferenceDeliveries).toMatchObject({ local: 0, updated: 0 });
       await page.reload(); const link = page.getByTestId("meeting-url"); await expect(link).toHaveAttribute("href", `https://meet.google.com/qa-qa-${uid}`); await link.focus(); await page.keyboard.press("Tab"); await expect(page.getByRole("link", { name: "Reschedule", exact: true })).toBeFocused(); await page.keyboard.press("Shift+Tab"); await expect(link).toBeFocused();
       await expect(page.getByRole("status").filter({ hasText: "Google Meet is preparing" })).toHaveCount(0); await page.screenshot({ path: info.outputPath("conference-ready.png") });
       await page.goto(`app/meetings/${uid}`); await expect(page.getByRole("link", { name: "Join meeting", exact: true })).toHaveAttribute("href", `https://meet.google.com/qa-qa-${uid}`);

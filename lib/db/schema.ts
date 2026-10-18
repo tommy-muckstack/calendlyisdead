@@ -181,6 +181,20 @@ export const calendarConferenceJobs = pgTable("calendar_conference_jobs", {
   attempts: integer("attempts").notNull().default(0),
   nextAttemptAt: timestamp("nextAttemptAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
 }, j => [index("calendar_conference_jobs_due").on(j.status, j.nextAttemptAt)]);
+export type ConferenceDeliveryPayload =
+  | { kind: "mail"; mail: { to: string; subject: string; text: string; ics: string } }
+  | { kind: "calendar"; hostId: string; calendarId: string; externalEventId: string };
+export const calendarConferenceDeliveries = pgTable("calendar_conference_deliveries", {
+  id: text("id").primaryKey(),
+  conferenceId: text("conferenceId").notNull().references(() => calendarConferenceJobs.id, { onDelete: "cascade" }),
+  bookingUid: text("bookingUid").notNull().references(() => bookings.uid, { onDelete: "cascade" }),
+  meetingUrl: text("meetingUrl").notNull(),
+  payload: jsonb("payload").$type<ConferenceDeliveryPayload>().notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  nextAttemptAt: timestamp("nextAttemptAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, d => [index("calendar_conference_deliveries_due").on(d.status, d.nextAttemptAt)]);
 export const teams = pgTable("teams", { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const teamMembers = pgTable("team_members", { teamId: text("teamId").notNull(), userId: text("userId").notNull(), role: text("role").notNull().default("member") },

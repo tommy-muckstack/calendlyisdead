@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "../db";
 import { seal, open } from "../crypto";
-import { google, googleOAuth, readGoogleConference } from "./google";
+import { google, googleOAuth, readGoogleConference, updateGoogleConferenceLocation } from "./google";
 import { microsoft, msOAuth } from "./microsoft";
 import { caldav } from "./caldav";
 import { mock } from "./mock";
@@ -93,6 +93,16 @@ export async function readCalendarConference(userId: string, calendarId: string,
   const [conn] = await db.select().from(cc).where(and(eq(cc.id, cal.connectionId), eq(cc.userId, userId), eq(cc.provider, "google")));
   if (!conn) return { conferenceStatus: "failed" };
   return readGoogleConference(await secretFor(conn), cal.externalId, eventId);
+}
+
+export async function updateCalendarConferenceLocation(userId: string, calendarId: string, eventId: string, meetingUrl: string): Promise<"updated" | "cancelled"> {
+  const db = await getDb();
+  // Use the original event's destination, never the user's newly selected calendar.
+  const [cal] = await db.select().from(uc).where(and(eq(uc.id, calendarId), eq(uc.userId, userId), eq(uc.canWrite, true)));
+  if (!cal) return "cancelled";
+  const [conn] = await db.select().from(cc).where(and(eq(cc.id, cal.connectionId), eq(cc.userId, userId), eq(cc.provider, "google")));
+  if (!conn) return "cancelled";
+  return updateGoogleConferenceLocation(await secretFor(conn), cal.externalId, eventId, meetingUrl);
 }
 
 export async function removeEvent(userCalendarId: string | null, externalEventId: string | null) {
