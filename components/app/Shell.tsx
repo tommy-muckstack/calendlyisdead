@@ -9,6 +9,7 @@ import "./appshell.css";
 
 const SCHED = [{ href: "/app", label: "Event types" }, { href: "/app/one-off", label: "Single-use links" }, { href: "/app/polls", label: "Meeting polls" }, { href: "/app/routing", label: "Routing forms" }];
 const CALENDAR = [{ href: "/app/meetings", label: "Meetings" }, { href: "/app/calendars", label: "Calendar connections" }];
+const AUTOMATIONS = [{ href: "/app/integrations", label: "Integrations & apps" }, { href: "/app/workflows", label: "My automations" }];
 const NAV: { href: string; label: string; icon: keyof typeof I; match: (p: string) => boolean }[] = [
   { href: "/app", label: "Scheduling", icon: "sched", match: p => SCHED.some(t => t.href === p) || p === "/app/availability" },
   { href: "/app/meetings", label: "Calendar", icon: "cal", match: p => p.startsWith("/app/calendars") || p.startsWith("/app/meetings") },
@@ -16,12 +17,12 @@ const NAV: { href: string; label: string; icon: keyof typeof I; match: (p: strin
   { href: "/app/contacts", label: "Contacts", icon: "contacts", match: p => p.startsWith("/app/contacts") },
   { href: "/app/opportunities", label: "Opportunities", icon: "work", match: p => p.startsWith("/app/opportunities") },
   { href: "/app/teams", label: "Teams", icon: "team", match: p => p.startsWith("/app/teams") },
-  { href: "/app/workflows", label: "Automations", icon: "auto", match: p => p.startsWith("/app/workflows") },
+  { href: "/app/integrations", label: "Automations", icon: "auto", match: p => p.startsWith("/app/workflows") || p.startsWith("/app/integrations") },
   { href: "/app/analytics", label: "Analytics", icon: "chart", match: p => p.startsWith("/app/analytics") },
 ];
 const TITLES: [string, string, { href: string; label: string }[]?][] = [
   ["/app/contacts", "Contacts"], ["/app/opportunities", "Opportunities"],
-  ["/app/meetings", "Calendar", CALENDAR], ["/app/calendars", "Calendar", CALENDAR], ["/app/assistant", "Assistant"], ["/app/teams", "Teams"], ["/app/workflows", "Automations", [{ href: "/app/workflows", label: "My automations" }]],
+  ["/app/meetings", "Calendar", CALENDAR], ["/app/calendars", "Calendar", CALENDAR], ["/app/assistant", "Assistant"], ["/app/teams", "Teams"], ["/app/workflows", "Automations", AUTOMATIONS], ["/app/integrations", "Automations", AUTOMATIONS],
   ["/app/analytics", "Analytics", [{ href: "/app/analytics", label: "Events" }]], 
 ];
 const GET_STARTED = [
@@ -110,9 +111,9 @@ export function AppShell({ user, signOut, children }: { user: { name: string; im
           <div className="cs-title"><h1>{meta[0]}</h1><span className="cs-help" title="Help">{I.help(16)}</span></div>
           {sched && <div className="cs-actions"><Link className="cs-btn cs-outline" href="/app/availability">{I.avail(16)}Manage availability</Link>
             <div className="cs-create"><button ref={topCreate} className="cs-btn cs-dark" onClick={() => setMenu(menu === "top" ? null : "top")} onKeyDown={e => { if (e.key === "ArrowDown") { e.preventDefault(); setMenu("top"); } }} aria-haspopup="menu" aria-expanded={menu === "top"} aria-controls="create-top">{I.plus(16)}Create{I.chev(14)}</button>{menu === "top" && <CreateMenu id="create-top" trigger={topCreate} onCreate={create} onClose={closeCreate} />}</div></div>}
-          {meta[1] && <div className="cs-tabs" role="tablist">{meta[1].map(t => {
-            const selected = path === t.href || (t.href === "/app/meetings" && path.startsWith("/app/meetings/")) || (settings && t.href === "/app");
-            return <Link key={t.href + t.label} href={t.href} role="tab" className={selected ? "on" : ""} aria-selected={selected}>{t.label}</Link>;
+          {meta[1] && <div className="cs-tabs" role={meta[1] === AUTOMATIONS ? "navigation" : "tablist"} aria-label={meta[1] === AUTOMATIONS ? "Automations sections" : undefined}>{meta[1].map(t => {
+            const selected = path === t.href || (t.href === "/app/meetings" && path.startsWith("/app/meetings/")) || (t.href === "/app/integrations" && path.startsWith("/app/integrations/")) || (settings && t.href === "/app");
+            return <Link key={t.href + t.label} href={t.href} role={meta[1] === AUTOMATIONS ? undefined : "tab"} className={selected ? "on" : ""} aria-current={meta[1] === AUTOMATIONS && selected ? "page" : undefined} aria-selected={meta[1] === AUTOMATIONS ? undefined : selected}>{t.label}</Link>;
           })}</div>}
         </header>}
         {settings ? <div className="cs-body cs-dim" aria-hidden /> : <div className="cs-body">{children}</div>}
