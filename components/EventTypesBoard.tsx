@@ -1,4 +1,5 @@
 "use client";
+import { track, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { useEffect, useRef, useState } from "react";
 type ET = { id: string; slug: string; title: string; description: string; durationMin: number; location: string; color: string;
@@ -15,7 +16,7 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
   const open = items.find(i => i.id === openId) ?? null;
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1400); };
   async function create() {
-    const r = await fetch(BP + "/api/event-types", { method: "POST" }); const et = await r.json();
+    const r = await fetch(BP + "/api/event-types", { method: "POST" }); const et = await r.json(); if (r.ok) track(EVENTS.app_event_type_created);
     setItems(x => [...x, et]); setOpenId(et.id);
   }
   useEffect(() => { const f = () => create(); addEventListener("cid:create-event-type", f); if (new URLSearchParams(location.search).get("new")) { history.replaceState(null, "", location.pathname); create(); } return () => removeEventListener("cid:create-event-type", f); }, []);
@@ -33,12 +34,12 @@ export function EventTypesBoard({ initial, username, schedules, owner }: { initi
         <p>{!et.location && <span className="cs-dot" />}{et.durationMin} min • {et.location || "No location set"} • {et.kind === "group" ? `Group (${et.seats} seats)` : "One-on-One"}{et.managedParentId ? " • Managed by your team" : ""}</p>
         <p>{sched ? `${sched}` : "Weekdays, 9 am - 5 pm"}</p>
       </div>
-      <button className="cs-btn cs-outline" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); flash("Link copied"); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>Copy link</button>
+      <button className="cs-btn cs-outline" onClick={e => { e.stopPropagation(); navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${et.slug}`); track(EVENTS.app_shared, { object: "event_type", method: "clipboard" }); flash("Link copied"); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>Copy link</button>
       <a className="cs-ibtn" aria-label={`View ${et.title}`} href={`${BP}/${username}/${et.slug}`} target="_blank" onClick={e => e.stopPropagation()}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" /></svg></a>
     </div>)}
     {open && <Editor key={open.id} et={open} username={username} schedules={schedules} onClose={() => setOpenId(null)}
       onChange={n => setItems(x => x.map(i => i.id === n.id ? n : i))} onSaved={() => flash("Saved")}
-      onDelete={async () => { await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" }); setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null); }} />}
+      onDelete={async () => { const r = await fetch(`${BP}/api/event-types/${open.id}`, { method: "DELETE" }); if (r.ok) track(EVENTS.app_event_type_deleted); setItems(x => x.filter(i => i.id !== open.id)); setOpenId(null); }} />}
     {toast && <div className="toast" role="status">{toast}</div>}
   </>;
 }

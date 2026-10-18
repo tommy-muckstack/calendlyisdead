@@ -6,6 +6,7 @@ import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, auth
 import { BP } from "@/lib/basepath";
 import { G, Check } from "@/components/mk/icons";
 import { Arrow } from "@/components/mk/chrome";
+import { trackNow, EVENTS } from "@/lib/posthog";
 type Props = { config: FirebaseClientConfig | null; demo: boolean; demoAs?: "mate"; to: string; mode?: "login" | "signup"; autoProvider?: string };
 // Calendly auth layout: email first, then password; Google below. Login = narrow card; signup = wide card with a perks column.
 export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }: Props) {
@@ -20,7 +21,7 @@ export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }:
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); const fd = new FormData(e.currentTarget);
     if (step === "email") { const v = String(fd.get("email") || "").trim(); if (!v) return; setEmail(v); if (mode === "reset") { run(async () => { await resetPassword(config!, v); setNote("If that email has an account, a reset link is on its way."); setMode("login"); }); return; } setStep("password"); return; }
     const password = String(fd.get("password") ?? ""), name = String(fd.get("name") ?? "");
-    run(async () => { if (signup) await signUpWithEmail(config!, session, email, password, name || undefined); else await signInWithEmail(config!, session, email, password); done(); }); };
+    run(async () => { if (signup) { await signUpWithEmail(config!, session, email, password, name || undefined); await trackNow(EVENTS.app_signed_up, { method: "password" }); } else { await signInWithEmail(config!, session, email, password); await trackNow(EVENTS.app_signed_in, { method: "password" }); } done(); }); };
   const demoLogin = () => run(async () => { const r = await fetch(`${BP}/api/session/demo${demoAs ? `?who=${demoAs}` : ""}`, { method: "POST" }); if (!r.ok) throw new Error("Demo sign-in failed"); done(); });
   const form = <div>
     <h1>{signup ? "Create a free account" : mode === "reset" ? "Reset your password" : "Log in to your account"}</h1>
@@ -41,7 +42,7 @@ export function LoginForm({ config, demo, demoAs, to, mode: initial = "login" }:
       </form>
       {mode !== "reset" && <>
         <div className="cm-or">or</div>
-        <button className="cm-social" disabled={busy} onClick={() => run(async () => { await signInWithGoogle(config, session); done(); })}><G s={20} />Continue with Google</button>
+        <button className="cm-social" disabled={busy} onClick={() => run(async () => { await signInWithGoogle(config, session); await trackNow(EVENTS.app_signed_in, { method: "google" }); done(); })}><G s={20} />Continue with Google</button>
       </>}</>}
     {signup && <p className="cm-aft">Continue with Google to connect your calendar.</p>}
     <p className="cm-aft" style={{ marginTop: signup ? 28 : 28 }}>

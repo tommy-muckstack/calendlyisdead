@@ -1,4 +1,5 @@
 "use client";
+import { track, trackNow, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { useState } from "react";
 import { DateTime } from "luxon";
@@ -11,11 +12,11 @@ export function PollsPanel({ initial, tz }: { initial: P[]; tz: string }) {
     setErr("");
     const options = opts.filter(Boolean).map(o => DateTime.fromISO(o, { zone: tz }).toUTC().toISO());
     const r = await fetch(BP + "/api/polls", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, durationMin: dur, location: loc, options }) });
-    if (r.ok) location.reload(); else setErr("Add at least two times.");
+    if (r.ok) { await trackNow(EVENTS.app_poll_created, { options: options.length, duration_min: dur }); location.reload(); } else setErr("Add at least two times.");
   }
   async function book(id: string, option: string) {
     const r = await fetch(`${BP}/api/polls/${id}/book`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ option }) });
-    if (r.ok) location.reload(); else setErr("That time is no longer free.");
+    if (r.ok) { await trackNow(EVENTS.app_poll_booked); location.reload(); } else setErr("That time is no longer free.");
   }
   return <>
     <h2>Meeting polls</h2>

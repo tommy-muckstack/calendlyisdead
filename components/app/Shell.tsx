@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { identify, resetIdentity, track, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { I } from "./icons";
 import "./appshell.css";
@@ -26,7 +27,8 @@ const GET_STARTED = [
   { t: "Using CalendlyIsDead with a team", n: "2 tasks", a: <><circle cx="17" cy="19" r="6" fill="#fbcfe8" stroke="#db2777" strokeWidth="2" /><circle cx="32" cy="22" r="5" fill="#bae6fd" stroke="#0284c7" strokeWidth="2" /><path d="M6 38c1-7 6-10 11-10s10 3 11 10M28 37c.8-4 3-6 6-6s5 2 6 6" stroke="#475569" strokeWidth="2" fill="none" strokeLinecap="round" /></> },
 ];
 
-export function AppShell({ user, signOut, children }: { user: { name: string; email: string; username: string }; signOut: ReactNode; children: ReactNode }) {
+export function AppShell({ user, signOut, analytics, children }: { user: { name: string; email: string; username: string }; signOut: ReactNode; analytics?: { id: string; kind: "firebase" | "guest" | "demo" }; children: ReactNode }) {
+  useEffect(() => { if (analytics) identify(analytics.id, analytics.kind); }, [analytics?.id, analytics?.kind]);
   const path = (usePathname() || "").replace(BP, "") || "/app";
   const [menu, setMenu] = useState<null | "side" | "top" | "user">(null);
   const [gs, setGs] = useState(true);
@@ -47,7 +49,7 @@ export function AppShell({ user, signOut, children }: { user: { name: string; em
     <div className="cs-user"><button className="cs-who" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Account menu"><span className="cs-av">{initial}</span><b>{user.name || user.email}</b>{I.chev(16)}</button>
       <button className="cs-ico" aria-label="Collapse sidebar">{I.panel(20)}</button>
       {menu === "user" && <div className="cs-menu cs-menu-user" role="menu"><div className="cs-em">{user.email}</div><a role="menuitem" href={`${BP}/${user.username}`} target="_blank">My booking page</a><Link role="menuitem" href="/app/branding" onClick={() => setMenu(null)}>Settings</Link>
-        {signOut}</div>}</div>
+        <div style={{ display: "contents" }} onSubmitCapture={() => { track(EVENTS.app_signed_out); resetIdentity(); }}>{signOut}</div></div>}</div>
     <aside className="cs-side">
       <div className="cs-create"><button className="cs-btn cs-outline cs-wide" onClick={() => setMenu(menu === "side" ? null : "side")} aria-haspopup="menu">{I.plus(16)}Create{I.chev(14)}</button><CreateMenu id="side" /></div>
       <nav>{NAV.map(n => { const on = n.match(path); return <Link key={n.href} href={n.href} className={"cs-nav" + (on ? " on" : "")} aria-current={on ? "page" : undefined}>{I[n.icon](22)}{n.label}</Link>; })}</nav>

@@ -1,4 +1,5 @@
 "use client";
+import { track, trackNow, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
@@ -40,6 +41,8 @@ export function BookingWidget(p: Props) {
       answers: Object.fromEntries(p.questions.map(q => [q.id, String(fd.get(`q_${q.id}`) ?? "")])) }) });
     const j = await r.json(); setBusy(false);
     if (r.ok) {
+      // Sent before navigating away. Kinds only: never the invitee's name, email, notes or answers.
+      await trackNow(EVENTS.app_booking_created, { rescheduled: !!p.reschedule, paid: !!j.checkoutUrl, embed: !!p.embed, guests: guests.length });
       if (j.checkoutUrl) { location.href = j.checkoutUrl; return; }
       if (j.redirectUrl && !p.embed) { location.href = j.redirectUrl; return; }
       router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);

@@ -1,4 +1,5 @@
 "use client";
+import { track, EVENTS } from "@/lib/posthog";
 import { BP } from "@/lib/basepath";
 import { useState } from "react";
 type L = { id: string; slug: string; title: string; durationMin: number; used: boolean };
@@ -6,7 +7,7 @@ export function OneOffPanel({ username, bases, initial }: { username: string; ba
   const [links, setLinks] = useState(initial), [title, setTitle] = useState(""), [dur, setDur] = useState(30), [from, setFrom] = useState("");
   async function create() {
     const r = await fetch(BP + "/api/one-off", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, durationMin: dur, fromEventTypeId: from || undefined }) });
-    const et = await r.json(); setLinks([{ id: et.id, slug: et.slug, title: et.title, durationMin: et.durationMin, used: false }, ...links]); setTitle("");
+    const et = await r.json(); if (r.ok) track(EVENTS.app_one_off_created, { duration_min: dur }); setLinks([{ id: et.id, slug: et.slug, title: et.title, durationMin: et.durationMin, used: false }, ...links]); setTitle("");
   }
   return <>
     <h2>One-off links</h2>
@@ -21,7 +22,7 @@ export function OneOffPanel({ username, bases, initial }: { username: string; ba
     <div style={{ marginTop: 18 }}>{links.map(l => <div key={l.id} className="card et" data-testid="one-off">
       <div style={{ flex: 1 }}><b>{l.title}</b><div className="muted" style={{ fontSize: 14 }}>{l.durationMin} min · {l.used ? "Used" : "Not used yet"} · /{username}/{l.slug}</div></div>
       <a className="btn" href={`${BP}/${username}/${l.slug}`} target="_blank">Open</a>
-      <button className="btn" onClick={() => navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${l.slug}`)}>Copy link</button>
+      <button className="btn" onClick={() => { navigator.clipboard?.writeText(`${location.origin}${BP}/${username}/${l.slug}`); track(EVENTS.app_shared, { object: "one_off", method: "clipboard" }); }}>Copy link</button>
       <button className="btn danger" onClick={async () => { await fetch(`${BP}/api/one-off/${l.id}`, { method: "DELETE" }); setLinks(links.filter(x => x.id !== l.id)); }}>Remove</button>
     </div>)}</div>
   </>;
