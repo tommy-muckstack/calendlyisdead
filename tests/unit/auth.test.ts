@@ -12,12 +12,13 @@ const tokens: Record<string, any> = {
 };
 const revoke = vi.fn();
 const createCookie = vi.fn(async (t: string) => `sess:${t}`);
+const verifyCookie = vi.fn(async (c: string, checkRevoked = false) => { const t = c.replace(/^sess:/, ""); if (!tokens[t] || (checkRevoked && tokens[t].revoked)) throw new Error("bad"); return tokens[t]; });
 const unsupportedProviders = ["microsoft.com", "saml.company", "oidc.company", "anonymous", "custom", undefined];
 vi.mock("firebase-admin/app", () => ({ initializeApp: () => ({ name: "isdead" }), getApps: () => [], cert: (x: any) => x }));
 vi.mock("firebase-admin/auth", () => ({ getAuth: () => ({
   verifyIdToken: async (t: string) => { if (!tokens[t]) throw new Error("bad"); return { ...tokens[t], auth_time: Math.floor(Date.now() / 1000) }; },
   createSessionCookie: createCookie,
-  verifySessionCookie: async (c: string) => { const t = c.replace(/^sess:/, ""); if (!tokens[t]) throw new Error("bad"); return tokens[t]; },
+  verifySessionCookie: verifyCookie,
   revokeRefreshTokens: revoke,
 }) }));
 const jar = new Map<string, string>();
@@ -34,9 +35,21 @@ beforeAll(async () => {
   await (await import("../../lib/db")).getDb();
   A = await import("../../auth"); R = await import("../../app/api/session/route"); D = await import("../../app/api/session/demo/route"); S = await import("../../lib/isdead-auth/server");
 });
-beforeEach(() => { jar.clear(); createCookie.mockClear(); setFb(true); });
+beforeEach(() => { jar.clear(); createCookie.mockClear(); verifyCookie.mockClear(); setFb(true); });
 
 describe("shared Firebase session", () => {
+  it("checks revocation on protected requests after credential changes", async () => {
+    tokens["tok-revoked"] = { ...tokens["tok-new"], uid: "fb-revoked", revoked: true };
+    jar.set("isdead_session", "sess:tok-revoked"); expect(await A.requireUser()).toBeNull(); expect(verifyCookie).toHaveBeenCalledWith("sess:tok-revoked", true);
+  });
+  it("synchronizes verified login email on session exchange without stale-cookie rollback", async () => {
+    tokens["tok-email-before"] = { ...tokens["tok-new"], uid: "fb-email-sync", email: "first-sync@example.invalid", email_verified: true };
+    tokens["tok-email-after"] = { ...tokens["tok-email-before"], email: "second-sync@example.invalid" };
+    expect((await R.POST(post({ idToken: "tok-email-before" }))).status).toBe(204); jar.set("isdead_session", "sess:tok-email-before"); const old = await A.requireUser();
+    expect((await R.POST(post({ idToken: "tok-email-after" }))).status).toBe(204);
+    // A read from the earlier claim cannot roll the database email backward.
+    expect(await A.requireUser()).toMatchObject({ id: old!.id, email: "second-sync@example.invalid", username: old!.username });
+  });
   it("without Firebase env: not configured, 503, no crash", async () => {
     setFb(false);
     expect(A.firebaseConfigured()).toBe(false);
