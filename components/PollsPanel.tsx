@@ -1,9 +1,13 @@
 "use client";
 import { BP } from "@/lib/basepath";
+import { useRouter } from "next/navigation";
+import { PollBookingReview } from "./PollBookingReview";
 import { useState } from "react";
 import { DateTime } from "luxon";
 type P = { id: string; title: string; status: string; chosen: string | null; bookingUid: string | null; voters: number; tally: { option: string; count: number; names: string[]; best: boolean }[] };
 export function PollsPanel({ initial, tz }: { initial: P[]; tz: string }) {
+  const router = useRouter();
+  const [selected, setSelected] = useState<{ id: string; option: string } | null>(null);
   const [title, setTitle] = useState("Team sync"), [dur, setDur] = useState(30), [loc, setLoc] = useState("Google Meet");
   const [opts, setOpts] = useState<string[]>(["", ""]), [err, setErr] = useState("");
   const fmt = (iso: string) => DateTime.fromISO(iso).setZone(tz).toFormat("ccc LLL d, h:mm a");
@@ -13,11 +17,8 @@ export function PollsPanel({ initial, tz }: { initial: P[]; tz: string }) {
     const r = await fetch(BP + "/api/polls", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, durationMin: dur, location: loc, options }) });
     if (r.ok) location.reload(); else setErr("Add at least two times.");
   }
-  async function book(id: string, option: string) {
-    const r = await fetch(`${BP}/api/polls/${id}/book`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ option }) });
-    if (r.ok) location.reload(); else setErr("That time is no longer free.");
-  }
   return <>
+    {selected && <PollBookingReview pollId={selected.id} option={selected.option} tz={tz} onClose={() => setSelected(null)} onBooked={() => { setSelected(null); router.refresh(); }} />}
     <h2>Meeting polls</h2>
     <p className="muted">Offer a few times, share the link, let people vote, then book the winner.</p>
     <div className="card" style={{ padding: 18, maxWidth: 560 }}>
@@ -35,7 +36,7 @@ export function PollsPanel({ initial, tz }: { initial: P[]; tz: string }) {
       <div className="muted" style={{ fontSize: 14, margin: "4px 0 10px" }}>Share: <a href={`${BP}/poll/${p.id}`} target="_blank">/poll/{p.id}</a></div>
       {p.tally.map(t => <div key={t.option} className="row" style={{ justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid var(--line)" }}>
         <span>{t.best ? "★ " : ""}{fmt(t.option)} <span className="muted">· {t.count} {t.names.length ? `(${t.names.join(", ")})` : ""}</span></span>
-        {p.status === "open" && t.count > 0 && <button className="btn" onClick={() => book(p.id, t.option)}>Book this time</button>}
+        {p.status === "open" && <button className="btn" onClick={() => setSelected({ id: p.id, option: t.option })}>Book this time</button>}
         {p.chosen === t.option && <a className="btn" href={`${BP}/booking/${p.bookingUid}`}>View booking</a>}
       </div>)}
     </div>)}
