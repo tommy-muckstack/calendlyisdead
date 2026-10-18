@@ -112,11 +112,16 @@ The existing `/api/cron/workflows` runner also processes contact reminders. On i
 Delivery attempts share a provider idempotency key and immutable payload. Failed/abandoned attempts can retry after 15 minutes, at most three times within a 23-hour window. Changed summary content or recipient cancels retries of the old snapshot. Notes edited or completed after dispatch begins cannot retract that email. Native browser behavior, original overdue/retry rules and Notetaker recap/multi-contact note creation remain unverified or missing; see the parity report.
 
 ## Calendar sync
+
+Automations → **Integrations & apps** (`/app/integrations`) lists working calendar, conferencing-link and website-embed setup paths. Search by name, filter by category, or show connected apps. Calendar statuses reflect the signed-in user's saved connections; failed connections stay visible as needing attention. Google Meet's “Calendar ready” label requires a selected writable Google destination and a healthy last-known connection, without claiming a live provider check. OAuth connection buttons appear only when their existing provider configuration is available. iCloud setup opens the app-specific-password form; accounts can be managed or disconnected in Calendar connections.
+
+Zoom, Teams and the Google Meet location picker currently use reusable links supplied per event. Their setup pages state that limitation. Existing legacy automatic Meet events retain their calendar-based creation path; the directory does not enable automatic rooms in the current location picker. CRM, Slack, browser extensions, general connectors and assigned/managed automation tabs remain missing parity work. These are not paid gates or claimed exceptions. The directory uses original capability pictograms and licensed Material Symbols instead of copied provider logos.
+
 - **Google**: its own OAuth client (`AUTH_GOOGLE_ID`), separate from Firebase sign-in. Add redirect URI `{APP_URL}/api/integrations/google/callback`; scopes `calendar.readonly` + `calendar.events`. Free/busy via the freeBusy API; bookings written with `sendUpdates=none` (we send our own invite) and a Meet link when the location is Google Meet.
 - **Outlook / Microsoft 365**: Entra app (multi-tenant + personal accounts), redirect `{APP_URL}/api/integrations/microsoft/callback`, delegated `Calendars.ReadWrite offline_access User.Read`.
 - **iCloud**: CalDAV at caldav.icloud.com with the Apple ID and an app-specific password.
 - **Demo calendar**: keyless mock (dev or `DEMO_MODE=1`), busy 12-1pm ET on weekdays.
-- Each user can connect several accounts, choose which calendars are checked for conflicts, and one calendar new bookings are added to. If a provider fails, its busy times are skipped and the connection is flagged.
+- Each user can connect several accounts, choose which calendars are checked for conflicts, and one calendar new bookings are added to. Failed selected-calendar checks flag the connection and block event availability/booking. Poll review also blocks failed checks; successful checks with external conflicts show a warning that the host can explicitly confirm.
 
 ## Opportunities
 

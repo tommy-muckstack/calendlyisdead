@@ -23,6 +23,8 @@ describe("website route privacy", () => {
     ["/calendlyisdead/onboarding?error=private#calendar", "/onboarding", "auth"],
     ["/calendlyisdead/app/meetings/private-id", "/app/meetings/[uid]", "app"],
     ["/calendlyisdead/app/profile?name=private#photo", "/app/profile", "app"],
+    ["/calendlyisdead/app/integrations?search=private", "/app/integrations", "app"],
+    ["/calendlyisdead/app/integrations/private?account=private", "/app/integrations/[id]", "app"],
     ["/calendlyisdead/app/opportunities/automations?eventId=private&q=private", "/app/opportunities/automations", "app"],
     ["/calendlyisdead/app/opportunities?contactId=private&q=deal", "/app/opportunities", "app"],
     ["/calendlyisdead/app/opportunities/private-id?historyPage=2#private", "/app/opportunities/[id]", "app"],
