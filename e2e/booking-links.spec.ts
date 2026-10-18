@@ -20,13 +20,13 @@ for (const width of [1440, 390]) {
     });
     test("UTC and aliases stay selected and browser history restores the timezone", async ({ page }) => {
       await page.goto("demo/30min?month=2027-01&tz=US/Eastern");
-      await expect(page.getByLabel("Time zone")).toHaveValue("US/Eastern");
-      await page.getByLabel("Time zone").selectOption("UTC");
-      await expect(page.getByLabel("Time zone")).toHaveValue("UTC");
+      await expect(page.locator(".booking-zone-trigger")).toHaveAttribute("data-timezone", "US/Eastern");
+      await page.locator(".booking-zone-trigger").click(); await page.getByRole("combobox", { name: "Search time zones" }).fill("UTC"); await page.getByRole("combobox", { name: "Search time zones" }).press("Enter");
+      await expect(page.locator(".booking-zone-trigger")).toHaveAttribute("data-timezone", "UTC");
       await page.goBack();
-      await expect(page.getByLabel("Time zone")).toHaveValue("US/Eastern");
+      await expect(page.locator(".booking-zone-trigger")).toHaveAttribute("data-timezone", "US/Eastern");
       await page.goForward();
-      await expect(page.getByLabel("Time zone")).toHaveValue("UTC");
+      await expect(page.locator(".booking-zone-trigger")).toHaveAttribute("data-timezone", "UTC");
     });
   });
 }

@@ -7,17 +7,20 @@ import { useEffect, useMemo, useState } from "react";
 import { DateTime } from "luxon";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { BookingTimezonePicker, BookingTimeFormatControl, useBookingTimeFormat } from "./BookingTimezonePicker";
+import { formatBookingTime, timezoneLabel } from "@/lib/timezone-display";
 
 type Props = { username: string; embed?: boolean; price?: string; seatsLeftNote?: string; kindLabel?: string; slug: string; host: string; hostImage?: string | null; title: string; durationMin: number; location: string; description: string; color: string; lockedTimezone?: string | null;
   locations?: PublicLocationOption[] | null;
   reschedule?: { locationSelection?: LocationSelection; uid: string; name: string; email: string; start: string };
   questions: { id: string; label: string; type: "text" | "textarea" | "phone" | "select"; required: boolean; options?: string[] }[] };
-const ZONES: string[] = (Intl as any).supportedValuesOf?.("timeZone") ?? ["UTC"];
 
 export function BookingWidget(p: Props) {
   const router = useRouter(), path = usePathname(), q = useSearchParams();
-  const { tz, month, date, slot, invalid } = readBookingQuery(q, Intl.DateTimeFormat().resolvedOptions().timeZone, DateTime.utc(), p.lockedTimezone);
-  const zones = [...new Set(["UTC", tz, ...ZONES])];
+  const [deviceZone, setDeviceZone] = useState<string | null>(null);
+  const [timeFormat, setTimeFormat] = useBookingTimeFormat();
+  useEffect(() => { setDeviceZone(Intl.DateTimeFormat().resolvedOptions().timeZone); }, []);
+  const { tz, month, date, slot, invalid } = readBookingQuery(q, deviceZone ?? "UTC", DateTime.utc(), p.lockedTimezone);
   const [availability, setAvailability] = useState<{ url: string; slots: SlotCalendar | null; error: string; reload?: boolean }>({ url: "", slots: null, error: "" });
   const [retry, setRetry] = useState(0);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -34,6 +37,7 @@ export function BookingWidget(p: Props) {
   const availabilityError = availability.url === availabilityUrl ? availability.error : "";
   const zoneChanged = availability.url === availabilityUrl && !!availability.reload;
   useEffect(() => {
+    if (!deviceZone) return;
     const controller = new AbortController();
     let active = true;
     const failed = () => setAvailability({ url: availabilityUrl, slots: null, error: "We couldn’t load available times. Please try again." });
@@ -49,8 +53,9 @@ export function BookingWidget(p: Props) {
       else failed();
     } }).finally(() => clearTimeout(timeout));
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
-  }, [availabilityUrl, retry, tz]);
+  }, [availabilityUrl, retry, tz, deviceZone]);
   const cells = useMemo(() => { const first = m.startOf("month"); const pad = first.weekday % 7; return [...Array(pad).fill(null), ...Array.from({ length: first.daysInMonth! }, (_, i) => first.plus({ days: i }))]; }, [month, tz]);
+  const clock = (iso: string) => formatBookingTime(iso, tz, timeFormat);
   const fmt = (iso: string, f: string) => DateTime.fromISO(iso).setZone(tz).toFormat(f);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -89,9 +94,9 @@ export function BookingWidget(p: Props) {
       {p.location && <div className="muted" style={{ marginTop: 6 }}>📍 {p.location}</div>}
       {p.locations?.length === 1 && <p className="location-description muted">{p.locations[0].description}</p>}
       {p.price && <div className="muted" style={{ marginTop: 6 }} data-testid="price">💳 {p.price}, paid when you book</div>}
-      {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {fmt(slot, "h:mm a")} – {DateTime.fromISO(slot).plus({ minutes: p.durationMin }).setZone(tz).toFormat("h:mm a, cccc, LLLL d")}</div>}
-      {slot && <p className="muted" data-testid="booking-timezone">{tz.replaceAll("_", " ")}</p>}
-      {p.reschedule && <div className="card" style={{ padding: 12, marginTop: 16, background: "var(--brand-soft)" }}>Moving your booking from <b>{fmt(p.reschedule.start, "ccc LLL d, h:mm a")}</b></div>}
+      {slot && <div style={{ marginTop: 10, fontWeight: 600 }}>▣ {clock(slot)} – {clock(DateTime.fromISO(slot).plus({ minutes: p.durationMin }).toISO()!)}{fmt(slot, ", cccc, LLLL d")}</div>}
+      {slot && <p className="muted" data-testid="booking-timezone" data-timezone={tz}>{timezoneLabel(tz)}</p>}
+      {p.reschedule && <div className="card" style={{ padding: 12, marginTop: 16, background: "var(--brand-soft)" }}>Moving your booking from <b>{fmt(p.reschedule.start, "ccc LLL d")}, {clock(p.reschedule.start)}</b></div>}
       {p.description && <p style={{ whiteSpace: "pre-wrap" }}>{p.description}</p>}
     </section>
     {!slot ? <section className="pick">
@@ -110,15 +115,13 @@ export function BookingWidget(p: Props) {
         {!slots && !availabilityError && <p className="muted" role="status">Loading open times…</p>}
         {availabilityError && !zoneChanged && <div><p role="alert">{availabilityError}</p><button className="btn" onClick={() => setRetry(value => value + 1)}>Retry available times</button></div>}
         {slots && !Object.values(slots).some(times => times.length > 0) && <p className="muted" role="status">No available times this month. Try another month.</p>}
-        {p.lockedTimezone ? <div className="f">Time zone<p data-testid="booking-timezone">{tz.replaceAll("_", " ")}</p></div> : <>
-          <label className="f" htmlFor="tz">Time zone</label>
-          <select id="tz" className="input" value={tz} onChange={e => nav({ tz: e.target.value })}>{zones.map(z => <option key={z}>{z}</option>)}</select>
-        </>}
+        {p.lockedTimezone ? <div className="f">Time zone<p data-testid="booking-timezone" data-timezone={tz}>{timezoneLabel(tz)}</p><BookingTimeFormatControl value={timeFormat} onChange={setTimeFormat} /></div>
+          : <BookingTimezonePicker value={tz} onChange={zone => nav({ tz: zone })} format={timeFormat} onFormatChange={setTimeFormat} />}
       </div>
       {date && <div className="times" data-testid="times">
         <b style={{ marginBottom: 4 }}>{DateTime.fromISO(date).toFormat("cccc, LLLL d")}</b>
         {(slots?.[date] ?? []).map(s => <div key={s} className={`slot ${chosen === s ? "chosen" : ""}`}>
-          <button className="t" onClick={() => setChosen(s)}>{fmt(s, "h:mm a")}</button>
+          <button className="t" onClick={() => setChosen(s)}>{clock(s)}</button>
           {chosen === s && <button className="go" onClick={() => nav({ slot: s })}>Next</button>}
         </div>)}
         {slots && !(slots[date] ?? []).length && <p className="muted">No times left on this day.</p>}

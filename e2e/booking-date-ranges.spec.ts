@@ -41,7 +41,7 @@ for (const width of [1440, 390]) {
       const rejected = await page.request.post("api/bookings", { data: { username: "demo", slug: event.slug, start: start.plus({ days: 1 }).toUTC().toISO(), name: "Range QA", email: "range-qa@example.invalid", tz: "Asia/Tokyo" } });
       expect(rejected.status()).toBe(409);
       await page.goto(`demo/${event.slug}?${new URLSearchParams({ month: local.toFormat("yyyy-MM"), date: local.toISODate()!, tz: "Asia/Tokyo" })}`);
-      await page.getByRole("button", { name: local.toFormat("h:mm a"), exact: true }).click(); await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByRole("button", { name: local.toFormat("h:mma").toLowerCase(), exact: true }).click(); await page.getByRole("button", { name: "Next", exact: true }).click();
       await page.getByLabel("Name", { exact: true }).fill("Range QA"); await page.getByLabel("Email", { exact: true }).fill("range-qa@example.invalid");
       const submitted = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/bookings"));
       await page.getByRole("button", { name: "Book it", exact: true }).click(); const response = await submitted; expect(response.ok()).toBeTruthy(); bookingUid = (await response.json()).uid;
@@ -53,7 +53,7 @@ for (const width of [1440, 390]) {
       await expect(editor.getByLabel("Days into the future", { exact: true })).toHaveCount(0); await editor.getByRole("button", { name: "Save changes", exact: true }).click(); await expect(editor.locator("footer").getByRole("status")).toHaveText("Changes saved");
       const start = DateTime.now().setZone("America/New_York").plus({ years: 3 }).startOf("week").set({ hour: 9 });
       await page.goto(`demo/${event.slug}?${new URLSearchParams({ month: start.toFormat("yyyy-MM"), date: start.toISODate()!, tz: "America/New_York" })}`);
-      await expect(page.getByRole("button", { name: "9:00 AM", exact: true })).toBeEnabled();
+      await expect(page.getByRole("button", { name: "9:00am", exact: true })).toBeEnabled();
     });
     test("validates fixed dates and retains the draft through save failure and retry", async ({ page }) => {
       await page.getByRole("button", { name: `Edit ${event.title}`, exact: true }).click(); const editor = page.getByRole("dialog", { name: "Edit event type" });

@@ -37,10 +37,10 @@ for (const width of [1440, 390]) {
       await editor.getByRole("button", { name: /^Booking page options/ }).click(); await expect(interval).toHaveValue("15");
       const day = DateTime.now().setZone("America/New_York").plus({ weeks: 2 }).startOf("week");
       await page.goto(`demo/${event.slug}?month=${day.toFormat("yyyy-MM")}&date=${day.toISODate()}&tz=America%2FNew_York`);
-      await page.getByRole("button", { name: "9:15 AM", exact: true }).click();
+      await page.getByRole("button", { name: "9:15am", exact: true }).click();
       await page.screenshot({ path: info.outputPath("quarter-hour-slots.png") });
       await page.getByRole("button", { name: "Next", exact: true }).click();
-      await expect(page.getByText(/9:15 AM – 10:15 AM/)).toBeVisible();
+      await expect(page.getByText(/9:15am – 10:15am/)).toBeVisible();
       await page.getByLabel("Name", { exact: true }).fill("Increment QA"); await page.getByLabel("Email", { exact: true }).fill("increment-qa@example.invalid");
       const booked = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/bookings"));
       await page.getByRole("button", { name: "Book it", exact: true }).click(); const response = await booked; expect(response.ok()).toBeTruthy(); bookingUid = (await response.json()).uid;
