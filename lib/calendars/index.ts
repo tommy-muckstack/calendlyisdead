@@ -72,13 +72,14 @@ async function addTo(userId: string) {
   const db = await getDb();
   const [u] = await db.select().from(users).where(eq(users.id, userId));
   if (!u?.addToCalendarId) return null;
-  const [cal] = await db.select().from(uc).where(eq(uc.id, u.addToCalendarId)); if (!cal) return null;
-  const [conn] = await db.select().from(cc).where(eq(cc.id, cal.connectionId)); if (!conn) return null;
+  const [cal] = await db.select().from(uc).where(and(eq(uc.id, u.addToCalendarId), eq(uc.userId, userId), eq(uc.canWrite, true))); if (!cal) return null;
+  const [conn] = await db.select().from(cc).where(and(eq(cc.id, cal.connectionId), eq(cc.userId, userId))); if (!conn) return null;
   return { cal, conn };
 }
 
 export async function writeEvent(userId: string, e: NewEvent) {
   const t = await addTo(userId); if (!t) return null;
+  if (e.wantsMeet && t.conn.provider !== "google") return { conferenceStatus: "failed" as const, externalCalendarId: t.cal.id, externalEventId: undefined, meetingUrl: undefined };
   try {
     const r = await providers[t.conn.provider].createEvent(await secretFor(t.conn), t.cal.externalId, e);
     return { externalCalendarId: t.cal.id, ...r };

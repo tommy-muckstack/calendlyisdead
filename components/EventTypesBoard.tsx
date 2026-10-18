@@ -222,6 +222,7 @@ export function EventTypeEditor({ et, username, schedules, hostDirectory, defaul
         else if (result?.error === "locked") setErr("Your team changed the locked settings. Your edits have not been saved. Copy your changes before reloading.");
         else if (result?.error === "event_kind_locked") setErr("An event type cannot be converted to another kind. Create a new event type instead.");
         else if (result?.error === "bad_schedule") { setSect("avail"); setErr("That schedule is no longer available. Choose another schedule and save again."); }
+        else if (result?.error === "google_meet_not_configured") { setSect("where"); setErr("To create Google Meet links automatically, each host must select a connected, writable Google calendar for new bookings. Set up calendar connections or choose a reusable link, then save again."); }
         else throw new Error("save_failed");
         return;
       }

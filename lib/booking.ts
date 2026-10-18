@@ -1,4 +1,5 @@
 import { canonicalLocations, resolveLocation, type LocationSelection } from "./event-locations";
+import { googleMeetHostsReady } from "./google-meet-setup";
 import { queueGoogleConference } from "./calendar-conferences";
 import { conferenceMessage } from "./conference-status";
 import { randomInt } from "node:crypto";
@@ -15,6 +16,7 @@ import { sendMail } from "./email";
 import { onBooked, onCancelled } from "./workflows";
 import type { Question } from "./db/schema";
 import { confFor, meetingUrlFor } from "./conferencing";
+const wantsGoogleMeet = (row: { location: string; locationChoice?: { kind: string } | null }) => row.locationChoice?.kind === "google_meet" || (!row.locationChoice && confFor(row.location) === "meet");
 import { HOLD_MIN } from "./payments";
 import { confirmedReservations, reservationBusy } from "./booking-busy";
 import { hostLimitCheck } from "./host-meeting-limits";
@@ -224,7 +226,7 @@ export async function createBooking(input: BookingInput) {
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
-    ...resolvedLocation, conferenceRequestId: !resolvedLocation.locationChoice && confFor(resolvedLocation.location) === "meet" ? uid : null,
+    ...resolvedLocation, conferenceRequestId: wantsGoogleMeet(resolvedLocation) ? uid : null,
     bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeLimit: et.kind === "group" ? et.seats : 1,
     inviteeTz: r.timezone, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
@@ -271,18 +273,20 @@ export async function createBooking(input: BookingInput) {
         if (!consumed.length) throw new Error("slot_unavailable");
       }
       const eligible: string[] = [];
+      let unavailableMeetHost = false;
       const currentZone = currentType.lockedTimezone ?? input.tz, currentDay = startDt.setZone(currentZone).toISODate()!;
       base.inviteeTz = currentZone;
       for (const host of bookingHosts) {
         if (!free.includes(host.user.id)) continue;
         const currentHost = currentHosts.find((u: typeof users.$inferSelect) => u.id === host.user.id);
         if (!currentHost) continue;
+        if (resolvedLocation.locationChoice?.kind === "google_meet" && !(await googleMeetHostsReady(tx, [host.user.id]))) { unavailableMeetHost = true; continue; }
         const fresh = await hostSlots({ ...host, user: currentHost }, { ...et, maxPerDay: currentType.maxPerDay, maxPerWeek: currentType.maxPerWeek,
           maxPerMonth: currentType.maxPerMonth, startIntervalMin: currentType.startIntervalMin, rangeDays: currentType.rangeDays,
           dateRange: currentType.dateRange }, currentDay, currentDay, currentZone, DateTime.utc(), new Set(oldGroup.map(b => b.uid)), r.ev.limitsTimezone, tx);
         if ((fresh.slots[currentDay] ?? []).includes(startIso)) eligible.push(host.user.id);
       }
-      if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error("slot_unavailable");
+      if (!eligible.length || (et.kind === "collective" && eligible.length !== r.ev.hosts.length)) throw new Error(unavailableMeetHost ? "google_meet_not_configured" : "slot_unavailable");
       const hostIds = et.kind === "collective" ? eligible
         : et.kind === "round_robin" ? [await pickHost(et, r.ev.hosts, eligible, tx)] : [eligible[0]];
       hostUsers = hostIds.map(id => r.ev.hosts.find(h => h.user.id === id)!.user);
@@ -312,7 +316,7 @@ export async function createBooking(input: BookingInput) {
       }
       for (const row of rows) await recordBookingContact(tx, row, et.questions ?? []);
     }, { isolationLevel: "read committed" });
-  } catch { throw new Error("slot_unavailable"); }
+  } catch (error) { throw new Error(error instanceof Error && error.message === "google_meet_not_configured" ? "calendar_unavailable" : "slot_unavailable"); }
 
   for (const o of oldGroup) await removeEvent(o.externalCalendarId, o.externalEventId);
   const paidBefore = oldGroup.find(o => o.paymentStatus === "paid");
@@ -337,7 +341,7 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
   const db = await getDb();
   // Polls and reservations made before this field existed also need a stable
   // request identity. Group attendees share it, even after seat zero is freed.
-  if (!rows[0].locationChoice && confFor(rows[0].location) === "meet" && !rows[0].conferenceRequestId) {
+  if (wantsGoogleMeet(rows[0]) && !rows[0].conferenceRequestId) {
     const scope = et.kind === "group" ? and(eq(bookings.eventTypeId, et.id), eq(bookings.hostId, rows[0].hostId), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")) : inArray(bookings.uid, rows.map(row => row.uid));
     const [first] = await db.select({ uid: bookings.uid, conferenceRequestId: bookings.conferenceRequestId }).from(bookings).where(scope).orderBy(asc(bookings.createdAt), asc(bookings.uid)).limit(1);
     const id = first?.conferenceRequestId ?? first?.uid ?? rows[0].uid;
@@ -349,14 +353,20 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
     if (row.externalEventId && row.conferenceStatus) continue; // A known Google event is read, never recreated by finalization retries.
     if (et.kind === "group" && (row.seat > 0 || (row.conferenceRequestId && row.conferenceRequestId !== row.uid))) continue;
     const host = hostUsers.find(u => u.id === row.hostId);
-    const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: row.location, start: row.start, end: row.end,
+    const automatic = row.locationChoice?.kind === "google_meet";
+    // One organizer creates the room for a collective reservation. Other calendar
+    // copies reuse its immediate result; they never request another room.
+    const createsMeet = wantsGoogleMeet(row) && (!automatic || row === rows[0]);
+    const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: automatic && rows[0].meetingUrl ? rows[0].meetingUrl : row.location, start: row.start, end: row.end,
       organizer: { name: host.name ?? "", email: host.email ?? "" }, attendees: [{ name: row.inviteeName, email: row.inviteeEmail }, ...row.guests.map((g: string) => ({ name: g, email: g }))],
-      wantsMeet: !row.locationChoice && confFor(row.location) === "meet" });
+      wantsMeet: createsMeet });
     if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null, conferenceStatus: w.conferenceStatus ?? null });
       await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId }).where(eq(bookings.uid, row.uid)); }
+    else if (automatic && createsMeet) row.conferenceStatus = "failed";
   }
   const main = rows[0];
-  const fromCal = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
+  const automatic = main.locationChoice?.kind === "google_meet";
+  const fromCal = (automatic ? main.meetingUrl : rows.find(x => x.meetingUrl)?.meetingUrl) ?? null;
   // a group seat reuses the session's existing link
   // A cancelled attendee can still hold the session's first resolved link.
   // The request ID distinguishes that session from a later all-new reservation.
@@ -367,8 +377,8 @@ export async function finalize(rows: any[], et: any, hostUsers: any[], reschedul
   const providerPending = rows.find(row => row.conferenceStatus === "pending" && row.externalEventId);
   const providerFailed = rows.some(row => row.conferenceStatus === "failed") || conference?.status === "failed";
   const waitingForGroup = et.kind === "group" && main.conferenceRequestId && main.conferenceRequestId !== main.uid && !knownUrl && !providerFailed;
-  const realConference = !main.locationChoice && confFor(main.location) === "meet" && (!!fromCal || !!providerPending || providerFailed || waitingForGroup);
-  main.meetingUrl = knownUrl ?? (main.locationChoice ? main.locationChoice.meetingUrl : realConference ? fromCal : await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal));
+  const realConference = wantsGoogleMeet(main) && (automatic || !!fromCal || !!providerPending || providerFailed || waitingForGroup);
+  main.meetingUrl = knownUrl ?? (realConference ? fromCal : main.locationChoice ? main.locationChoice.meetingUrl : await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal));
   main.conferenceStatus = main.meetingUrl ? (sibling?.conferenceStatus ?? (conference?.status === "ready" || rows.some(row => row.conferenceStatus) ? "ready" : null)) : providerPending || waitingForGroup ? "pending" : providerFailed ? "failed" : null;
   const recipients = main.conferenceRequestId ? and(eq(bookings.conferenceRequestId, main.conferenceRequestId), eq(bookings.status, "confirmed"), inArray(bookings.paymentStatus, ["none", "paid"])) : inArray(bookings.uid, rows.map(r => r.uid));
   await db.update(bookings).set({ ...(main.meetingUrl ? { meetingUrl: main.meetingUrl } : {}), conferenceStatus: main.conferenceStatus })

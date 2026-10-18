@@ -1,4 +1,5 @@
-import { normalizeLocationPatch } from "./event-locations";
+import { hasAutomaticMeet, normalizeLocationPatch } from "./event-locations";
+import { googleMeetHostsReady } from "./google-meet-setup";
 import { createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "./db";
@@ -42,6 +43,8 @@ export async function createEventDraft(userId: string, raw: EventCreation) {
         const [schedule] = await tx.select({ id: schema.schedules.id }).from(schema.schedules).where(and(eq(schema.schedules.id, input.settings.scheduleId), eq(schema.schedules.userId, userId))).for("share");
         if (!schedule) throw new EventCreationError(400, "bad_schedule");
       }
+      if (hasAutomaticMeet(input.settings.locations) && !(await googleMeetHostsReady(tx, hosts ? hosts.map(host => host.userId) : [userId])))
+        throw new EventCreationError(400, "google_meet_not_configured");
       const [inserted] = await tx.insert(R).values({ id: input.draftId, userId, requestHash }).onConflictDoNothing().returning({ id: R.id });
       if (!inserted) throw new EventCreationError(409, "creation_conflict");
       const values = { ...normalizeLocationPatch({ location: "" }, input.settings), id: input.draftId, userId, ...(input.shared ? {

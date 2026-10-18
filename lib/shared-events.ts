@@ -1,4 +1,5 @@
-import { normalizeLocationPatch, validLocationsForKind } from "./event-locations";
+import { hasAutomaticMeet, normalizeLocationPatch, validLocationsForKind } from "./event-locations";
+import { googleMeetHostsReady } from "./google-meet-setup";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { SharedEventError, SharedEventSettings, type SharedHostDirectory } from "./shared-event-validation";
@@ -87,6 +88,11 @@ export async function updateSharedEvent(userId: string, id: string, version: num
     const shared = SharedEventSettings.parse(rawShared ?? current.shared);
     if (shared.workspaceId !== event.sharedWorkspaceId) throw new SharedEventError(409, "hosts_changed");
     const hosts = rawShared ? await validateSharedHosts(tx, shared) : null;
+    const locations = fields.locations === undefined ? event.locations : fields.locations;
+    if (hasAutomaticMeet(locations)) {
+      const targets = hosts ?? await tx.select({ userId: H.userId }).from(H).where(eq(H.eventTypeId, id));
+      if (!(await googleMeetHostsReady(tx, targets.map(host => host.userId)))) throw new SharedEventError(400, "google_meet_not_configured");
+    }
     const hostIds = (value: SharedEventSettings) => value.hosts.map(h => h.membershipId).sort().join(",");
     const reset = hostIds(shared) !== hostIds(current.shared) || shared.distribution !== current.shared.distribution;
     const [saved]: Event[] = await tx.update(E).set({ ...fields, scheduleId: null, secret: true,
