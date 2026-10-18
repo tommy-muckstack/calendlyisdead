@@ -1,4 +1,5 @@
-import { normalizeLocationPatch, validLocationsForKind, withLocationLocks, canonicalLocations } from "@/lib/event-locations";
+import { hasAutomaticMeet, normalizeLocationPatch, validLocationsForKind, withLocationLocks, canonicalLocations } from "@/lib/event-locations";
+import { googleMeetHostsReady } from "@/lib/google-meet-setup";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
@@ -77,6 +78,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       const [sc] = await connection.select().from(schema.schedules)
         .where(and(eq(schema.schedules.id, data.scheduleId), eq(schema.schedules.userId, u.id)));
       if (!sc) return NextResponse.json({ error: "bad_schedule" }, { status: 400 });
+    }
+    // Templates are configured by an admin; each assigned host must connect their
+    // own calendar before this option can accept a booking.
+    if (current.kind !== "managed" && hasAutomaticMeet(data.locations === undefined ? current.locations : data.locations as typeof current.locations)) {
+      const hosts = current.teamId ? await connection.select({ userId: schema.eventTypeHosts.userId }).from(schema.eventTypeHosts).where(eq(schema.eventTypeHosts.eventTypeId, id)) : [{ userId: current.userId }];
+      if (!(await googleMeetHostsReady(connection, hosts.map(host => host.userId)))) return NextResponse.json({ error: "google_meet_not_configured" }, { status: 400 });
     }
     const [saved] = Object.keys(data).length
       ? await connection.update(schema.eventTypes).set(data).where(and(eq(schema.eventTypes.id, id), isNull(schema.eventTypes.deletedAt))).returning()

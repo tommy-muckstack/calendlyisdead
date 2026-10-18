@@ -25,10 +25,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <div className="integration-actions">{configured && (item.provider === "caldav" ? <Link className="btn primary" href="/app/calendars?connect=icloud">Connect iCloud Calendar</Link> : <a className="btn primary" href={`${BP}/api/integrations/${item.provider}/connect`}>Connect {item.name}</a>)}<Link className="btn" href="/app/calendars">Manage calendar connections</Link></div>
       </>}
       {item.setup === "meet" && <>
-        <ol><li>Create a reusable meeting link in Google Meet.</li><li>Open an event type, choose Google Meet in Location, and paste the meeting link.</li><li>Save changes. New bookings include the same link in their confirmation and invitation.</li></ol>
-        <p className="integration-notice">The location picker currently uses a link you provide. It does not create a unique Meet room for each booking.</p>
-        <h3>Existing automatic Meet events</h3><p>If an existing event already creates Meet links automatically, connect Google Calendar and select a writable Google calendar under “Add new bookings to.” Keep that event’s current location to retain automatic link creation.</p>
-        <p>“Calendar ready” reflects your selected Google destination and last known connection status. It does not verify live provider access or enable automatic Meet on an event.</p>
+        <ol><li>Connect Google Calendar and select a writable Google calendar under “Add new bookings to.” Each host of a shared event must complete this step.</li><li>Open an event type, choose Google Meet in Location, and select “Create a new link for each meeting.”</li><li>Save changes. A new booking requests its Meet link from Google; group attendees share one link per session.</li></ol>
+        <p>Prefer an existing room? Choose “Use a reusable meeting link” and paste its URL. Previously saved reusable links keep that behavior until you change it.</p>
+        <p>“Calendar ready” reflects your selected Google destination and last known connection status. It does not verify live provider access. If Google is still preparing a room, the booking confirmation shows that status until the link is ready.</p>
         <div className="integration-actions"><Link className="btn primary" href="/app/calendars">Set up Google Calendar</Link><Link className="btn" href="/app">Choose an event type</Link></div>
       </>}
       {item.setup === "reusable" && <>

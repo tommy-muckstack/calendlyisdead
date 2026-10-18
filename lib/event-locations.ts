@@ -13,6 +13,7 @@ export const LocationOptionSchema = z.discriminatedUnion("kind", [
   z.object({ id: Id, kind: z.literal("phone"), direction: z.enum(["host_calls", "invitee_calls"]), phone: z.string().trim().max(40) }).strict(),
   z.object({ id: Id, kind: z.literal("custom"), details: text(1000), showBeforeBooking: z.boolean() }).strict(),
   z.object({ id: Id, kind: z.literal("invitee"), prompt: text(200) }).strict(),
+  z.object({ id: Id, kind: z.literal("google_meet") }).strict(),
   z.object({ id: Id, kind: z.literal("video"), provider: z.enum(["zoom", "google_meet", "teams", "webex", "gotomeeting"]), url: MeetingLink }).strict(),
 ]).superRefine((option, ctx) => {
   if (option.kind === "phone" && option.direction === "invitee_calls" && !validPhone(option.phone)) ctx.addIssue({ code: "custom", path: ["phone"], message: "Enter your phone number." });
@@ -27,7 +28,7 @@ export const LocationSelectionSchema = z.object({ id: Id, input: z.string().trim
 export type LocationSelection = z.infer<typeof LocationSelectionSchema>;
 
 export function locationLabel(option: LocationOption) {
-  return option.kind === "video" ? VIDEO_LABELS[option.provider] : { in_person: "In-person meeting", phone: "Phone call", custom: "Custom", invitee: "Ask invitee" }[option.kind];
+  return option.kind === "video" ? VIDEO_LABELS[option.provider] : { in_person: "In-person meeting", phone: "Phone call", custom: "Custom", invitee: "Ask invitee", google_meet: "Google Meet" }[option.kind];
 }
 export function locationSummary(options: LocationOption[]) {
   return options.length > 1 ? `Choose from ${options.length} locations` : options[0] ? locationLabel(options[0]) : "";
@@ -60,6 +61,7 @@ export function withLocationLocks(fields: readonly string[]) {
 export function canonicalLocations(options: LocationOption[] | null | undefined) {
   return JSON.stringify(options == null ? null : LocationOptionsSchema.parse(options));
 }
+export const hasAutomaticMeet = (options: LocationOption[] | null | undefined) => !!options?.some(option => option.kind === "google_meet");
 export function resolveLocation(event: { location: string; locations?: LocationOption[] | null }, selection?: LocationSelection): { location: string; locationChoice: BookedLocationChoice | null } {
   if (event.locations == null) { if (selection) throw new Error("location_changed"); return { location: event.location, locationChoice: null }; }
   const options = LocationOptionsSchema.parse(event.locations);
@@ -72,7 +74,7 @@ export function resolveLocation(event: { location: string; locations?: LocationO
   if (option.kind === "invitee" && !input) throw new Error("location_input_required");
   const location = option.kind === "in_person" ? [option.address, option.notes].filter(Boolean).join("\n")
     : option.kind === "phone" ? `Phone call: ${option.direction === "host_calls" ? phone : option.phone}`
-    : option.kind === "custom" ? option.details : option.kind === "video" ? option.url : input;
+    : option.kind === "custom" ? option.details : option.kind === "video" ? option.url : option.kind === "google_meet" ? "Google Meet" : input;
   return { location, locationChoice: { id: option.id, kind: option.kind, input: option.kind === "invitee" || phone ? input : "", phone,
     meetingUrl: option.kind === "video" ? option.url : option.kind === "custom" && MeetingLink.safeParse(option.details).success ? option.details : null } };
 }
