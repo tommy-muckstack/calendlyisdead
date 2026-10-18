@@ -8,6 +8,6 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const u = await requireUser(); if (!u) redirect("/login"); const db = await getDb();
   const ps = await db.select().from(schema.polls).where(eq(schema.polls.userId, u.id)).orderBy(desc(schema.polls.createdAt));
-  const full = await Promise.all(ps.map(async (p: any) => { const g = (await getPoll(p.id))!; return { id: p.id, title: p.title, status: p.status, chosen: p.chosen, bookingUid: p.bookingUid, voters: g.votes.length, tally: g.tally }; }));
+  const full = await Promise.all(ps.map(async (p: typeof schema.polls.$inferSelect) => { const g = (await getPoll(p.id))!; return { id: p.id, title: p.title, status: g.poll.status, showVotes: p.showVotes, chosen: p.chosen, bookingUid: p.bookingUid, voters: g.votes.length, tally: g.tally }; }));
   return <PollsPanel initial={full} tz={u.timezone} />;
 }

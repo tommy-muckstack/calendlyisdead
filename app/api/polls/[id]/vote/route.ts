@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { vote } from "@/lib/polls";
+import { PollVoteInput } from "@/lib/poll-participation";
 export const runtime = "nodejs";
-const Body = z.object({ name: z.string().min(1).max(200), email: z.string().email(), picks: z.array(z.string()).max(40) });
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const p = Body.safeParse(await req.json()); if (!p.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
+  const p = PollVoteInput.safeParse(await req.json().catch(() => null)); if (!p.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
   try { return NextResponse.json({ picks: await vote((await params).id, p.data) }); }
-  catch (e: any) { return NextResponse.json({ error: e.message }, { status: e.message === "not_found" ? 404 : 409 }); }
+  catch (error) {
+    const code = error instanceof Error && ["not_found", "closed", "already_voted", "full", "bad_option", "invalid"].includes(error.message) ? error.message : "unavailable";
+    return NextResponse.json({ error: code }, { status: code === "not_found" ? 404 : code === "unavailable" ? 503 : 409 });
+  }
 }

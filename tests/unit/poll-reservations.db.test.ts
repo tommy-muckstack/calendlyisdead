@@ -85,19 +85,21 @@ describe("poll reservations", () => {
     await expect(polls.bookPoll(host, id, at("12:00"))).resolves.toBeTypeOf("string");
   });
   it("rejects non-owners, invalid options and options without votes", async () => {
-    const id = await poll();
+    const id = await polls.createPoll(host, { title: "Poll", durationMin: 30, options: [at("11:00"), at("12:00")] });
     await expect(polls.bookPoll("demo-mate", id, at("11:00"))).rejects.toThrow("not_found");
     await expect(polls.bookPoll(host, id, at("14:00"))).rejects.toThrow("bad_option");
     await polls.vote(id, { name: "Poll invitee", email: "poll@example.invalid", picks: [at("12:00")] });
     await expect(polls.bookPoll(host, id, at("11:00"))).rejects.toThrow("no_votes");
     expect(await confirmed()).toHaveLength(0);
   });
-  it("keeps one vote per email during concurrent revotes", async () => {
+  it("accepts only one of two different concurrent votes from the same email", async () => {
     const id = await poll();
-    await Promise.all([
+    const result = await Promise.allSettled([
       polls.vote(id, { name: "New A", email: "NEW@example.invalid", picks: [at("11:00")] }),
       polls.vote(id, { name: "New B", email: "new@example.invalid", picks: [at("12:00")] }),
     ]);
+    expect(result.filter(row => row.status === "fulfilled")).toHaveLength(1);
+    expect(result.find(row => row.status === "rejected")).toMatchObject({ reason: new Error("already_voted") });
     const votes = (await polls.getPoll(id))!.votes.filter((v: any) => v.email === "new@example.invalid");
     expect(votes).toHaveLength(1);
     expect(votes[0].picks).toHaveLength(1);
@@ -122,13 +124,13 @@ describe("poll reservations", () => {
       expect(invited).not.toContain("concurrent@example.invalid");
     }
   });
-  it("preserves the old vote when replacement cannot commit", async () => {
+  it("rolls back a new vote when the transaction cannot commit", async () => {
     const id = await poll();
     const transact = db.transaction.bind(db);
     const spy = vi.spyOn(db, "transaction").mockImplementation((fn: any, config: any) => transact(async (tx: any) => {
       await fn(tx); throw new Error("Simulated transaction failure");
     }, config));
-    await expect(polls.vote(id, { name: "Changed", email: "poll@example.invalid", picks: [at("11:00")] })).rejects.toThrow();
+    await expect(polls.vote(id, { name: "New", email: "new@example.invalid", picks: [at("11:00")] })).rejects.toThrow("Simulated transaction failure");
     spy.mockRestore();
     const votes = (await polls.getPoll(id))!.votes;
     expect(votes).toHaveLength(1);
