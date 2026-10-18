@@ -40,6 +40,25 @@ export async function readGoogleConference(t: Tokens, calendarId: string, eventI
   return googleConferenceResult(await j(response));
 }
 
+/** Add a resolved link to an existing copy without changing its time or attendees. */
+export async function updateGoogleConferenceLocation(t: Tokens, calendarId: string, eventId: string, meetingUrl: string): Promise<"updated" | "cancelled"> {
+  if (googleConferenceResult({ hangoutLink: meetingUrl }).conferenceStatus !== "ready") throw new Error("invalid_meeting_url");
+  const url = `${API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`;
+  const signal = AbortSignal.timeout(10_000);
+  const response = await fetch(`${url}?fields=status,etag,location`, { headers: h(t), signal });
+  if (response.status === 404 || response.status === 410) return "cancelled";
+  const current = await j(response);
+  if (current.status === "cancelled") return "cancelled";
+  if (current.location === meetingUrl) return "updated";
+  // A concurrent provider edit/deletion must win; a 412 is retried from a fresh GET.
+  if (typeof current.etag !== "string" || !current.etag) throw new ProviderError(502, "Missing calendar event version");
+  const patched = await fetch(`${url}?sendUpdates=none`, { method: "PATCH", headers: { ...h(t), "If-Match": current.etag },
+    body: JSON.stringify({ location: meetingUrl }), signal });
+  if (patched.status === 404 || patched.status === 410) return "cancelled";
+  await j(patched);
+  return "updated";
+}
+
 export const google: CalendarProvider<Tokens> = {
   id: "google",
   async listCalendars(t) {

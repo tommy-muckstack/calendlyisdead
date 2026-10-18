@@ -297,3 +297,17 @@ CREATE TABLE IF NOT EXISTS calendar_conference_jobs (
   "nextAttemptAt" timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS calendar_conference_jobs_due ON calendar_conference_jobs (status, "nextAttemptAt");
+
+-- Immutable, individually retryable effects for a conference that resolved late.
+CREATE TABLE IF NOT EXISTS calendar_conference_deliveries (
+  id text PRIMARY KEY,
+  "conferenceId" text NOT NULL REFERENCES calendar_conference_jobs(id) ON DELETE CASCADE,
+  "bookingUid" text NOT NULL REFERENCES bookings(uid) ON DELETE CASCADE,
+  "meetingUrl" text NOT NULL,
+  payload jsonb NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  "nextAttemptAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS calendar_conference_deliveries_due ON calendar_conference_deliveries (status, "nextAttemptAt");
