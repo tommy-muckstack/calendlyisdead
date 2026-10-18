@@ -29,9 +29,9 @@ for (const width of [1440, 390]) {
       })) });
       const start = DateTime.now().setZone("America/New_York").plus({ weeks: 2 }).startOf("week").set({ hour: 16 }), local = start.setZone("Asia/Tokyo");
       await page.goto(`demo/${event.slug}?${new URLSearchParams({ month: local.toFormat("yyyy-MM"), date: local.toISODate()!, tz: "Pacific/Honolulu" })}`);
-      await expect(page.getByRole("combobox", { name: "Time zone", exact: true })).toHaveCount(0); await expect(page.getByTestId("booking-timezone")).toHaveText("Asia/Tokyo");
-      await page.getByRole("button", { name: local.toFormat("h:mm a"), exact: true }).click(); await page.getByRole("button", { name: "Next", exact: true }).click();
-      await expect(page.getByTestId("booking-timezone")).toHaveText("Asia/Tokyo"); await page.screenshot({ path: info.outputPath("locked-timezone-invitee.png") });
+      await expect(page.getByRole("combobox", { name: "Time zone", exact: true })).toHaveCount(0); await expect(page.getByTestId("booking-timezone")).toHaveAttribute("data-timezone", "Asia/Tokyo");
+      await page.getByRole("button", { name: local.toFormat("h:mma").toLowerCase(), exact: true }).click(); await page.getByRole("button", { name: "Next", exact: true }).click();
+      await expect(page.getByTestId("booking-timezone")).toHaveAttribute("data-timezone", "Asia/Tokyo"); await page.screenshot({ path: info.outputPath("locked-timezone-invitee.png") });
       await page.getByLabel("Name", { exact: true }).fill("Timezone QA"); await page.getByLabel("Email", { exact: true }).fill("timezone-qa@example.invalid");
       const submitted = page.waitForResponse(response => response.request().method() === "POST" && response.url().endsWith("/api/bookings"));
       await page.getByRole("button", { name: "Book it", exact: true }).click(); const response = await submitted; expect(response.ok()).toBeTruthy(); bookingUid = (await response.json()).uid;
@@ -43,7 +43,7 @@ for (const width of [1440, 390]) {
       await editor.getByRole("button", { name: /^Booking page options/ }).click(); await expect(editor.getByLabel("Booking time zone", { exact: true })).toHaveValue("Asia/Tokyo");
       await editor.getByLabel("Lock the timezone", { exact: true }).uncheck(); await editor.getByRole("button", { name: "Save changes", exact: true }).click();
       await expect(editor.locator("footer").getByRole("status")).toHaveText("Changes saved"); await page.goto(`demo/${event.slug}?tz=America%2FNew_York`);
-      const picker = page.getByRole("combobox", { name: "Time zone", exact: true }); await expect(picker).toHaveValue("America/New_York"); await picker.selectOption("UTC"); await expect(picker).toHaveValue("UTC");
+      const picker = page.locator(".booking-zone-trigger"); await expect(picker).toHaveAttribute("data-timezone", "America/New_York"); await picker.click(); await page.getByRole("combobox", { name: "Search time zones" }).fill("UTC"); await page.getByRole("combobox", { name: "Search time zones" }).press("Enter"); await expect(picker).toHaveAttribute("data-timezone", "UTC");
     });
     test("retains the timezone draft after a failed save and supports retry", async ({ page }) => {
       await page.getByRole("button", { name: `Edit ${event.title}`, exact: true }).click(); const editor = page.getByRole("dialog", { name: "Edit event type" });
@@ -59,7 +59,7 @@ for (const width of [1440, 390]) {
       const slot = DateTime.now().setZone("America/New_York").plus({ weeks: 2 }).startOf("week").set({ hour: 16 }).toUTC().toISO()!;
       await page.goto(`demo/${event.slug}?${new URLSearchParams({ slot })}`); await expect(page.getByRole("alert")).toContainText("time zone has changed");
       await expect(page.getByRole("button", { name: "Book it", exact: true })).toBeDisabled(); await page.getByRole("button", { name: "Refresh booking page", exact: true }).click();
-      await expect(page.getByTestId("booking-timezone")).toHaveText("Europe/London"); await expect(page.getByRole("alert")).toHaveCount(0); await expect(page.getByRole("button", { name: "Book it", exact: true })).toBeEnabled();
+      await expect(page.getByTestId("booking-timezone")).toHaveAttribute("data-timezone", "Europe/London"); await expect(page.getByRole("alert")).toHaveCount(0); await expect(page.getByRole("button", { name: "Book it", exact: true })).toBeEnabled();
     });
     test("shows a managed timezone lock and prevents the assigned host from changing it", async ({ page }) => {
       const slug = `tz-${width}-${Date.now()}`; const created = await page.request.post("api/teams", { data: { name: "Timezone QA team", slug } }); expect(created.ok()).toBeTruthy(); const team = await created.json();

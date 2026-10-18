@@ -43,7 +43,7 @@ for (const width of [1440, 390]) {
       await expect(day).toBeEnabled();
       release();
       await day.click();
-      await expect(page.getByRole("button", { name: "9:00 AM", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "9:00am", exact: true })).toBeVisible();
       await expect(page.getByTestId("month-label")).toHaveText("February 2027");
     });
 
