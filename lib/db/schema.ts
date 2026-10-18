@@ -162,13 +162,25 @@ export const bookings = pgTable("bookings", {
   externalCalendarId: text("externalCalendarId"),
   externalEventId: text("externalEventId"),
   meetingUrl: text("meetingUrl"),
+  conferenceRequestId: text("conferenceRequestId"),
+  conferenceStatus: text("conferenceStatus").$type<"pending" | "ready" | "failed" | null>(),
   seat: integer("seat").notNull().default(0),
   inviteeLimit: integer("inviteeLimit").notNull().default(1), // Shared snapshot for every attendee in a group session.
   groupUid: text("groupUid"),
   paymentStatus: text("paymentStatus").notNull().default("none"), // none | pending | paid
   paymentRef: text("paymentRef"),
   amountCents: integer("amountCents").notNull().default(0),
-}, b => [index("bookings_contact_lookup").on(b.hostId, sql`lower(btrim(${b.inviteeEmail}))`)]);
+}, b => [index("bookings_contact_lookup").on(b.hostId, sql`lower(btrim(${b.inviteeEmail}))`), index("bookings_conference_request").on(b.conferenceRequestId)]);
+export const calendarConferenceJobs = pgTable("calendar_conference_jobs", {
+  id: text("id").primaryKey(),
+  hostId: text("hostId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  calendarId: text("calendarId").notNull(),
+  externalEventId: text("externalEventId").notNull(),
+  meetingUrl: text("meetingUrl"),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("nextAttemptAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+}, j => [index("calendar_conference_jobs_due").on(j.status, j.nextAttemptAt)]);
 export const teams = pgTable("teams", { id: text("id").primaryKey(), slug: text("slug").notNull().unique(), name: text("name").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow() });
 export const teamMembers = pgTable("team_members", { teamId: text("teamId").notNull(), userId: text("userId").notNull(), role: text("role").notNull().default("member") },

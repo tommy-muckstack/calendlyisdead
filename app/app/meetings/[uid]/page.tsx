@@ -5,6 +5,7 @@ import { requireUser } from "@/auth";
 import { getHostMeeting, meetingZone } from "@/lib/meetings";
 import { getGroupInviteeLimit } from "@/lib/group-sessions";
 import { GroupInviteeLimit } from "@/components/GroupInviteeLimit";
+import { conferenceMessage } from "@/lib/conference-status";
 import "../meetings.css";
 export default async function Meeting({ params }: { params: Promise<{ uid: string }> }) {
   const user = await requireUser(); if (!user) redirect("/login");
@@ -21,6 +22,7 @@ export default async function Meeting({ params }: { params: Promise<{ uid: strin
       <dt>Invitee</dt><dd>{meeting.inviteeName}<br />{meeting.inviteeEmail}</dd>
       <dt>Invitee timezone</dt><dd>{meeting.inviteeTz}</dd>
       <dt>Location</dt><dd>{meeting.location || "Not specified"}{meeting.meetingUrl && /^https?:\/\//i.test(meeting.meetingUrl) && <><br /><a href={meeting.meetingUrl} target="_blank" rel="noreferrer">Join meeting</a></>}</dd>
+      {meeting.status !== "cancelled" && !meeting.meetingUrl && conferenceMessage(meeting.conferenceStatus, true) && <><dt>Conferencing</dt><dd role="status">{conferenceMessage(meeting.conferenceStatus, true)}</dd></>}
       {meeting.guests.length > 0 && <><dt>Guests</dt><dd>{meeting.guests.join(", ")}</dd></>}
       {meeting.notes && <><dt>Invitee notes</dt><dd className="meeting-text">{meeting.notes}</dd></>}
       {Object.entries(meeting.answers).map(([key, answer]) => <div className="meeting-answer" key={key}><dt>{meeting.questions.find(q => q.id === key)?.label || key}</dt><dd className="meeting-text">{answer}</dd></div>)}

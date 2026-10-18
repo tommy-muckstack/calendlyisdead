@@ -1,8 +1,10 @@
 import { canonicalLocations, resolveLocation, type LocationSelection } from "./event-locations";
+import { queueGoogleConference } from "./calendar-conferences";
+import { conferenceMessage } from "./conference-status";
 import { randomInt } from "node:crypto";
 import { loadSharedHosts } from "./shared-events";
 import { BP } from "./basepath";
-import { and, eq, gte, lte, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, lte, inArray, isNull } from "drizzle-orm";
 import { DateTime } from "luxon";
 import { nanoid } from "nanoid";
 import { getDb, schema } from "./db";
@@ -184,14 +186,15 @@ export const baseUrl = () => process.env.APP_URL ?? process.env.AUTH_URL ?? `htt
 export async function notify(kind: "confirmed" | "cancelled" | "rescheduled", b: any, et: any, hostUsers: any[]) {
   const when = DateTime.fromJSDate(b.start).setZone(b.inviteeTz).toFormat("cccc, LLLL d, yyyy 'at' h:mm a ZZZZ");
   const hostNames = hostUsers.map(h => h.name).join(", ");
-  const ics = buildIcs({ uid: `${b.uid}@calendlyisdead`, start: b.start, end: b.end, title: `${et.title} with ${hostNames}`,
-    description: describe(b, et), location: b.meetingUrl || b.location, organizer: { name: hostUsers[0].name, email: hostUsers[0].email }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
-    cancelled: kind === "cancelled", sequence: kind === "confirmed" ? 0 : 1 });
   const manage = `${baseUrl()}/booking/${b.uid}`;
+  const conferenceNote = kind !== "cancelled" ? conferenceMessage(b.conferenceStatus) : "";
+  const ics = buildIcs({ uid: `${b.uid}@calendlyisdead`, start: b.start, end: b.end, title: `${et.title} with ${hostNames}`,
+    description: [describe(b, et), conferenceNote && `${conferenceNote}\nBooking details: ${manage}`].filter(Boolean).join("\n\n"), location: b.meetingUrl || b.location, organizer: { name: hostUsers[0].name, email: hostUsers[0].email }, attendee: { name: b.inviteeName, email: b.inviteeEmail },
+    cancelled: kind === "cancelled", sequence: kind === "confirmed" ? 0 : 1 });
   const verb = { confirmed: "is booked", cancelled: "was cancelled", rescheduled: "moved" }[kind];
   for (const to of [b.inviteeEmail, ...hostUsers.map(h => h.email), ...(b.guests ?? [])]) {
     await sendMail({ to, subject: `${et.title} ${verb}: ${when}`, ics,
-      text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || b.location || "TBD"}${answersText(b, et)}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` });
+      text: `${et.title} with ${hostNames} ${verb}.\nWhen: ${when}\nWhere: ${b.meetingUrl || b.location || "TBD"}${answersText(b, et)}${conferenceNote ? `\n\n${conferenceNote}\nBooking details: ${manage}` : ""}\n\nReschedule: ${manage}/reschedule\nCancel: ${manage}/cancel` });
   }
 }
 
@@ -220,7 +223,8 @@ export async function createBooking(input: BookingInput) {
   const free = r.free.get(startIso) ?? [];
   const uid = nanoid(12);
   const base = { eventTypeId: et.id, start: startDt.toJSDate(), end: startDt.plus({ minutes: et.durationMin }).toJSDate(), inviteeName: input.name, inviteeEmail: input.email,
-    ...resolvedLocation, bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
+    ...resolvedLocation, conferenceRequestId: !resolvedLocation.locationChoice && confFor(resolvedLocation.location) === "meet" ? uid : null,
+    bufferBeforeMin: et.bufferBeforeMin, bufferAfterMin: et.bufferAfterMin,
     inviteeLimit: et.kind === "group" ? et.seats : 1,
     inviteeTz: r.timezone, notes: input.notes ?? "", guests: input.guests ?? [], rescheduledFrom: input.rescheduleUid ?? null, answers };
   let rows: any[] = [], hostUsers: any[] = [];
@@ -290,7 +294,7 @@ export async function createBooking(input: BookingInput) {
       }
       if (et.kind === "group") {
         // New seats share the session's original location and buffers.
-        const attendees = await tx.select({ location: bookings.location, locationChoice: bookings.locationChoice, bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
+        const attendees = await tx.select({ location: bookings.location, locationChoice: bookings.locationChoice, conferenceRequestId: bookings.conferenceRequestId, conferenceStatus: bookings.conferenceStatus, bufferBeforeMin: bookings.bufferBeforeMin, bufferAfterMin: bookings.bufferAfterMin, inviteeLimit: bookings.inviteeLimit, seat: bookings.seat }).from(bookings)
           .where(and(eq(bookings.hostId, rows[0].hostId), eq(bookings.eventTypeId, et.id), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")))
           .orderBy(bookings.createdAt, bookings.uid);
         if (attendees.length) {
@@ -330,22 +334,45 @@ export async function createBooking(input: BookingInput) {
 /** Calendar write-back, conferencing link, notifications and workflows for freshly confirmed rows. */
 export async function finalize(rows: any[], et: any, hostUsers: any[], rescheduled: boolean) {
   const db = await getDb();
+  // Polls and reservations made before this field existed also need a stable
+  // request identity. Group attendees share it, even after seat zero is freed.
+  if (!rows[0].locationChoice && confFor(rows[0].location) === "meet" && !rows[0].conferenceRequestId) {
+    const scope = et.kind === "group" ? and(eq(bookings.eventTypeId, et.id), eq(bookings.hostId, rows[0].hostId), eq(bookings.start, rows[0].start), eq(bookings.status, "confirmed")) : inArray(bookings.uid, rows.map(row => row.uid));
+    const [first] = await db.select({ uid: bookings.uid, conferenceRequestId: bookings.conferenceRequestId }).from(bookings).where(scope).orderBy(asc(bookings.createdAt), asc(bookings.uid)).limit(1);
+    const id = first?.conferenceRequestId ?? first?.uid ?? rows[0].uid;
+    await db.update(bookings).set({ conferenceRequestId: id }).where(and(scope, isNull(bookings.conferenceRequestId)));
+    for (const row of rows) row.conferenceRequestId = id;
+  }
   // a group session is written once (first seat)
   for (const row of rows) {
-    if (et.kind === "group" && row.seat > 0) continue;
+    if (row.externalEventId && row.conferenceStatus) continue; // A known Google event is read, never recreated by finalization retries.
+    if (et.kind === "group" && (row.seat > 0 || (row.conferenceRequestId && row.conferenceRequestId !== row.uid))) continue;
     const host = hostUsers.find(u => u.id === row.hostId);
     const w = await writeEvent(row.hostId, { uid: row.uid, title: et.kind === "group" ? et.title : `${et.title}: ${row.inviteeName}`, description: describe(row, et), location: row.location, start: row.start, end: row.end,
       organizer: { name: host.name ?? "", email: host.email ?? "" }, attendees: [{ name: row.inviteeName, email: row.inviteeEmail }, ...row.guests.map((g: string) => ({ name: g, email: g }))],
       wantsMeet: !row.locationChoice && confFor(row.location) === "meet" });
-    if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null });
+    if (w) { Object.assign(row, { externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId, meetingUrl: w.meetingUrl ?? null, conferenceStatus: w.conferenceStatus ?? null });
       await db.update(bookings).set({ externalCalendarId: w.externalCalendarId, externalEventId: w.externalEventId }).where(eq(bookings.uid, row.uid)); }
   }
   const main = rows[0];
   const fromCal = rows.find(x => x.meetingUrl)?.meetingUrl ?? null;
   // a group seat reuses the session's existing link
-  const [sibling] = et.kind === "group" ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.start, main.start), eq(bookings.status, "confirmed")))).filter((b: any) => b.meetingUrl && b.uid !== main.uid) : [];
-  main.meetingUrl = sibling?.meetingUrl ?? (main.locationChoice ? main.locationChoice.meetingUrl : await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal));
-  if (main.meetingUrl) await db.update(bookings).set({ meetingUrl: main.meetingUrl }).where(inArray(bookings.uid, rows.map(r => r.uid)));
+  // A cancelled attendee can still hold the session's first resolved link.
+  // The request ID distinguishes that session from a later all-new reservation.
+  const [sibling] = et.kind === "group" ? (await db.select().from(bookings).where(and(eq(bookings.eventTypeId, et.id), eq(bookings.hostId, main.hostId), eq(bookings.start, main.start),
+    main.conferenceRequestId ? eq(bookings.conferenceRequestId, main.conferenceRequestId) : eq(bookings.status, "confirmed")))).filter((b: any) => b.meetingUrl && b.uid !== main.uid) : [];
+  const [conference] = main.conferenceRequestId ? await db.select().from(schema.calendarConferenceJobs).where(eq(schema.calendarConferenceJobs.id, main.conferenceRequestId)) : [];
+  const knownUrl = sibling?.meetingUrl ?? (conference?.status === "ready" ? conference.meetingUrl : null);
+  const providerPending = rows.find(row => row.conferenceStatus === "pending" && row.externalEventId);
+  const providerFailed = rows.some(row => row.conferenceStatus === "failed") || conference?.status === "failed";
+  const waitingForGroup = et.kind === "group" && main.conferenceRequestId && main.conferenceRequestId !== main.uid && !knownUrl && !providerFailed;
+  const realConference = !main.locationChoice && confFor(main.location) === "meet" && (!!fromCal || !!providerPending || providerFailed || waitingForGroup);
+  main.meetingUrl = knownUrl ?? (main.locationChoice ? main.locationChoice.meetingUrl : realConference ? fromCal : await meetingUrlFor(main.location, main.uid, { topic: et.title, start: main.start, durationMin: et.durationMin }, fromCal));
+  main.conferenceStatus = main.meetingUrl ? (sibling?.conferenceStatus ?? (conference?.status === "ready" || rows.some(row => row.conferenceStatus) ? "ready" : null)) : providerPending || waitingForGroup ? "pending" : providerFailed ? "failed" : null;
+  const recipients = main.conferenceRequestId ? and(eq(bookings.conferenceRequestId, main.conferenceRequestId), eq(bookings.status, "confirmed"), inArray(bookings.paymentStatus, ["none", "paid"])) : inArray(bookings.uid, rows.map(r => r.uid));
+  await db.update(bookings).set({ ...(main.meetingUrl ? { meetingUrl: main.meetingUrl } : {}), conferenceStatus: main.conferenceStatus })
+    .where(main.meetingUrl ? recipients : and(recipients, isNull(bookings.meetingUrl)));
+  if (!main.meetingUrl && providerPending && main.conferenceRequestId) await queueGoogleConference({ id: main.conferenceRequestId, hostId: providerPending.hostId, calendarId: providerPending.externalCalendarId, externalEventId: providerPending.externalEventId });
   await notify(rescheduled ? "rescheduled" : "confirmed", main, et, hostUsers);
   await onBooked(main.uid);
   return main;

@@ -1,4 +1,4 @@
-import { CalendarProvider, Tokens, j } from "./types";
+import { CalendarProvider, Tokens, ProviderError, j, type ConferenceResult } from "./types";
 const API = "https://www.googleapis.com/calendar/v3";
 export const GOOGLE_SCOPES = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
 export const googleOAuth = {
@@ -11,7 +11,7 @@ export const googleOAuth = {
   },
   async token(body: Record<string, string>): Promise<Tokens & { id_token?: string }> {
     const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: process.env.AUTH_GOOGLE_ID!, client_secret: process.env.AUTH_GOOGLE_SECRET!, ...body }) });
+      body: new URLSearchParams({ client_id: process.env.AUTH_GOOGLE_ID!, client_secret: process.env.AUTH_GOOGLE_SECRET!, ...body }), signal: AbortSignal.timeout(10_000) });
     const t = await j(r);
     return { access_token: t.access_token, refresh_token: t.refresh_token, id_token: t.id_token, expires_at: Math.floor(Date.now() / 1000) + (t.expires_in ?? 3600) };
   },
@@ -20,6 +20,24 @@ export const googleOAuth = {
   emailFromIdToken(idt?: string) { try { return JSON.parse(Buffer.from(idt!.split(".")[1], "base64url").toString()).email ?? ""; } catch { return ""; } },
 };
 const h = (t: Tokens) => ({ authorization: `Bearer ${t.access_token}`, "content-type": "application/json" });
+
+type GoogleConference = { hangoutLink?: string; status?: string; conferenceData?: { createRequest?: { status?: { statusCode?: string } }; entryPoints?: { entryPointType?: string; uri?: string }[] } };
+export function googleConferenceResult(event: GoogleConference): ConferenceResult {
+  if (event.status === "cancelled" || event.conferenceData?.createRequest?.status?.statusCode === "failure") return { conferenceStatus: "failed" };
+  const link = event.hangoutLink ?? event.conferenceData?.entryPoints?.find(point => point.entryPointType === "video")?.uri;
+  if (link) {
+    try { const url = new URL(link); if (url.protocol === "https:" && url.hostname === "meet.google.com" && !url.username && !url.password) return { conferenceStatus: "ready", meetingUrl: link }; } catch { /* Invalid provider data must not become a join link. */ }
+    return { conferenceStatus: "failed" };
+  }
+  return { conferenceStatus: event.conferenceData?.createRequest?.status?.statusCode === "success" ? "failed" : "pending" };
+}
+
+/** Read the existing event: polling must never insert another event or conference. */
+export async function readGoogleConference(t: Tokens, calendarId: string, eventId: string): Promise<ConferenceResult> {
+  const response = await fetch(`${API}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, { headers: h(t), signal: AbortSignal.timeout(10_000) });
+  if (response.status === 404 || response.status === 410) return { conferenceStatus: "failed" };
+  return googleConferenceResult(await j(response));
+}
 
 export const google: CalendarProvider<Tokens> = {
   id: "google",
@@ -43,7 +61,8 @@ export const google: CalendarProvider<Tokens> = {
     if (e.wantsMeet) body.conferenceData = { createRequest: { requestId: e.uid, conferenceSolutionKey: { type: "hangoutsMeet" } } };
     // sendUpdates=none: we send our own confirmation + .ics, so Google shouldn't send a second invite
     const d = await j(await fetch(`${API}/calendars/${encodeURIComponent(cal)}/events?sendUpdates=none${e.wantsMeet ? "&conferenceDataVersion=1" : ""}`, { method: "POST", headers: h(t), body: JSON.stringify(body) }));
-    return { externalEventId: d.id, meetingUrl: d.hangoutLink };
+    if (typeof d.id !== "string" || !d.id) throw new ProviderError(502, "Google Calendar did not return an event identifier");
+    return { externalEventId: d.id, ...(e.wantsMeet ? googleConferenceResult(d) : { meetingUrl: d.hangoutLink }) };
   },
   async deleteEvent(t, cal, id) {
     const r = await fetch(`${API}/calendars/${encodeURIComponent(cal)}/events/${encodeURIComponent(id)}?sendUpdates=none`, { method: "DELETE", headers: h(t) });

@@ -280,3 +280,19 @@ CREATE INDEX IF NOT EXISTS shared_workspace_events ON event_types ("sharedWorksp
 -- Structured event options remain null for legacy location strings.
 ALTER TABLE event_types ADD COLUMN IF NOT EXISTS locations jsonb;
 ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "locationChoice" jsonb;
+
+-- Pending Google conferences are read from their existing provider event.
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "conferenceRequestId" text;
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS "conferenceStatus" text;
+CREATE INDEX IF NOT EXISTS bookings_conference_request ON bookings ("conferenceRequestId");
+CREATE TABLE IF NOT EXISTS calendar_conference_jobs (
+  id text PRIMARY KEY,
+  "hostId" text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "calendarId" text NOT NULL,
+  "externalEventId" text NOT NULL,
+  "meetingUrl" text,
+  status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  "nextAttemptAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS calendar_conference_jobs_due ON calendar_conference_jobs (status, "nextAttemptAt");

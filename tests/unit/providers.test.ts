@@ -34,7 +34,7 @@ describe("google adapter", () => {
   it("creates events without Google's own invite email and requests Meet links", async () => {
     stub({ id: "gev1", hangoutLink: "https://meet.google.com/x" });
     const r = await google.createEvent(T, "primary", { ...ev, wantsMeet: true });
-    expect(r).toEqual({ externalEventId: "gev1", meetingUrl: "https://meet.google.com/x" });
+    expect(r).toEqual({ externalEventId: "gev1", meetingUrl: "https://meet.google.com/x", conferenceStatus: "ready" });
     expect(calls[0].url).toContain("sendUpdates=none"); expect(calls[0].url).toContain("conferenceDataVersion=1");
     expect(JSON.parse(calls[0].init.body).conferenceData.createRequest.conferenceSolutionKey.type).toBe("hangoutsMeet");
   });
