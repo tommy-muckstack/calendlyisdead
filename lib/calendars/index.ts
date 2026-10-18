@@ -43,23 +43,29 @@ async function syncCalendars(userId: string, connectionId: string, cals: ExtCale
   }
 }
 
-/** Busy times from every calendar the host marked "check for conflicts". A failing provider is skipped (fail-open) and flagged on the connection. */
+/** Busy times from every calendar the host marked "check for conflicts". Any failed selected calendar makes the host unavailable; callers must check errors. */
 export async function externalBusy(userId: string, from: Date, to: Date): Promise<{ busy: Busy[]; errors: string[] }> {
   const db = await getDb();
   const cals = await db.select().from(uc).where(and(eq(uc.userId, userId), eq(uc.checkConflicts, true)));
   if (!cals.length) return { busy: [], errors: [] };
   const conns = await db.select().from(cc).where(eq(cc.userId, userId));
   const busy: Busy[] = [], errors: string[] = [];
+  if (cals.some(cal => !conns.some(conn => conn.id === cal.connectionId))) errors.push("calendar_unavailable");
   await Promise.all(conns.map(async (conn: any) => {
     const ids = cals.filter((c: any) => c.connectionId === conn.id).map((c: any) => c.externalId);
     if (!ids.length) return;
-    try { busy.push(...await providers[conn.provider].freeBusy(await secretFor(conn), ids, from, to)); }
+    try {
+      busy.push(...await providers[conn.provider].freeBusy(await secretFor(conn), ids, from, to));
+      if (conn.status !== "ok") await db.update(cc).set({ status: "ok" }).where(eq(cc.id, conn.id));
+    }
     catch (e: any) {
-      errors.push(`${conn.provider}: ${e.message}`); console.warn(`[calendar] free/busy failed for ${conn.provider} ${conn.accountEmail}: ${e.message}`);
+      errors.push("calendar_unavailable");
+      // Provider bodies may contain private calendar details. Keep the error bounded.
+      console.warn("[calendar] selected calendar conflict check failed");
       await db.update(cc).set({ status: e.status === 401 || e.status === 403 ? "reauth" : "error" }).where(eq(cc.id, conn.id));
     }
   }));
-  return { busy, errors };
+  return { busy: errors.length ? [] : busy, errors };
 }
 
 async function addTo(userId: string) {

@@ -1,3 +1,4 @@
+import type { Busy } from "../slots";
 import { CalendarProvider, Tokens, ProviderError, j, type ConferenceResult } from "./types";
 const API = "https://www.googleapis.com/calendar/v3";
 export const GOOGLE_SCOPES = "openid email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events";
@@ -52,8 +53,27 @@ export const google: CalendarProvider<Tokens> = {
   },
   async freeBusy(t, ids, from, to) {
     if (!ids.length) return [];
-    const d = await j(await fetch(`${API}/freeBusy`, { method: "POST", headers: h(t), body: JSON.stringify({ timeMin: from.toISOString(), timeMax: to.toISOString(), items: ids.map(id => ({ id })) }) }));
-    return Object.values<any>(d.calendars ?? {}).flatMap(c => c.busy ?? []);
+    const busy: Busy[] = [];
+    const selected = [...new Set(ids)], signal = AbortSignal.timeout(10_000);
+    // Google accepts at most 50 calendars per query. Every selected calendar
+    // must succeed, including per-calendar errors inside an HTTP 200 response.
+    for (let offset = 0; offset < selected.length; offset += 50) {
+      const batch = selected.slice(offset, offset + 50);
+      const d = await j(await fetch(`${API}/freeBusy`, { method: "POST", headers: h(t), signal,
+        body: JSON.stringify({ timeMin: from.toISOString(), timeMax: to.toISOString(), items: batch.map(id => ({ id })) }) }));
+      for (const id of batch) {
+        const calendar = d?.calendars?.[id];
+        if (!calendar || (calendar.errors !== undefined && (!Array.isArray(calendar.errors) || calendar.errors.length)) || !Array.isArray(calendar.busy))
+          throw new ProviderError(502, "Calendar availability could not be checked");
+        for (const interval of calendar.busy) {
+          if (!interval || typeof interval.start !== "string" || typeof interval.end !== "string" ||
+            !Number.isFinite(Date.parse(interval.start)) || !Number.isFinite(Date.parse(interval.end)) || Date.parse(interval.end) <= Date.parse(interval.start))
+            throw new ProviderError(502, "Invalid calendar availability response");
+          busy.push({ start: interval.start, end: interval.end });
+        }
+      }
+    }
+    return busy;
   },
   async createEvent(t, cal, e) {
     const body: any = { summary: e.title, description: e.description, location: e.location, iCalUID: `${e.uid}@calendlyisdead`,

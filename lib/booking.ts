@@ -74,6 +74,7 @@ async function hostSlots(h: Host, et: any, from: string, to: string, tz: string,
   // Reservation rechecks use only local state under the host lock. Provider I/O
   // was checked in the preflight; never hold database locks during network I/O.
   const ext = transaction ? { busy: [], errors: [] } : await externalBusy(h.user.id, lo, hi);
+  if (ext.errors.length) return { slots: {} as Record<string, string[]>, errors: ext.errors };
   // a group session that already exists is shown on the host's external calendar too; don't let that hide its own open seats
   const ownStarts = new Set<string>(existing.filter((b: any) => b.eventTypeId === et.id).map((b: any) => b.start.toISOString()));
   const extBusy = isGroup ? ext.busy.filter(b => !ownStarts.has(new Date(b.start).toISOString())) : ext.busy;
@@ -213,7 +214,7 @@ export async function createBooking(input: BookingInput) {
   const r = await eventAvailability(input.username, input.slug, { start: startDt }, input.tz, DateTime.utc(), oldGroup.map(b => b.uid));
   if (!r) throw new Error("not_found");
   const day = startDt.setZone(r.timezone).toISODate()!;
-  if (!(r.slots[day] ?? []).includes(startIso)) throw new Error("slot_unavailable");
+  if (!(r.slots[day] ?? []).includes(startIso)) throw new Error(r.calendarErrors.length ? "calendar_unavailable" : "slot_unavailable");
   const et = r.ev.eventType;
   // A deleted event's slug may now belong to a different template. A reschedule
   // token must never silently move its booking to that replacement event.
