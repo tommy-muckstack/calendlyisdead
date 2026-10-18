@@ -18,6 +18,26 @@ const ev = { uid: "abc123", title: "Chat: Ada", description: "notes", location: 
 beforeEach(() => vi.unstubAllGlobals());
 
 describe("google adapter", () => {
+  it.each([
+    {}, { calendars: {} }, { calendars: { selected: { errors: [{ reason: "notFound" }], busy: [] } } },
+    { calendars: { selected: { busy: null } } }, { calendars: { selected: { busy: [{ start: "bad", end: "bad" }] } } },
+    { calendars: { selected: { busy: [{ start: "2026-10-20T15:00:00Z", end: "2026-10-20T14:00:00Z" }] } } },
+  ])("rejects incomplete or failed free/busy responses: %j", async response => {
+    stub(response);
+    await expect(google.freeBusy(T, ["selected"], new Date("2026-10-20"), new Date("2026-10-22"))).rejects.toMatchObject({ status: 502 });
+  });
+  it("does not accept partial success when another selected calendar is missing", async () => {
+    stub({ calendars: { first: { busy: [] } } });
+    await expect(google.freeBusy(T, ["first", "missing"], new Date("2026-10-20"), new Date("2026-10-22"))).rejects.toMatchObject({ status: 502 });
+  });
+  it("checks every selected calendar in batches of at most 50", async () => {
+    const ids = Array.from({ length: 51 }, (_, index) => `cal-${index}`);
+    stub(...[ids.slice(0, 50), ids.slice(50)].map(batch => ({ calendars: Object.fromEntries(batch.map(id => [id, { busy: [] }])) })));
+    await expect(google.freeBusy(T, [...ids, ids[0]], new Date("2026-10-20"), new Date("2026-10-22"))).resolves.toEqual([]);
+    expect(calls.map(call => JSON.parse(call.init.body).items.length)).toEqual([50, 1]);
+    expect(calls[0].init.signal).toBeInstanceOf(AbortSignal);
+    expect(calls[1].init.signal).toBe(calls[0].init.signal);
+  });
   it("lists calendars across pages with write access", async () => {
     stub({ items: [{ id: "p", summary: "Me", primary: true, accessRole: "owner" }], nextPageToken: "n" }, { items: [{ id: "h", summary: "Holidays", accessRole: "reader" }] });
     const l = await google.listCalendars(T);

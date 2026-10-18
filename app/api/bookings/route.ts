@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ uid: b.uid, checkoutUrl, redirectUrl });
   } catch (e: any) {
-    const status = e.message === "not_found" ? 404 : (e.message.startsWith("answer_") || e.message.startsWith("location_")) ? 400 : e.message.startsWith("stripe") ? 502 : 409;
+    const status = e.message === "calendar_unavailable" ? 503 : e.message === "not_found" ? 404 : (e.message.startsWith("answer_") || e.message.startsWith("location_")) ? 400 : e.message.startsWith("stripe") ? 502 : 409;
     return NextResponse.json({ error: e.message }, { status });
   }
 }

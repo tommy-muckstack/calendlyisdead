@@ -32,7 +32,10 @@ export function readBookingQuery(params: Pick<URLSearchParams, "get">, fallbackZ
 // A failed or malformed response must not masquerade as an empty calendar.
 export async function loadSlotCalendar(url: string, signal: AbortSignal, expectedTimezone?: string): Promise<SlotCalendar> {
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error("availability_unavailable");
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    throw new Error(response.status === 503 && failure?.error === "calendar_unavailable" ? "calendar_unavailable" : "availability_unavailable");
+  }
   const body: unknown = await response.json();
   if (expectedTimezone && body && typeof body === "object" && "timezone" in body && typeof body.timezone === "string" && body.timezone !== expectedTimezone)
     throw new Error("booking_timezone_changed");

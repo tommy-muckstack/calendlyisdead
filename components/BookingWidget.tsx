@@ -44,6 +44,8 @@ export function BookingWidget(p: Props) {
       if (active && !controller.signal.aborted) setAvailability({ url: availabilityUrl, slots, error: "" });
     }).catch(error => { if (active && !controller.signal.aborted) {
       if (error instanceof Error && error.message === "booking_timezone_changed") setAvailability({ url: availabilityUrl, slots: null, error: "The event’s time zone has changed. Refresh this page to see current times.", reload: true });
+      else if (error instanceof Error && error.message === "calendar_unavailable") setAvailability({ url: availabilityUrl, slots: null,
+        error: "This calendar is temporarily unavailable. Try again later or contact the host." });
       else failed();
     } }).finally(() => clearTimeout(timeout));
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
@@ -68,6 +70,7 @@ export function BookingWidget(p: Props) {
         if (typeof j.uid !== "string" || !j.uid) throw new Error("invalid_booking_response");
         router.push(`/booking/${j.uid}?new=1${p.embed ? "&embed=1" : ""}`);
       }
+      else if (r.status === 503 && j.error === "calendar_unavailable") setErr("The host’s calendar could not be checked. Your booking was not made. Try again later or contact the host.");
       else if (r.status >= 500) throw new Error("booking_unconfirmed");
       else setErr(j.error === "location_changed" ? "The location choices have changed. Refresh this page and choose again." : String(j.error).startsWith("location_") ? "Choose a location and provide its required details." : j.error === "slot_unavailable" ? "Someone just took that time. Pick another one." : String(j.error).startsWith("answer_") ? "Please answer the required questions." : "Please check your details and try again.");
     } catch {
