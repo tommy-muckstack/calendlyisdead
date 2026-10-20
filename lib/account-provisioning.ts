@@ -1,11 +1,10 @@
 import { eq, isNull, and } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { defaultWeekly } from "./slots";
+import { isReservedUsername } from "./public-username";
 import type { FirebaseIdentity } from "./isdead-auth/server";
 type DB = Awaited<ReturnType<typeof getDb>>;
 type User = typeof schema.users.$inferSelect;
-// These paths serve application pages rather than public scheduling profiles.
-const reservedNames = new Set(["app", "api", "login", "signup", "onboarding", "pricing", "team", "booking", "meet", "pay", "poll", "invite", "f"]);
 function uniqueConflict(error: unknown): boolean {
   return !!error && typeof error === "object" && (("code" in error && error.code === "23505") || ("cause" in error && uniqueConflict(error.cause)));
 }
@@ -41,7 +40,7 @@ export async function upsertFirebaseUser(identity: FirebaseIdentity, options: { 
         const id = crypto.randomUUID();
         const base = (email ?? "user").split("@")[0].replace(/[^a-z0-9-]/g, "-").slice(0, 24) || "user";
         let username = base, suffix = 1;
-        while (reservedNames.has(username) || (await tx.select({ id: U.id }).from(U).where(eq(U.username, username))).length) username = `${base}-${++suffix}`;
+        while (isReservedUsername(username) || (await tx.select({ id: U.id }).from(U).where(eq(U.username, username))).length) username = `${base}-${++suffix}`;
         const [user] = await tx.insert(U).values({ id, firebaseUid: identity.uid, email, name: identity.name, image: identity.picture, username, emailVerified: identity.emailVerified ? new Date() : null }).returning();
         await tx.insert(schema.accountOnboarding).values({ userId: id, weekly: defaultWeekly() });
         return user;

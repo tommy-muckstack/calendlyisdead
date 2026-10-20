@@ -65,6 +65,14 @@ Passwords go directly to the Firebase browser SDK; they are not stored in app pr
 
 Two-factor authentication, Calendly's exact code-based method-switching flow and native/live provider verification remain open. Google linking keeps both supported methods available until the user removes Google. Other IsDead apps must independently adopt revocation checks and verified-email synchronization in their own session handlers. `npx playwright test --config playwright.login-settings.config.ts` provides isolated synthetic scenarios; they are currently authored/typechecked only, not executed. Development and verification do not modify Firebase project configuration or any real account credentials.
 
+## My link
+
+Settings → My link (`/app/my-link`) edits your personal scheduling address with **Save changes**. Choose an available name of 1–60 lowercase letters, numbers or hyphens. Application routes are reserved. Failed saves retain the draft; an edit from another session requires explicitly loading the current link. Retrying an uncertain save confirms the current name without reverting later changes.
+
+Saving replaces the username on your profile and all event links beneath it, including this replica's shared and single-use links. Previously shared URLs do not redirect; update website links, messages and embeds. Released names can be claimed by another account, so restoring an older name requires it to remain available. Existing meeting IDs and confirmation/cancellation links continue to work; reschedule links resolve the creator's current name. Team URLs are independent. Scheduling share menus and newly generated embeds use the saved name after refresh.
+
+The original uses independent, non-customizable URLs for shared event types; this remains a separate parity gap. Exact original username restrictions, layout and keyboard behavior require browser comparison. `npx playwright test --config playwright.my-link.config.ts` contains isolated scenarios at 1440px and 390px, currently authored/typechecked but unexecuted. No schema migration or external service is needed.
+
 ## Contacts
 
 Contacts (`/app/contacts`) supports manual records with name, email, phone, job title, company, LinkedIn URL, time zone, country, city and state. Search by name, email, phone or company; sort by name or last update. Each host has their own records, with one active contact per email address. Use **Save contact** or **Save changes**; failed saves retain the draft, and conflicting edits require an explicit reload.
