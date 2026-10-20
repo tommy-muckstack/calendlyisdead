@@ -253,6 +253,9 @@ export async function createBooking(input: BookingInput) {
       // Read committed gives the following checks a fresh snapshot after waiting.
       const lockIds = [...new Set([...r.ev.hosts.map(h => h.user.id), ...oldGroup.map(b => b.hostId), ...(et.sharedWorkspaceId ? [et.userId] : [])])].sort();
       const currentHosts = await tx.select().from(users).where(inArray(users.id, lockIds)).orderBy(users.id).for("update");
+      // Renaming a personal URL during provider preflight must close that old
+      // URL before a reservation commits. Shared URLs use the creator's name.
+      if (!et.teamId && currentHosts.find((u: typeof users.$inferSelect) => u.id === et.userId)?.username !== input.username) throw new Error("slot_unavailable");
       if (!et.teamId && !et.sharedWorkspaceId) currentType = (await lockType())[0];
       // Never reserve a location that changed during the availability preflight.
       // Group reservations also require a consistent session definition.

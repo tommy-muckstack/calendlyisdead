@@ -1,0 +1,14 @@
+.my-link-settings { max-width: 640px; overflow-wrap: anywhere; }
+.my-link-settings h3 { margin: 0 0 16px; font-size: 20px; }
+.my-link-settings label { display: block; font-weight: 600; margin: 24px 0 8px; }
+.my-link-field { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.my-link-field span { color: #476788; }
+.my-link-field .input { flex: 1 1 180px; width: 100%; min-width: 0; }
+.my-link-settings .muted { font-size: 13px; margin-top: 8px; }
+.my-link-warning { background: #fff7e6; border-left: 3px solid #b97a00; padding: 12px 16px; line-height: 1.5; margin: 24px 0; }
+.my-link-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.my-link-current { border-top: 1px solid #d9e0e6; padding-top: 24px; display: grid; gap: 12px; }
+.my-link-current > span { font-weight: 600; }
+.my-link-current button { justify-self: start; }
+.my-link-settings [role="alert"] { color: #9d2626; }
+.my-link-settings :is(input, button, a):focus-visible { outline: 3px solid #1a5fb4; outline-offset: 3px; }
